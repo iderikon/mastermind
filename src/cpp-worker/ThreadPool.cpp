@@ -217,7 +217,7 @@ void ThreadPool::thread_func(int thr_id)
             if (next != NULL)
                 dispatch(next);
 
-            delete job;
+            job->dispose();
         } else {
             break;
         }

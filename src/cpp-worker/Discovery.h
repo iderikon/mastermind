@@ -56,10 +56,15 @@ private:
             size_t nmemb, void *userdata);
 
 private:
+    class DiscoveryStart;
+
+private:
     WorkerApplication & m_app;
 
     std::unique_ptr<ioremap::elliptics::node> m_node;
     std::unique_ptr<ioremap::elliptics::session> m_session;
+
+    DiscoveryStart *m_discovery_start;
 
     int m_http_port;
     int m_epollfd;

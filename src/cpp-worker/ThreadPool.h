@@ -52,6 +52,16 @@ public:
 
         bool check_ready();
 
+        virtual void dispose()
+        { delete this; }
+
+    protected:
+        void clear()
+        {
+            m_next = NULL;
+            m_nr_deps = 0;
+        }
+
     private:
         Job *m_next;
         int m_nr_deps;

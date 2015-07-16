@@ -35,22 +35,6 @@ using namespace ioremap;
 
 namespace {
 
-class DiscoveryStart : public ThreadPool::Job
-{
-public:
-    DiscoveryStart(Discovery & discovery)
-        : m_discovery(discovery)
-    {}
-
-    virtual void execute()
-    {
-        m_discovery.start();
-    }
-
-private:
-    Discovery & m_discovery;
-};
-
 class UpdateStorage : public ThreadPool::Job
 {
 public:
@@ -107,6 +91,26 @@ private:
 
 } // unnamed namespace
 
+class Discovery::DiscoveryStart : public ThreadPool::Job
+{
+public:
+    DiscoveryStart(Discovery & discovery)
+        : m_discovery(discovery)
+    {}
+
+    virtual void execute()
+    {
+        m_discovery.start();
+    }
+
+    virtual void dispose()
+    {
+        clear();
+    }
+
+private:
+    Discovery & m_discovery;
+};
 
 Discovery::Discovery(WorkerApplication & app)
     :
@@ -115,11 +119,14 @@ Discovery::Discovery(WorkerApplication & app)
     m_epollfd(-1),
     m_curl_handle(NULL),
     m_timeout_ms(0)
-{}
+{
+    m_discovery_start = new DiscoveryStart(*this);
+}
 
 Discovery::~Discovery()
 {
     curl_global_cleanup();
+    delete m_discovery_start;
 }
 
 int Discovery::init()
