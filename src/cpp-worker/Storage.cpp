@@ -22,6 +22,7 @@
 #include "Node.h"
 #include "Storage.h"
 #include "ThreadPool.h"
+#include "WorkerApplication.h"
 
 #include <elliptics/session.hpp>
 
@@ -38,7 +39,7 @@ public:
 
     virtual void execute()
     {
-        BH_LOG(*m_storage.get_logger(), DNET_LOG_NOTICE, "Updating groups and couples");
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE, "Updating groups and couples");
 
         m_storage.update_groups();
         m_storage.update_couples();
@@ -111,12 +112,8 @@ private:
 
 } // unnamed namespace
 
-Storage::Storage(ThreadPool & thread_pool, const Config & config,
-        std::shared_ptr<elliptics::logger_base> logger)
-    :
-    m_thread_pool(thread_pool),
-    m_config(config),
-    m_logger(logger)
+Storage::Storage(WorkerApplication & app)
+    : m_app(app)
 {}
 
 Storage::~Storage()
@@ -148,7 +145,7 @@ bool Storage::add_node(const char *host, int port, int family)
 
         auto it = m_nodes.find(node_id_str);
         if (it != m_nodes.end()) {
-            BH_LOG(*m_logger, DNET_LOG_DEBUG, "Node %s already exists", node_id_str.c_str());
+            BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", node_id_str.c_str());
             return false;
         }
     }
@@ -156,7 +153,7 @@ bool Storage::add_node(const char *host, int port, int family)
     {
         Node node(*this, host, port, family);
 
-        BH_LOG(*m_logger, DNET_LOG_INFO, "New node %s", node_id_str.c_str());
+        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", node_id_str.c_str());
 
         WriteGuard<RWMutex> guard(m_nodes_lock);
 
@@ -221,8 +218,8 @@ void Storage::schedule_update_groups_and_couples(elliptics::session & session)
     }
 
     UpdateJob *update = new UpdateJob(*this);
-    UpdateJobToggle *toggle = new UpdateJobToggle(m_thread_pool, update, m_groups.size());
-    m_thread_pool.dispatch_pending(update);
+    UpdateJobToggle *toggle = new UpdateJobToggle(m_app.get_thread_pool(), update, m_groups.size());
+    m_app.get_thread_pool().dispatch_pending(update);
 
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group *group = it->second;
@@ -234,7 +231,7 @@ void Storage::schedule_update_groups_and_couples(elliptics::session & session)
         new_session->set_namespace("metabalancer");
         new_session->set_groups(group_id);
 
-        BH_LOG(*m_logger, DNET_LOG_DEBUG,
+        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
                 "Scheduling metadata download for group %d", group_id[0]);
 
         elliptics::async_read_result res = new_session->read_data(key, group_id, 0, 0);
@@ -316,8 +313,8 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
 
 void Storage::arm_timer()
 {
-    if (m_discovery_timer->arm(DiscoveryTimer::Subsequent) < 0) {
+    if (m_app.get_discovery_timer().arm(DiscoveryTimer::Subsequent) < 0) {
         int err = errno;
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "Failed to arm timer: %s", strerror(err));
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to arm timer: %s", strerror(err));
     }
 }

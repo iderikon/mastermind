@@ -36,14 +36,38 @@ namespace ioremap {
 }
 
 class BackendStat;
-class Config;
 class Couple;
-class DiscoveryTimer;
 class Group;
-class ThreadPool;
+class WorkerApplication;
 
 class Storage
 {
+public:
+    Storage(WorkerApplication & app);
+    ~Storage();
+
+    WorkerApplication & get_app()
+    { return m_app; }
+
+    void get_nodes(std::vector<Node *> & nodes);
+
+    bool add_node(const char *host, int port, int family);
+
+    void handle_backend(BackendStat & backend);
+
+    void get_group_ids(std::vector<int> & groups) const;
+
+    void schedule_update_groups_and_couples(ioremap::elliptics::session & session);
+
+    void update_groups();
+
+    void update_couples();
+
+    // group_ids must be sorted
+    void create_couple(const std::vector<int> & groups_ids, Group *group);
+
+    void arm_timer();
+
 public:
     struct CoupleKey
     {
@@ -79,48 +103,8 @@ public:
         std::vector<int> group_ids;
     };
 
-public:
-    Storage(ThreadPool & thread_pool, const Config & config,
-            std::shared_ptr<ioremap::elliptics::logger_base> logger);
-
-    ~Storage();
-
-    const Config & get_config() const
-    { return m_config; }
-
-    void get_nodes(std::vector<Node *> & nodes);
-
-    bool add_node(const char *host, int port, int family);
-
-    void handle_backend(BackendStat & backend);
-
-    void get_group_ids(std::vector<int> & groups) const;
-
-    void schedule_update_groups_and_couples(ioremap::elliptics::session & session);
-
-    void update_groups();
-
-    void update_couples();
-
-    // group_ids must be sorted
-    void create_couple(const std::vector<int> & groups_ids, Group *group);
-
-    ioremap::elliptics::logger_base *get_logger()
-    { return m_logger.get(); }
-
-    void set_discovery_timer(DiscoveryTimer *timer)
-    { m_discovery_timer = timer; }
-
-    void arm_timer();
-
 private:
-    ThreadPool & m_thread_pool;
-
-    const Config & m_config;
-
-    DiscoveryTimer *m_discovery_timer;
-
-    std::shared_ptr<ioremap::elliptics::logger_base> m_logger;
+    WorkerApplication & m_app;
 
     std::map<std::string, Node> m_nodes;
     mutable RWMutex m_nodes_lock;

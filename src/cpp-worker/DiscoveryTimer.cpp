@@ -15,36 +15,16 @@
  * License along with this library.
  */
 
+#include "Discovery.h"
 #include "DiscoveryTimer.h"
 #include "ThreadPool.h"
+#include "WorkerApplication.h"
 
 #include <elliptics/logger.hpp>
 
-namespace {
-
-class DiscoveryStart : public ThreadPool::Job
-{
-public:
-    DiscoveryStart(Discovery & discovery)
-        : m_discovery(discovery)
-    {}
-
-    virtual void execute()
-    {
-        m_discovery.start();
-    }
-
-private:
-    Discovery & m_discovery;
-};
-
-} // unnamed namespace
-
-DiscoveryTimer::DiscoveryTimer(Discovery & discovery,
-        ThreadPool & thread_pool, int interval)
+DiscoveryTimer::DiscoveryTimer(WorkerApplication & app, int interval)
     :
-    m_discovery(discovery),
-    m_thread_pool(thread_pool),
+    m_app(app),
     m_interval(interval),
     m_started(false)
 {
@@ -64,7 +44,7 @@ int DiscoveryTimer::init()
     sigemptyset(&sa.sa_mask);
     if (sigaction(m_signum, &sa, NULL) < 0) {
         int err = errno;
-        BH_LOG(*m_discovery.get_logger(), DNET_LOG_ERROR, "sigaction: %s", strerror(err));
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "sigaction: %s", strerror(err));
         return -1;
     }
 
@@ -82,14 +62,14 @@ int DiscoveryTimer::start()
     sev.sigev_value.sival_ptr = (void *) this;
     if (timer_create(CLOCK_REALTIME, &sev, &m_timer_id) < 0) {
         int err = errno;
-        BH_LOG(*m_discovery.get_logger(), DNET_LOG_ERROR, "timer_create: %s", strerror(err));
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "timer_create: %s", strerror(err));
         return -1;
     }
 
     int rc = arm(Initial);
     if (rc < 0) {
         int err = errno;
-        BH_LOG(*m_discovery.get_logger(), DNET_LOG_ERROR, "Arm timer: %s", strerror(err));
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Arm timer: %s", strerror(err));
         return -1;
     }
 
@@ -108,12 +88,12 @@ void DiscoveryTimer::stop()
 
 void DiscoveryTimer::trigger()
 {
-    m_thread_pool.dispatch(new DiscoveryStart(m_discovery));
+    m_app.get_discovery().dispatch_start();
 }
 
 int DiscoveryTimer::arm(Launch launch)
 {
-    BH_LOG(*m_discovery.get_logger(), DNET_LOG_DEBUG, "Starting new timer");
+    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Starting new timer");
 
     struct itimerspec its;
 

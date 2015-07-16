@@ -21,6 +21,7 @@
 #include "Guard.h"
 #include "Node.h"
 #include "Storage.h"
+#include "WorkerApplication.h"
 
 #include <msgpack.hpp>
 
@@ -270,7 +271,7 @@ void Group::process_metadata()
     if (backends.empty()) {
         m_status = INIT;
         m_status_text = "no node backends";
-    } else if (backends.size() > 1 && m_storage.get_config().forbidden_dht_groups) {
+    } else if (backends.size() > 1 && m_storage.get_app().get_config().forbidden_dht_groups) {
         m_status = BROKEN;
 
         ostr << "DHT groups are forbidden but the group has " << backends.size() << " backends";

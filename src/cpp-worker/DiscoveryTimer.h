@@ -18,14 +18,13 @@
 #ifndef __73daa2c1_32b3_4c59_a2fa_3ff5b0df23ef
 #define __73daa2c1_32b3_4c59_a2fa_3ff5b0df23ef
 
-#include "Discovery.h"
+#include <elliptics/logger.hpp>
 
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
 
-class Discovery;
-class ThreadPool;
+class WorkerApplication;
 
 class DiscoveryTimer
 {
@@ -35,7 +34,7 @@ public:
         Subsequent
     };
 
-    DiscoveryTimer(Discovery & discovery, ThreadPool & thread_pool, int interval);
+    DiscoveryTimer(WorkerApplication & app, int interval);
     ~DiscoveryTimer();
 
     int init();
@@ -51,8 +50,7 @@ public:
     static void handler(int sig, siginfo_t *si, void *uc);
 
 private:
-    Discovery & m_discovery;
-    ThreadPool & m_thread_pool;
+    WorkerApplication & m_app;
 
     timer_t m_timer_id;
     int m_signum;

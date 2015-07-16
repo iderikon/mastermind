@@ -29,7 +29,7 @@ class ConfigParser : public Parser
     typedef Parser super;
 
 public:
-    ConfigParser();
+    ConfigParser(Config & config);
 
     virtual bool Bool(bool b)
     { return UInteger(uint64_t(b)); }
@@ -49,7 +49,7 @@ private:
     int m_array_depth;
 
     Config::NodeInfo m_current_node;
-    Config m_config;
+    Config & m_config;
 };
 
 #endif

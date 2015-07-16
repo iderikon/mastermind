@@ -27,26 +27,21 @@
 #include <vector>
 
 class Node;
-class Storage;
-class ThreadPool;
-
-struct Config;
+class WorkerApplication;
 
 class Discovery
 {
 public:
-    Discovery(Storage & storage, ThreadPool & thread_pool,
-            std::shared_ptr<ioremap::elliptics::logger_base> logger);
+    Discovery(WorkerApplication & app);
     ~Discovery();
 
-    int init(const Config & config);
+    int init();
 
     void resolve_nodes();
 
     int start();
 
-    ioremap::elliptics::logger_base *get_logger()
-    { return m_logger.get(); }
+    void dispatch_start();
 
 private:
     CURL *create_easy_handle(Node *node, const char *stat);
@@ -61,10 +56,8 @@ private:
             size_t nmemb, void *userdata);
 
 private:
-    Storage & m_storage;
-    ThreadPool & m_thread_pool;
+    WorkerApplication & m_app;
 
-    std::shared_ptr<ioremap::elliptics::logger_base> m_logger;
     std::unique_ptr<ioremap::elliptics::node> m_node;
     std::unique_ptr<ioremap::elliptics::session> m_session;
 

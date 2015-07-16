@@ -50,11 +50,12 @@ static const Parser::UIntInfo config_uint_info[] = {
     { 0, 0, 0 }
 };
 
-ConfigParser::ConfigParser()
+ConfigParser::ConfigParser(Config & config)
     :
     super(config_folders, sizeof(config_folders)/sizeof(config_folders[0]),
-            config_uint_info, (uint8_t *) &m_config),
-    m_array_depth(0)
+            config_uint_info, (uint8_t *) &config),
+    m_array_depth(0),
+    m_config(config)
 {
     m_current_node.port = -1;
     m_current_node.family = -1;

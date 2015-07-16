@@ -23,6 +23,7 @@
 #include <vector>
 
 #define CONFIG_FILE "/etc/elliptics/mastermind.conf"
+#define LOG_FILE    "/var/log/mastermind-stat.log"
 
 struct Config
 {

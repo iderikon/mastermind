@@ -8,8 +8,10 @@ BINDIR = /usr/bin
 LDFLAGS = -pthread -lrt -lcurl -lelliptics_client -lelliptics -lelliptics_cpp -lboost_thread -lmsgpack
 
 DEPS = $(wildcard *.h)
-SOURCES = Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp BackendParser.cpp TimestampParser.cpp \
-		  ThreadPool.cpp Storage.cpp Group.cpp Couple.cpp DiscoveryTimer.cpp ConfigParser.cpp main.cpp
+SOURCES = Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp \
+		  BackendParser.cpp TimestampParser.cpp ThreadPool.cpp \
+		  Storage.cpp Group.cpp Couple.cpp DiscoveryTimer.cpp \
+		  ConfigParser.cpp WorkerApplication.cpp main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 %.o: %.cpp $(DEPS)

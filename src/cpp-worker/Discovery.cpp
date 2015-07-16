@@ -21,6 +21,7 @@
 #include "Node.h"
 #include "Storage.h"
 #include "ThreadPool.h"
+#include "WorkerApplication.h"
 
 #include <sys/epoll.h>
 
@@ -33,6 +34,22 @@
 using namespace ioremap;
 
 namespace {
+
+class DiscoveryStart : public ThreadPool::Job
+{
+public:
+    DiscoveryStart(Discovery & discovery)
+        : m_discovery(discovery)
+    {}
+
+    virtual void execute()
+    {
+        m_discovery.start();
+    }
+
+private:
+    Discovery & m_discovery;
+};
 
 class UpdateStorage : public ThreadPool::Job
 {
@@ -91,12 +108,9 @@ private:
 } // unnamed namespace
 
 
-Discovery::Discovery(Storage & storage, ThreadPool & thread_pool,
-        std::shared_ptr<elliptics::logger_base> logger)
+Discovery::Discovery(WorkerApplication & app)
     :
-    m_storage(storage),
-    m_thread_pool(thread_pool),
-    m_logger(logger),
+    m_app(app),
     m_http_port(10025),
     m_epollfd(-1),
     m_curl_handle(NULL),
@@ -108,18 +122,20 @@ Discovery::~Discovery()
     curl_global_cleanup();
 }
 
-int Discovery::init(const Config & config)
+int Discovery::init()
 {
     if (curl_global_init(CURL_GLOBAL_ALL)) {
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "Failed to initialize libcurl");
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to initialize libcurl");
         return -1;
     }
 
+    const Config & config = m_app.get_config();
+
     m_http_port = config.monitor_port;
 
-    m_node.reset(new elliptics::node(elliptics::logger(*m_logger, blackhole::log::attributes_t())));
+    m_node.reset(new elliptics::node(elliptics::logger(m_app.get_logger(), blackhole::log::attributes_t())));
 
-    BH_LOG(*m_logger, DNET_LOG_NOTICE, "Initializing discovery");
+    BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Initializing discovery");
 
     for (size_t i = 0; i < config.nodes.size(); ++i) {
         const Config::NodeInfo & info = config.nodes[i];
@@ -127,10 +143,10 @@ int Discovery::init(const Config & config)
         try {
             m_node->add_remote(elliptics::address(info.host, info.port, info.family));
         } catch (std::exception & e) {
-            BH_LOG(*m_logger, DNET_LOG_WARNING, "Failed to add remote '%s': %s\n", info.host, e.what());
+            BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "Failed to add remote '%s': %s\n", info.host, e.what());
             continue;
         } catch (...) {
-            BH_LOG(*m_logger, DNET_LOG_WARNING, "Failed to add remote '%s' with unknown reason", info.host);
+            BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "Failed to add remote '%s' with unknown reason", info.host);
             continue;
         }
     }
@@ -143,7 +159,7 @@ int Discovery::init(const Config & config)
 void Discovery::resolve_nodes()
 {
     if (m_session == NULL) {
-        BH_LOG(*m_logger, DNET_LOG_WARNING, "resolve_nodes: session is empty");
+        BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "resolve_nodes: session is empty");
         return;
     }
 
@@ -161,7 +177,7 @@ void Discovery::resolve_nodes()
         const char *host = dnet_addr_host_string(&addr);
         int port = dnet_addr_port(&addr);
 
-        if (m_storage.add_node(host, port, addr.family)) {
+        if (m_app.get_storage().add_node(host, port, addr.family)) {
             elliptics::address el_addr(addr);
             m_node->add_remote(el_addr);
         }
@@ -170,12 +186,12 @@ void Discovery::resolve_nodes()
 
 int Discovery::start()
 {
-    BH_LOG(*m_logger, DNET_LOG_INFO, "Starting discovery");
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Starting discovery");
 
     resolve_nodes();
 
     std::vector<Node*> nodes;
-    m_storage.get_nodes(nodes);
+    m_app.get_storage().get_nodes(nodes);
 
     if (nodes.empty())
         return 0;
@@ -191,7 +207,7 @@ int Discovery::start()
     m_epollfd = epoll_create(1);
     if (m_epollfd < 0) {
         int err = errno;
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "epoll_create() failed: %s", strerror(err));
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "epoll_create() failed: %s", strerror(err));
         return -1;
     }
 
@@ -199,7 +215,7 @@ int Discovery::start()
         Node & node = *nodes[i];
 
         if (node.get_download_state() != Node::DownloadStateEmpty) {
-            BH_LOG(*m_logger, DNET_LOG_DEBUG, "Node %s is in download state %d",
+            BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s is in download state %d",
                     node.get_host().c_str(), node.get_download_state());
             continue;
         }
@@ -225,7 +241,7 @@ int Discovery::start()
                 continue;
 
             int err = errno;
-            BH_LOG(*m_logger, DNET_LOG_ERROR, "epoll_wait() failed: %s", strerror(err));
+            BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "epoll_wait() failed: %s", strerror(err));
             return -1;
         }
 
@@ -244,7 +260,7 @@ int Discovery::start()
                 Node *node = NULL;
                 CURLcode cc = curl_easy_getinfo(easy, CURLINFO_PRIVATE, &node);
                 if (cc != CURLE_OK) {
-                    BH_LOG(*m_logger, DNET_LOG_ERROR, "curl_easy_getinfo() failed");
+                    BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "curl_easy_getinfo() failed");
                     return -1;
                 }
 
@@ -252,11 +268,11 @@ int Discovery::start()
                 curl_easy_cleanup(easy);
 
                 if (node->get_download_state() == Node::DownloadStateBackend) {
-                    BH_LOG(*m_logger, DNET_LOG_DEBUG,
+                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
                             "Node %s statistics: backend done", node->get_host().c_str());
 
                     ThreadPool::Job *job = node->create_backend_parse_job();
-                    m_thread_pool.dispatch(job);
+                    m_app.get_thread_pool().dispatch(job);
 
                     node->set_download_state(Node::DownloadStateProcfs);
                     easy = create_easy_handle(node, "procfs");
@@ -266,23 +282,28 @@ int Discovery::start()
                         curl_multi_socket_action(m_curl_handle, CURL_SOCKET_TIMEOUT, 0, &running_handles);
 
                 } else if (node->get_download_state() == Node::DownloadStateProcfs) {
-                    BH_LOG(*m_logger, DNET_LOG_DEBUG,
+                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
                             "Node %s statistics: procfs done", node->get_host().c_str());
 
                     ThreadPool::Job *job = node->create_procfs_parse_job();
-                    m_thread_pool.dispatch(job);
+                    m_app.get_thread_pool().dispatch(job);
                     node->set_download_state(Node::DownloadStateEmpty);
                 }
             }
         } while (msg);
     }
 
-    BH_LOG(*m_logger, DNET_LOG_INFO, "Discovery completed successfully");
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Discovery completed successfully");
 
     assert(m_session != NULL);
-    m_thread_pool.dispatch_after(new UpdateStorage(m_storage, *m_session));
+    m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app.get_storage(), *m_session));
 
     return 0;
+}
+
+void Discovery::dispatch_start()
+{
+    m_app.get_thread_pool().dispatch(new DiscoveryStart(*this));
 }
 
 CURL *Discovery::create_easy_handle(Node *node, const char *stat)
@@ -320,7 +341,7 @@ int Discovery::handle_socket(CURL *easy, curl_socket_t fd,
         int rc = epoll_ctl(self->m_epollfd, EPOLL_CTL_DEL, fd, &event);
         if (rc != 0 && errno != EBADF) {
             int err = errno;
-            BH_LOG(*self->m_logger, DNET_LOG_WARNING, "CURL_POLL_REMOVE: %s", strerror(err));
+            BH_LOG(self->m_app.get_logger(), DNET_LOG_WARNING, "CURL_POLL_REMOVE: %s", strerror(err));
         }
         return 0;
     }
@@ -337,7 +358,7 @@ int Discovery::handle_socket(CURL *easy, curl_socket_t fd,
             rc = epoll_ctl(self->m_epollfd, EPOLL_CTL_MOD, fd, &event);
         if (rc < 0) {
             int err = errno;
-            BH_LOG(*self->m_logger, DNET_LOG_WARNING, "EPOLL_CTL_MOD: %s", strerror(err));
+            BH_LOG(self->m_app.get_logger(), DNET_LOG_WARNING, "EPOLL_CTL_MOD: %s", strerror(err));
             return -1;
         }
     }

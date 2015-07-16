@@ -23,6 +23,7 @@
 #include "Node.h"
 #include "ProcfsParser.h"
 #include "TimestampParser.h"
+#include "WorkerApplication.h"
 
 #include <cmath>
 
@@ -73,7 +74,7 @@ void ProcfsJob::execute()
     reader.Parse(ss, parser);
 
     if (!parser.good()) {
-        BH_LOG(*m_node->get_storage().get_logger(), DNET_LOG_ERROR,
+        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
                 "Error parsing procfs statistics");
         return;
     }
@@ -92,7 +93,7 @@ void BackendJob::execute()
     }
 
     if (!ts_parser.good()) {
-        BH_LOG(*m_node->get_storage().get_logger(), DNET_LOG_ERROR,
+        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
                 "Error parsing timestamp in backend statistics");
         return;
     }
@@ -106,7 +107,7 @@ void BackendJob::execute()
     }
 
     if (!parser.good()) {
-        BH_LOG(*m_node->get_storage().get_logger(), DNET_LOG_ERROR,
+        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
                 "Error parsing backend statistics");
         return;
     }
