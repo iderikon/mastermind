@@ -330,10 +330,9 @@ bool Group::metadata_equals(const Group & other) const
     LockGuard<SpinLock> guard1(g1->m_metadata_lock);
     LockGuard<SpinLock> guard2(g2->m_metadata_lock);
 
-    if (g1->m_metadata.size() != g2->m_metadata.size())
-        return false;
-
-    return !std::memcmp(g1->m_metadata.data(), g2->m_metadata.data(), g1->m_metadata.size());
+    return (g1->m_frozen == g2->m_frozen &&
+            g1->m_couple == g2->m_couple &&
+            g1->m_namespace == g2->m_namespace);
 }
 
 void Group::set_status_text(const std::string & status_text)
