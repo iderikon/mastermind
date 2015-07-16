@@ -347,3 +347,23 @@ void Group::get_status_text(std::string & status_text) const
     LockGuard<SpinLock> guard(m_metadata_lock);
     status_text = m_status_text;
 }
+
+const char *Group::status_str(Status status)
+{
+    switch (status)
+    {
+    case INIT:
+        return "INIT";
+    case COUPLED:
+        return "COUPLED";
+    case BAD:
+        return "BAD";
+    case BROKEN:
+        return "BROKEN";
+    case RO:
+        return "RO";
+    case MIGRATING:
+        return "MIGRATING";
+    }
+    return "UNKNOWN";
+}

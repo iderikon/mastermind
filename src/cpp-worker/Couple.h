@@ -40,6 +40,8 @@ public:
         SERVICE_STALLED
     };
 
+    static const char *status_str(Status status);
+
 public:
     Couple();
     Couple(const std::vector<Group*> & groups);
@@ -52,6 +54,9 @@ public:
     void get_group_ids(std::vector<int> & groups) const;
 
     void update_status();
+
+    Status get_status() const
+    { return m_status; }
 
     const char *get_status_text() const
     { return m_status_text; }

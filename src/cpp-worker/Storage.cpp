@@ -200,9 +200,26 @@ void Storage::get_group_ids(std::vector<int> & groups) const
     ReadGuard<RWMutex> guard(m_groups_lock);
 
     groups.reserve(m_groups.size());
-    auto it = m_groups.begin();
-    for (; it != m_groups.end(); ++it)
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
         groups.push_back(it->first);
+}
+
+void Storage::get_groups(std::vector<Group*> & groups) const
+{
+    ReadGuard<RWMutex> guard(m_groups_lock);
+
+    groups.reserve(m_groups.size());
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+        groups.push_back(it->second);
+}
+
+void Storage::get_couples(std::vector<Couple*> & couples) const
+{
+    ReadGuard<RWMutex> guard(m_couples_lock);
+
+    couples.reserve(m_couples.size());
+    for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
+        couples.push_back(it->second);
 }
 
 void Storage::schedule_update_groups_and_couples(elliptics::session & session)

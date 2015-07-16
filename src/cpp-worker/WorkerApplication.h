@@ -20,6 +20,7 @@
 
 #include "Config.h"
 
+#include <cocaine/framework/dispatch.hpp>
 #include <elliptics/logger.hpp>
 
 class ThreadPool;
@@ -30,11 +31,8 @@ class DiscoveryTimer;
 class WorkerApplication
 {
 public:
-    WorkerApplication();
+    WorkerApplication(cocaine::framework::dispatch_t & d);
     ~WorkerApplication();
-
-    int open();
-    int run();
 
     ioremap::elliptics::logger_base & get_logger()
     { return *m_logger; }

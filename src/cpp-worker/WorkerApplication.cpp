@@ -16,6 +16,7 @@
  */
 
 #include "Storage.h"
+#include "CocaineHandlers.h"
 #include "ConfigParser.h"
 #include "Discovery.h"
 #include "DiscoveryTimer.h"
@@ -26,15 +27,50 @@
 #include <rapidjson/filereadstream.h>
 
 #include <cstdio>
+#include <exception>
 
-WorkerApplication::WorkerApplication()
-    :
-    m_logger(NULL)
+namespace {
+
+class worker_error : public std::exception
+{
+public:
+    worker_error(const char *text)
+        : m_text(text)
+    {}
+
+    virtual const char *what() const throw()
+    { return m_text; }
+
+private:
+    const char *m_text;
+};
+
+} // unnamed namespace
+
+WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
 {
     m_thread_pool = new ThreadPool;
     m_storage = new Storage(*this);
     m_discovery = new Discovery(*this);
     m_discovery_timer = new DiscoveryTimer(*this, 60);
+
+    m_logger = new ioremap::elliptics::file_logger(LOG_FILE, DNET_LOG_DEBUG);
+    if (!m_logger)
+        throw worker_error("failed to open log file " LOG_FILE);
+
+    if (load_config())
+        throw worker_error("failed to load config");
+
+    if (m_discovery->init())
+        throw worker_error("failed to initialize discovery");
+
+    if (m_discovery_timer->init())
+        throw worker_error("failed to start discovery timer");
+
+    d.on<on_summary>("summary", *this);
+
+    m_thread_pool->start();
+    m_discovery_timer->start();
 }
 
 WorkerApplication::~WorkerApplication()
@@ -44,35 +80,6 @@ WorkerApplication::~WorkerApplication()
     delete m_storage;
     delete m_thread_pool;
     delete m_logger;
-}
-
-int WorkerApplication::open()
-{
-    m_logger = new ioremap::elliptics::file_logger(LOG_FILE, DNET_LOG_DEBUG);
-    if (!m_logger)
-        return -1;
-
-    if (load_config())
-        return -1;
-
-    if (m_discovery->init())
-        return -1;
-
-    if (m_discovery_timer->init())
-        return -1;
-
-    return 0;
-}
-
-int WorkerApplication::run()
-{
-    m_thread_pool->start();
-    m_discovery_timer->start();
-
-    for (;;)
-        select(0, NULL, NULL, NULL, NULL);
-
-    return 0;
 }
 
 int WorkerApplication::load_config()

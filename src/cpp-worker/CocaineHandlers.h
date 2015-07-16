@@ -15,11 +15,31 @@
  * License along with this library.
  */
 
+#ifndef __afb88826_875d_494f_9652_520b90a5c9d1
+#define __afb88826_875d_494f_9652_520b90a5c9d1
+
 #include "WorkerApplication.h"
 
 #include <cocaine/framework/dispatch.hpp>
 
-int main(int argc, char **argv)
+class on_summary :
+    public cocaine::framework::handler<WorkerApplication>,
+    public std::enable_shared_from_this<on_summary>
 {
-    return cocaine::framework::run<WorkerApplication>(argc, argv);
-}
+public:
+    typedef cocaine::framework::handler<WorkerApplication> super;
+
+    on_summary(WorkerApplication & app)
+        :
+        super(app),
+        m_app(app)
+    {}
+
+    void on_chunk(const char *chunk, size_t size);
+
+private:
+    WorkerApplication & m_app;
+};
+
+#endif
+

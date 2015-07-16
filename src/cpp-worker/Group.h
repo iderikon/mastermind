@@ -41,6 +41,8 @@ public:
         MIGRATING
     };
 
+    static const char *status_str(Status status);
+
 public:
     Group(BackendStat & stat, Storage & storage);
     Group(int id, Storage & storage);

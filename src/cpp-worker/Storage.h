@@ -50,17 +50,16 @@ public:
     { return m_app; }
 
     void get_nodes(std::vector<Node *> & nodes);
-
     bool add_node(const char *host, int port, int family);
 
     void handle_backend(BackendStat & backend);
 
     void get_group_ids(std::vector<int> & groups) const;
+    void get_groups(std::vector<Group*> & groups) const;
+    void get_couples(std::vector<Couple*> & couples) const;
 
     void schedule_update_groups_and_couples(ioremap::elliptics::session & session);
-
     void update_groups();
-
     void update_couples();
 
     // group_ids must be sorted

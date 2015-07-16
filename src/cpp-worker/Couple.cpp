@@ -122,3 +122,31 @@ void Couple::update_status()
 
     // TODO: account job
 }
+
+const char *Couple::status_str(Status status)
+{
+    switch (status)
+    {
+    case INIT:
+        return "INIT";
+    case OK:
+        return "OK";
+    case FULL:
+        return "FULL";
+    case BAD:
+        return "BAD";
+    case BROKEN:
+        return "BROKEN";
+    case RO:
+        return "RO";
+    case FROZEN:
+        return "FROZEN";
+    case MIGRATING:
+        return "MIGRATING";
+    case SERVICE_ACTIVE:
+        return "SERVICE_ACTIVE";
+    case SERVICE_STALLED:
+        return "SERVICE_STALLED";
+    }
+    return "UNKNOWN";
+}
