@@ -49,19 +49,22 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     std::ostringstream ostr;
 
     ostr << "Storage contains:\n"
-            "  " << nodes.size() << " nodes\n"
-            "  " << nr_backends << " backends\n";
+         << nodes.size() << " nodes\n"
+         << nr_backends << " backends\n";
 
-    ostr << "  " << groups.size() << " groups\n"
-            "    ( ";
+    ostr << groups.size() << " groups\n  ( ";
     for (auto it = group_status.begin(); it != group_status.end(); ++it)
         ostr << it->second << ' ' << Group::status_str(it->first) << ' ';
 
-    ostr << ")\n  " << couples.size() << " couples\n"
-            "    ( ";
+    ostr << ")\n" << couples.size() << " couples\n  ( ";
     for (auto it = couple_status.begin(); it != couple_status.end(); ++it)
         ostr << it->second << ' ' << Couple::status_str(it->first) << ' ';
     ostr << ")\n";
+
+    std::vector<Namespace*> namespaces;
+    storage.get_namespaces(namespaces);
+
+    ostr << namespaces.size() << " namespaces\n";
 
     response()->write(ostr.str());
 }

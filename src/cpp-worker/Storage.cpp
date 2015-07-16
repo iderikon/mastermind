@@ -222,6 +222,33 @@ void Storage::get_couples(std::vector<Couple*> & couples) const
         couples.push_back(it->second);
 }
 
+Namespace *Storage::get_namespace(const std::string & name)
+{
+    {
+        ReadGuard<RWSpinLock> guard(m_namespaces_lock);
+        auto it = m_namespaces.find(name);
+        if (it != m_namespaces.end())
+            return &it->second;
+    }
+
+    {
+        WriteGuard<RWSpinLock> guard(m_namespaces_lock);
+        auto it = m_namespaces.lower_bound(name);
+        if (it == m_namespaces.end() || it->first != name)
+            it = m_namespaces.insert(it, std::make_pair(name, Namespace(name)));
+        return &it->second;
+    }
+}
+
+void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
+{
+    ReadGuard<RWSpinLock> guard(m_namespaces_lock);
+
+    namespaces.reserve(m_namespaces.size());
+    for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
+        namespaces.push_back(&it->second);
+}
+
 void Storage::schedule_update_groups_and_couples(elliptics::session & session)
 {
     std::vector<int> group_id(1);
@@ -324,6 +351,7 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
             Couple *couple = new Couple(groups);
             couple->bind_groups();
             m_couples.insert(it, std::make_pair(key, couple));
+            group->get_namespace()->add_couple(couple);
         }
     }
 }

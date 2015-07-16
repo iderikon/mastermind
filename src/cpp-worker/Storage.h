@@ -18,6 +18,7 @@
 #ifndef __f8057e8e_b6f5_475b_bb31_771928953bf8
 #define __f8057e8e_b6f5_475b_bb31_771928953bf8
 
+#include "Namespace.h"
 #include "Node.h"
 #include "RWMutex.h"
 
@@ -57,6 +58,9 @@ public:
     void get_group_ids(std::vector<int> & groups) const;
     void get_groups(std::vector<Group*> & groups) const;
     void get_couples(std::vector<Couple*> & couples) const;
+
+    Namespace *get_namespace(const std::string & name);
+    void get_namespaces(std::vector<Namespace*> & namespaces);
 
     void schedule_update_groups_and_couples(ioremap::elliptics::session & session);
     void update_groups();
@@ -113,6 +117,9 @@ private:
 
     std::map<CoupleKey, Couple*> m_couples;
     mutable RWMutex m_couples_lock;
+
+    std::map<std::string, Namespace> m_namespaces;
+    mutable RWSpinLock m_namespaces_lock;
 };
 
 #endif

@@ -58,7 +58,8 @@ Group::Group(BackendStat & stat, Storage & storage)
     m_clean(true),
     m_status(INIT),
     m_frozen(false),
-    m_version(0)
+    m_version(0),
+    m_namespace(NULL)
 {
     m_backends.insert(&stat);
     m_service.migrating = false;
@@ -242,9 +243,19 @@ void Group::process_metadata()
 
     m_version = version;
     m_frozen = frozen;
-    m_namespace = ns; // XXX could change?
     m_service.migrating = service_migrating;
     m_service.job_id = service_job_id;
+
+    if (m_namespace == NULL) {
+        m_namespace = m_storage.get_namespace(ns);
+    } else if (m_namespace->get_name() != ns) {
+        m_status = BAD;
+        ostr << "group moved to another namespace: '"
+             << m_namespace->get_name() << "' -> '"
+             << ns << '\'';
+        m_status_text = ostr.str();
+        return;
+    }
 
     if (m_couple != NULL) {
         if (!m_couple->check(couple)) {
@@ -319,20 +330,9 @@ void Group::process_metadata()
 
 bool Group::metadata_equals(const Group & other) const
 {
-    const Group *g1 = this;
-    const Group *g2 = &other;
-
-    if (g1 > g2) {
-        g1 = &other;
-        g2 = this;
-    }
-
-    LockGuard<SpinLock> guard1(g1->m_metadata_lock);
-    LockGuard<SpinLock> guard2(g2->m_metadata_lock);
-
-    return (g1->m_frozen == g2->m_frozen &&
-            g1->m_couple == g2->m_couple &&
-            g1->m_namespace == g2->m_namespace);
+    return (m_frozen == other.m_frozen &&
+            m_couple == other.m_couple &&
+            m_namespace == other.m_namespace);
 }
 
 void Group::set_status_text(const std::string & status_text)

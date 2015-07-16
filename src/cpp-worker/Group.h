@@ -27,6 +27,7 @@
 
 class BackendStat;
 class Couple;
+class Namespace;
 class Storage;
 
 class Group
@@ -58,6 +59,9 @@ public:
 
     Couple *get_couple()
     { return m_couple; }
+
+    Namespace *get_namespace()
+    { return m_namespace; }
 
     void update_backend(BackendStat & stat);
 
@@ -94,7 +98,7 @@ private:
 
     bool m_frozen;
     int m_version;
-    std::string m_namespace;
+    Namespace *m_namespace;
 
     struct {
         bool migrating;
