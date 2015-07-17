@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+class FS;
 class Storage;
 
 struct BackendStat
@@ -86,6 +87,8 @@ struct BackendStat
     int write_rps;
     int max_read_rps;
     int max_write_rps;
+
+    FS *fs;
 
     Status status;
     int disabled;

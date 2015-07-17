@@ -19,6 +19,7 @@
 
 #include "Storage.h"
 #include "BackendParser.h"
+#include "FS.h"
 #include "Guard.h"
 #include "Node.h"
 #include "ProcfsParser.h"
@@ -285,6 +286,17 @@ void Node::handle_backend(const BackendStat & new_stat)
     stat.fragmentation = double(stat.records_removed) /
         double(std::max(stat.records_total, 1UL));
 
+    if (stat.fs == NULL) {
+        stat.fs = m_storage.get_fs(m_host, stat.fsid);
+        stat.fs->add_backend(&stat);
+    } else if (stat.fs->get_fsid() != stat.fsid) {
+        stat.fs->remove_backend(&stat);
+        stat.fs = m_storage.get_fs(m_host, stat.fsid);
+        stat.fs->add_backend(&stat);
+    }
+
+    stat.fs->update(stat);
+
     if (stat.blob_size_limit) {
         // vfs_total_space can be less than blob_size_limit in case of misconfiguration
         stat.total_space = std::min(stat.blob_size_limit, stat.vfs_total_space);
@@ -300,10 +312,8 @@ void Node::handle_backend(const BackendStat & new_stat)
 
     if (stat.error || stat.disabled)
         stat.status = BackendStat::STALLED;
-#if 0
-    else if (stat.fs->status == FS::BROKEN)
+    else if (stat.fs->get_status() == FS::BROKEN)
         stat.status = BackendStat::BROKEN;
-#endif
     else if (stat.read_only)
         stat.status = BackendStat::RO;
     else

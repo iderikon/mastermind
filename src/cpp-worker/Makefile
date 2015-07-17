@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -O3 -fno-omit-frame-pointer -Wall -g
+CFLAGS = -O0 -Wall -g
 CXXFLAGS = $(CFLAGS) -std=c++0x
 CPPFLAGS = -I/usr/include/RapidJSON-1
 
@@ -14,7 +14,7 @@ SOURCES = Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp \
 		  BackendParser.cpp TimestampParser.cpp ThreadPool.cpp \
 		  Storage.cpp Group.cpp Couple.cpp DiscoveryTimer.cpp \
 		  ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp \
-		  Namespace.cpp main.cpp
+		  Namespace.cpp FS.cpp main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 %.o: %.cpp $(DEPS)

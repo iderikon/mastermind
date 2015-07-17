@@ -17,6 +17,7 @@
 
 #include "CocaineHandlers.h"
 #include "Couple.h"
+#include "FS.h"
 #include "Group.h"
 #include "Node.h"
 #include "Storage.h"
@@ -38,6 +39,9 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     std::vector<Couple*> couples;
     storage.get_couples(couples);
 
+    std::vector<FS*> filesystems;
+    storage.get_filesystems(filesystems);
+
     std::map<Group::Status, int> group_status;
     for (size_t i = 0; i < groups.size(); ++i)
         ++group_status[groups[i]->get_status()];
@@ -46,11 +50,20 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     for (size_t i = 0; i < couples.size(); ++i)
         ++couple_status[couples[i]->get_status()];
 
+    std::map<FS::Status, int> fs_status;
+    for (size_t i = 0; i < filesystems.size(); ++i)
+        ++fs_status[filesystems[i]->get_status()];
+
     std::ostringstream ostr;
 
     ostr << "Storage contains:\n"
-         << nodes.size() << " nodes\n"
-         << nr_backends << " backends\n";
+         << nodes.size() << " nodes\n";
+
+    ostr << filesystems.size() << " filesystems\n  ( ";
+    for (auto it = fs_status.begin(); it != fs_status.end(); ++it)
+        ostr << it->second << ' ' << FS::status_str(it->first) << ' ';
+
+    ostr << ")\n" << nr_backends << " backends\n";
 
     ostr << groups.size() << " groups\n  ( ";
     for (auto it = group_status.begin(); it != group_status.end(); ++it)

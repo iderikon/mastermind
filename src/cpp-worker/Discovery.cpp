@@ -46,7 +46,7 @@ public:
 
     virtual void execute()
     {
-        m_storage.schedule_update_groups_and_couples(m_session);
+        m_storage.schedule_update(m_session);
     }
 
 private:

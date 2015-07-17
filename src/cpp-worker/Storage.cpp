@@ -17,6 +17,7 @@
 
 #include "Couple.h"
 #include "DiscoveryTimer.h"
+#include "FS.h"
 #include "Group.h"
 #include "Guard.h"
 #include "Node.h"
@@ -39,8 +40,10 @@ public:
 
     virtual void execute()
     {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE, "Updating groups and couples");
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE,
+                "Updating filesystems, groups and couples");
 
+        m_storage.update_filesystems();
         m_storage.update_groups();
         m_storage.update_couples();
 
@@ -249,7 +252,36 @@ void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
         namespaces.push_back(&it->second);
 }
 
-void Storage::schedule_update_groups_and_couples(elliptics::session & session)
+FS *Storage::get_fs(const std::string & host, uint64_t fsid)
+{
+    std::string key = host + '/' + std::to_string(fsid);
+
+    {
+        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+        auto it = m_filesystems.find(key);
+        if (it != m_filesystems.end())
+            return &it->second;
+    }
+
+    {
+        WriteGuard<RWSpinLock> guard(m_filesystems_lock);
+        auto it = m_filesystems.lower_bound(key);
+        if (it == m_filesystems.end() || it->first != key)
+            it = m_filesystems.insert(it, std::make_pair(key, FS(*this, host, fsid)));
+        return &it->second;
+    }
+}
+
+void Storage::get_filesystems(std::vector<FS*> & filesystems)
+{
+    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+
+    filesystems.reserve(m_filesystems.size());
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+        filesystems.push_back(&it->second);
+}
+
+void Storage::schedule_update(elliptics::session & session)
 {
     std::vector<int> group_id(1);
     elliptics::key key("symmetric_groups");
@@ -282,6 +314,21 @@ void Storage::schedule_update_groups_and_couples(elliptics::session & session)
         res.connect(std::bind(&GroupMetadataHandler::result, handler, std::placeholders::_1),
                 std::bind(&GroupMetadataHandler::final, handler, std::placeholders::_1));
     }
+}
+
+void Storage::update_filesystems()
+{
+    std::vector<FS*> filesystems;
+
+    {
+        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+        filesystems.reserve(m_filesystems.size());
+        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+            filesystems.push_back(&it->second);
+    }
+
+    for (size_t i = 0; i < filesystems.size(); ++i)
+        filesystems[i]->update_status();
 }
 
 void Storage::update_groups()
