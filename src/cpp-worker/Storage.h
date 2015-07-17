@@ -18,6 +18,8 @@
 #ifndef __f8057e8e_b6f5_475b_bb31_771928953bf8
 #define __f8057e8e_b6f5_475b_bb31_771928953bf8
 
+#include "Couple.h"
+#include "Group.h"
 #include "Namespace.h"
 #include "Node.h"
 #include "RWMutex.h"
@@ -37,8 +39,6 @@ namespace ioremap {
 }
 
 class BackendStat;
-class Couple;
-class Group;
 class WorkerApplication;
 
 class Storage
@@ -56,8 +56,8 @@ public:
     void handle_backend(BackendStat & backend);
 
     void get_group_ids(std::vector<int> & groups) const;
-    void get_groups(std::vector<Group*> & groups) const;
-    void get_couples(std::vector<Couple*> & couples) const;
+    void get_groups(std::vector<Group*> & groups);
+    void get_couples(std::vector<Couple*> & couples);
 
     Namespace *get_namespace(const std::string & name);
     void get_namespaces(std::vector<Namespace*> & namespaces);
@@ -116,10 +116,10 @@ private:
     std::map<std::string, Node> m_nodes;
     mutable RWMutex m_nodes_lock;
 
-    std::map<int, Group*> m_groups;
+    std::map<int, Group> m_groups;
     mutable RWMutex m_groups_lock;
 
-    std::map<CoupleKey, Couple*> m_couples;
+    std::map<CoupleKey, Couple> m_couples;
     mutable RWMutex m_couples_lock;
 
     std::map<std::string, Namespace> m_namespaces;

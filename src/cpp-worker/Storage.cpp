@@ -120,12 +120,7 @@ Storage::Storage(WorkerApplication & app)
 {}
 
 Storage::~Storage()
-{
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        delete it->second;
-    for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        delete it->second;
-}
+{}
 
 void Storage::get_nodes(std::vector<Node *> & nodes)
 {
@@ -166,35 +161,25 @@ bool Storage::add_node(const char *host, int port, int family)
 
 void Storage::handle_backend(BackendStat & backend)
 {
-    Group *group;
-
     {
         ReadGuard<RWMutex> guard(m_groups_lock);
         auto it = m_groups.find(backend.group);
         if (it != m_groups.end()) {
-            group = it->second;
             guard.release();
-
-            group->update_backend(backend);
+            it->second.update_backend(backend);
             return;
         }
     }
-
-    group = new Group(backend, *this);
 
     {
         WriteGuard<RWMutex> guard(m_groups_lock);
         auto it = m_groups.lower_bound(backend.group);
         if (it != m_groups.end() && it->first == int(backend.group)) {
-            Group *existing = it->second;
             guard.release();
-
-            existing->update_backend(backend);
-            delete group;
-            return;
+            it->second.update_backend(backend);
+        } else {
+            m_groups.insert(it, std::make_pair(backend.group, Group(backend, *this)));
         }
-
-        m_groups.insert(it, std::make_pair(backend.group, group));
     }
 }
 
@@ -207,22 +192,22 @@ void Storage::get_group_ids(std::vector<int> & groups) const
         groups.push_back(it->first);
 }
 
-void Storage::get_groups(std::vector<Group*> & groups) const
+void Storage::get_groups(std::vector<Group*> & groups)
 {
     ReadGuard<RWMutex> guard(m_groups_lock);
 
     groups.reserve(m_groups.size());
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        groups.push_back(it->second);
+        groups.push_back(&it->second);
 }
 
-void Storage::get_couples(std::vector<Couple*> & couples) const
+void Storage::get_couples(std::vector<Couple*> & couples)
 {
     ReadGuard<RWMutex> guard(m_couples_lock);
 
     couples.reserve(m_couples.size());
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        couples.push_back(it->second);
+        couples.push_back(&it->second);
 }
 
 Namespace *Storage::get_namespace(const std::string & name)
@@ -298,7 +283,7 @@ void Storage::schedule_update(elliptics::session & session)
     m_app.get_thread_pool().dispatch_pending(update);
 
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
-        Group *group = it->second;
+        Group *group = &it->second;
         group_id[0] = group->get_id();
 
         GroupMetadataHandler *handler = new GroupMetadataHandler(session, group, toggle);
@@ -340,7 +325,7 @@ void Storage::update_groups()
         groups.reserve(m_groups.size());
         auto it = m_groups.begin();
         for (; it != m_groups.end(); ++it)
-            groups.push_back(it->second);
+            groups.push_back(&it->second);
     }
 
     for (size_t i = 0; i < groups.size(); ++i)
@@ -356,7 +341,7 @@ void Storage::update_couples()
         couples.reserve(m_couples.size());
         auto it = m_couples.begin();
         for (; it != m_couples.end(); ++it)
-            couples.push_back(it->second);
+            couples.push_back(&it->second);
     }
 
     for (size_t i = 0; i < couples.size(); ++i)
@@ -377,13 +362,9 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
                 groups.push_back(group);
             } else {
                 auto it = m_groups.lower_bound(id);
-                if (it != m_groups.end() && it->first == id) {
-                    groups.push_back(it->second);
-                } else {
-                    Group *new_group = new Group(id, *this);
-                    m_groups.insert(it, std::make_pair(id, new_group));
-                    groups.push_back(new_group);
-                }
+                if (it == m_groups.end() || it->first != id)
+                    it = m_groups.insert(it, std::make_pair(id, Group(id, *this)));
+                groups.push_back(&it->second);
             }
         }
     }
@@ -395,10 +376,11 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
 
         auto it = m_couples.lower_bound(key);
         if (it == m_couples.end() || it->first != key) {
-            Couple *couple = new Couple(groups);
-            couple->bind_groups();
-            m_couples.insert(it, std::make_pair(key, couple));
-            group->get_namespace()->add_couple(couple);
+            it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
+
+            Couple & couple = it->second;
+            couple.bind_groups();
+            group->get_namespace()->add_couple(&couple);
         }
     }
 }
