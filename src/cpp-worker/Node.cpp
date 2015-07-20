@@ -297,6 +297,8 @@ void Node::handle_backend(const BackendStat & new_stat)
 
     stat.fs->update(stat);
 
+    stat.node = this;
+
     if (stat.blob_size_limit) {
         // vfs_total_space can be less than blob_size_limit in case of misconfiguration
         stat.total_space = std::min(stat.blob_size_limit, stat.vfs_total_space);

@@ -81,3 +81,27 @@ void on_summary::on_chunk(const char *chunk, size_t size)
 
     response()->write(ostr.str());
 }
+
+void on_group_info::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+
+    do {
+        char c;
+        int group_id;
+        if (sscanf(chunk, "%d%c", &group_id, &c) != 1) {
+            ostr << "Invalid group id " << group_id;
+            break;
+        }
+
+        Group *group;
+        if (!m_app.get_storage().get_group(group_id, group)) {
+            ostr << "Group " << group_id << " is not found";
+            break;
+        }
+
+        group->print_info(ostr);
+    } while (0);
+
+    response()->write(ostr.str());
+}

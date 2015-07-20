@@ -68,6 +68,7 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
         throw worker_error("failed to start discovery timer");
 
     d.on<on_summary>("summary", *this);
+    d.on<on_group_info>("group_info", *this);
 
     m_thread_pool->start();
     m_discovery_timer->start();

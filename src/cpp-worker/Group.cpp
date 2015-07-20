@@ -347,6 +347,59 @@ void Group::get_status_text(std::string & status_text) const
     status_text = m_status_text;
 }
 
+void Group::print_info(std::ostream & ostr) const
+{
+    ostr << "Group " << m_id << " {\n"
+            "  couple:   [ ";
+
+    if (m_couple != NULL) {
+        std::vector<int> group_ids;
+        m_couple->get_group_ids(group_ids);
+        for (size_t i = 0; i < group_ids.size(); ++i)
+            ostr << group_ids[i] << ' ';
+    }
+
+    ostr << "]\n"
+            "  backends: [ ";
+    {
+        ReadGuard<RWSpinLock> guard(m_backends_lock);
+        size_t i = 1;
+        for (auto it = m_backends.begin(); it != m_backends.end(); ++it, ++i) {
+            if (i != 1)
+                ostr << "              ";
+
+            const Node *node = (*it)->node;
+            if (node != NULL)
+                ostr << node->get_host() << '/';
+            else
+                ostr << "<null>/";
+
+            ostr << (*it)->backend_id;
+            if (i < m_backends.size())
+                ostr << '\n';
+        }
+        ostr << " ]\n";
+    }
+
+    ostr << "  clean: " << std::boolalpha << m_clean << "\n"
+            "  status_text: " << m_status_text << "\n"
+            "  status: " << status_str(m_status) << "\n"
+            "  frozen: " << m_frozen << "\n"
+            "  version: " << m_version << "\n"
+            "  namespace: ";
+
+    if (m_namespace != NULL)
+        ostr << m_namespace->get_name() << '\n';
+    else
+        ostr << "<null>\n";
+
+    ostr << "  service: {\n"
+            "    migrating: " << m_service.migrating << "\n"
+            "    job_id: '" << m_service.job_id << "'\n"
+            "  }\n"
+            "}";
+}
+
 const char *Group::status_str(Status status)
 {
     switch (status)

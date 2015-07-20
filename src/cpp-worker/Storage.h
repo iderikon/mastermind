@@ -57,6 +57,8 @@ public:
 
     void get_group_ids(std::vector<int> & groups) const;
     void get_groups(std::vector<Group*> & groups);
+    bool get_group(int id, Group *& group);
+
     void get_couples(std::vector<Couple*> & couples);
 
     Namespace *get_namespace(const std::string & name);

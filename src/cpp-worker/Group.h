@@ -21,6 +21,7 @@
 #include "RWSpinLock.h"
 #include "SpinLock.h"
 
+#include <iostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -80,6 +81,8 @@ public:
 
     bool get_frozen() const
     { return m_frozen; }
+
+    void print_info(std::ostream & ostr) const;
 
 private:
     int m_id;

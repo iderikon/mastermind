@@ -201,6 +201,18 @@ void Storage::get_groups(std::vector<Group*> & groups)
         groups.push_back(&it->second);
 }
 
+bool Storage::get_group(int id, Group *& group)
+{
+    ReadGuard<RWMutex> guard(m_groups_lock);
+
+    auto it = m_groups.find(id);
+    if (it != m_groups.end()) {
+        group = &it->second;
+        return true;
+    }
+    return false;
+}
+
 void Storage::get_couples(std::vector<Couple*> & couples)
 {
     ReadGuard<RWMutex> guard(m_couples_lock);
