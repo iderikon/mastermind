@@ -23,3 +23,9 @@ void Namespace::add_couple(Couple *couple)
     WriteGuard<RWSpinLock> guard(m_couples_lock);
     m_couples.insert(couple);
 }
+
+size_t Namespace::get_couple_count() const
+{
+    ReadGuard<RWSpinLock> guard(m_couples_lock);
+    return m_couples.size();
+}

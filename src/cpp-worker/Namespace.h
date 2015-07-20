@@ -37,6 +37,8 @@ public:
 
     void add_couple(Couple *couple);
 
+    size_t get_couple_count() const;
+
 private:
     const std::string m_name;
 

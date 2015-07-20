@@ -22,6 +22,18 @@
 #include "Node.h"
 #include "Storage.h"
 
+namespace {
+
+struct NSVolumeSort
+{
+    bool operator () (Namespace *ns1, Namespace *ns2) const
+    {
+        return (ns1->get_couple_count() > ns2->get_couple_count());
+    }
+};
+
+} // unnamed namespace
+
 void on_summary::on_chunk(const char *chunk, size_t size)
 {
     Storage & storage = m_app.get_storage();
@@ -248,3 +260,22 @@ void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
 
     response()->write(ostr.str());
 }
+
+void on_list_namespaces::on_chunk(const char *chunk, size_t size)
+{
+    std::vector<Namespace*> namespaces;
+    m_app.get_storage().get_namespaces(namespaces);
+
+    std::ostringstream ostr;
+    ostr << "There are " << namespaces.size() << " namespaces\n";
+
+    std::sort(namespaces.begin(), namespaces.end(), NSVolumeSort());
+
+    for (size_t i = 0; i < namespaces.size(); ++i) {
+        Namespace *ns = namespaces[i];
+        ostr << "  '" << ns->get_name() << "' (" << ns->get_couple_count() << " couples)\n";
+    }
+
+    response()->write(ostr.str());
+}
+
