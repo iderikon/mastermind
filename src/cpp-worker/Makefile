@@ -27,3 +27,11 @@ all: cpp-worker
 
 clean:
 	rm -f $(OBJECTS) cpp-worker
+
+reload: all
+	cocaine-tool app stop --name cpp-worker || true
+	cocaine-tool app remove --name cpp-worker || true
+	tar czf cpp-worker.tar.gz cpp-worker
+	cocaine-tool app upload --name cpp-worker --package cpp-worker.tar.gz --manifest manifest.json
+	cocaine-tool app start --name cpp-worker --profile default
+
