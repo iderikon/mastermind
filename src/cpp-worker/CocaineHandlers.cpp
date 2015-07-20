@@ -126,3 +126,19 @@ void on_list_nodes::on_chunk(const char *chunk, size_t size)
 
     response()->write(ostr.str());
 }
+
+void on_node_info::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+    do {
+        Node *node;
+        if (!m_app.get_storage().get_node(chunk, node)) {
+            ostr << "Node " << chunk << " does not exist";
+            break;
+        }
+
+        node->print_info(ostr);
+    } while (0);
+
+    response()->write(ostr.str());
+}

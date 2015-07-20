@@ -122,15 +122,6 @@ Storage::Storage(WorkerApplication & app)
 Storage::~Storage()
 {}
 
-void Storage::get_nodes(std::vector<Node *> & nodes)
-{
-    ReadGuard<RWMutex> guard(m_nodes_lock);
-
-    auto it = m_nodes.begin();
-    for (; it != m_nodes.end(); ++it)
-        nodes.push_back(&it->second);
-}
-
 bool Storage::add_node(const char *host, int port, int family)
 {
     char node_id[128];
@@ -155,8 +146,29 @@ bool Storage::add_node(const char *host, int port, int family)
 
         WriteGuard<RWMutex> guard(m_nodes_lock);
 
-        return m_nodes.insert(std::make_pair(std::string(host), node)).second;
+        return m_nodes.insert(std::make_pair(std::string(node_id), node)).second;
     }
+}
+
+void Storage::get_nodes(std::vector<Node *> & nodes)
+{
+    ReadGuard<RWMutex> guard(m_nodes_lock);
+
+    auto it = m_nodes.begin();
+    for (; it != m_nodes.end(); ++it)
+        nodes.push_back(&it->second);
+}
+
+bool Storage::get_node(const std::string & key, Node *& node)
+{
+    ReadGuard<RWMutex> guard(m_nodes_lock);
+
+    auto it = m_nodes.find(key);
+    if (it != m_nodes.end()) {
+        node = &it->second;
+        return true;
+    }
+    return false;
 }
 
 void Storage::handle_backend(BackendStat & backend)

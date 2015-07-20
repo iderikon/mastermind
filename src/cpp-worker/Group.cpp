@@ -369,10 +369,13 @@ void Group::print_info(std::ostream & ostr) const
                 ostr << "              ";
 
             const Node *node = (*it)->node;
-            if (node != NULL)
-                ostr << node->get_host() << '/';
-            else
+            if (node != NULL) {
+                std::string key = node->get_host() + ":" + std::to_string(node->get_port())
+                    + ":" + std::to_string(node->get_family());
+                ostr << key << '/';
+            } else {
                 ostr << "<null>/";
+            }
 
             ostr << (*it)->backend_id;
             if (i < m_backends.size())

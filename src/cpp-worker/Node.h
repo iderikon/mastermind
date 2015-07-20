@@ -160,6 +160,10 @@ public:
 
     size_t get_backend_count() const;
 
+    void print_info(std::ostream & ostr) const;
+
+    static const char *download_state_str(DownloadState state);
+
 private:
     Storage & m_storage;
 

@@ -349,3 +349,37 @@ size_t Node::get_backend_count() const
     ReadGuard<RWSpinLock> guard(m_backends_lock);
     return m_backends.size();
 }
+
+void Node::print_info(std::ostream & ostr) const
+{
+    ostr << "Node {\n"
+            "  host: " << m_host << "\n"
+            "  port: " << m_port << "\n"
+            "  family: " << m_family << "\n"
+            "  download_state: " << download_state_str(m_download_state) << "\n"
+            "  Stat {\n"
+            "    ts: [ " << m_stat.ts_sec << ' ' << m_stat.ts_usec << " ]\n"
+            "    la: " << m_stat.la1 << "\n"
+            "    tx_bytes: " << m_stat.tx_bytes << "\n"
+            "    rx_bytes: " << m_stat.rx_bytes << "\n"
+            "    load_average: " << m_stat.load_average << "\n"
+            "    tx_rate: " << m_stat.tx_rate << "\n"
+            "    rx_rate: " << m_stat.rx_rate << "\n"
+            "  }\n"
+            "  number of backends: " << get_backend_count() << "\n"
+            "}";
+}
+
+const char *Node::download_state_str(DownloadState state)
+{
+    switch (state)
+    {
+    case DownloadStateEmpty:
+        return "DownloadStateEmpty";
+    case DownloadStateBackend:
+        return "DownloadStateBackend";
+    case DownloadStateProcfs:
+        return "DownloadStateProcfs";
+    }
+    return "UNKNOWN";
+}
