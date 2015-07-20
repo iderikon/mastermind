@@ -162,8 +162,28 @@ std::ostream & operator << (std::ostream & ostr, const BackendStat & stat)
          << "\n    write_rps: " << stat.write_rps
          << "\n    max_read_rps: " << stat.max_read_rps
          << "\n    max_write_rps: " << stat.max_write_rps
+         << "\n    status: " << BackendStat::status_str(stat.status)
          << "\n}";
     return ostr;
+}
+
+const char *BackendStat::status_str(Status status)
+{
+    switch (status) {
+    case INIT:
+        return "INIT";
+    case OK:
+        return "OK";
+    case RO:
+        return "RO";
+    case BAD:
+        return "BAD";
+    case STALLED:
+        return "STALLED";
+    case BROKEN:
+        return "BROKEN";
+    }
+    return "UNKNOWN";
 }
 
 Node::Node(Storage & storage, const char *host, int port, int family)

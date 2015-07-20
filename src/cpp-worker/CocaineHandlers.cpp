@@ -105,3 +105,24 @@ void on_group_info::on_chunk(const char *chunk, size_t size)
 
     response()->write(ostr.str());
 }
+
+void on_list_nodes::on_chunk(const char *chunk, size_t size)
+{
+    std::vector<Node*> nodes;
+    m_app.get_storage().get_nodes(nodes);
+
+    std::ostringstream ostr;
+    ostr << "There are " << nodes.size() << " nodes\n";
+
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        Node *node = nodes[i];
+        if (node == NULL) {
+            ostr << "  <NULL>\n";
+            continue;
+        }
+        ostr << "  " << node->get_host() << ':' << node->get_port()
+             << ':' << node->get_family() << '\n';
+    }
+
+    response()->write(ostr.str());
+}

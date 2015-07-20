@@ -60,5 +60,24 @@ private:
     WorkerApplication & m_app;
 };
 
+class on_list_nodes :
+    public cocaine::framework::handler<WorkerApplication>,
+    public std::enable_shared_from_this<on_list_nodes>
+{
+public:
+    typedef cocaine::framework::handler<WorkerApplication> super;
+
+    on_list_nodes(WorkerApplication & app)
+        :
+        super(app),
+        m_app(app)
+    {}
+
+    void on_chunk(const char *chunk, size_t size);
+
+private:
+    WorkerApplication & m_app;
+};
+
 #endif
 

@@ -69,6 +69,7 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
 
     d.on<on_summary>("summary", *this);
     d.on<on_group_info>("group_info", *this);
+    d.on<on_list_nodes>("list_nodes", *this);
 
     m_thread_pool->start();
     m_discovery_timer->start();

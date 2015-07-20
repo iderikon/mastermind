@@ -95,6 +95,8 @@ struct BackendStat
     Status status;
     int disabled;
     int read_only;
+
+    static const char *status_str(Status status);
 };
 
 std::ostream & operator << (std::ostream & ostr, const BackendStat & stat);
@@ -133,6 +135,9 @@ public:
 
     int get_port() const
     { return m_port; }
+
+    int get_family() const
+    { return m_family; }
 
     const NodeStat & get_stat() const
     { return m_stat; }

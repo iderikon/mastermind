@@ -50,7 +50,7 @@ public:
     WorkerApplication & get_app()
     { return m_app; }
 
-    void get_nodes(std::vector<Node *> & nodes);
+    void get_nodes(std::vector<Node*> & nodes);
     bool add_node(const char *host, int port, int family);
 
     void handle_backend(BackendStat & backend);
