@@ -33,6 +33,11 @@ FS::FS(Storage & storage, const std::string & host, uint64_t fsid)
     m_stat.total_space = 0;
 }
 
+std::string FS::get_key() const
+{
+    return m_host + "/" + std::to_string(m_fsid);
+}
+
 void FS::add_backend(BackendStat *backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
@@ -43,6 +48,21 @@ void FS::remove_backend(BackendStat *backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
     m_backends.erase(backend);
+}
+
+void FS::get_backends(std::vector<BackendStat*> & backends) const
+{
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+
+    backends.reserve(m_backends.size());
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        backends.push_back(*it);
+}
+
+size_t FS::get_backend_count() const
+{
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+    return m_backends.size();
 }
 
 void FS::update(const BackendStat & stat)
@@ -72,6 +92,20 @@ void FS::update_status()
         BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
                 "FS %s/%lu status change %d -> %d",
                 m_host.c_str(), m_fsid, int(prev), int(m_status));
+}
+
+void FS::print_info(std::ostream & ostr) const
+{
+    ostr << "FS {\n"
+            "  host: " << m_host << "\n"
+            "  fsid: " << m_fsid << "\n"
+            "  Stat {\n"
+            "    ts [ " << m_stat.ts_sec << ' ' << m_stat.ts_usec << " ]\n"
+            "    total_space: " << m_stat.total_space << "\n"
+            "  }\n"
+            "  number of backends: " << get_backend_count() << "\n"
+            "  status: " << status_str(m_status) << "\n"
+            "}";
 }
 
 const char *FS::status_str(Status status)

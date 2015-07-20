@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "RWSpinLock.h"
 
@@ -47,17 +48,26 @@ public:
 public:
     FS(Storage & storage, const std::string & host, uint64_t fsid);
 
+    const std::string & get_host() const
+    { return m_host; }
+
     uint64_t get_fsid() const
     { return m_fsid; }
 
+    std::string get_key() const;
+
     void add_backend(BackendStat *stat);
     void remove_backend(BackendStat *stat);
+    void get_backends(std::vector<BackendStat*> & backends) const;
+    size_t get_backend_count() const;
 
     void update(const BackendStat & stat);
     void update_status();
 
     Status get_status() const
     { return m_status; }
+
+    void print_info(std::ostream & ostr) const;
 
 private:
     Storage & m_storage;

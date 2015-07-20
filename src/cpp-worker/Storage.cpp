@@ -281,6 +281,18 @@ FS *Storage::get_fs(const std::string & host, uint64_t fsid)
     }
 }
 
+bool Storage::get_fs(const std::string & key, FS *& fs)
+{
+    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+
+    auto it = m_filesystems.find(key);
+    if (it != m_filesystems.end()) {
+        fs = &it->second;
+        return true;
+    }
+    return false;
+}
+
 void Storage::get_filesystems(std::vector<FS*> & filesystems)
 {
     ReadGuard<RWSpinLock> guard(m_filesystems_lock);

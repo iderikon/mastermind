@@ -66,6 +66,7 @@ public:
     void get_namespaces(std::vector<Namespace*> & namespaces);
 
     FS *get_fs(const std::string & host, uint64_t fsid);
+    bool get_fs(const std::string & key, FS *& fs);
     void get_filesystems(std::vector<FS*> & filesystems);
 
     void schedule_update(ioremap::elliptics::session & session);

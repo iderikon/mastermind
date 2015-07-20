@@ -96,10 +96,10 @@ struct BackendStat
     int disabled;
     int read_only;
 
+    void print_info(std::ostream & ostr) const;
+
     static const char *status_str(Status status);
 };
-
-std::ostream & operator << (std::ostream & ostr, const BackendStat & stat);
 
 struct NodeStat
 {
@@ -139,6 +139,8 @@ public:
     int get_family() const
     { return m_family; }
 
+    std::string get_key() const;
+
     const NodeStat & get_stat() const
     { return m_stat; }
 
@@ -146,7 +148,8 @@ public:
 
     void handle_backend(const BackendStat & new_stat);
 
-    void set_download_state(DownloadState state);
+    void set_download_state(DownloadState state)
+    { m_download_state = state; }
 
     DownloadState get_download_state() const
     { return m_download_state; }
@@ -159,6 +162,8 @@ public:
     ThreadPool::Job *create_procfs_parse_job();
 
     size_t get_backend_count() const;
+    void get_backends(std::vector<BackendStat*> & backends);
+    bool get_backend(int id, BackendStat *& stat);
 
     void print_info(std::ostream & ostr) const;
 

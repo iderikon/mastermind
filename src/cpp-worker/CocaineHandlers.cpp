@@ -142,3 +142,109 @@ void on_node_info::on_chunk(const char *chunk, size_t size)
 
     response()->write(ostr.str());
 }
+
+void on_node_list_backends::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+    do {
+        Node *node;
+        if (!m_app.get_storage().get_node(chunk, node)) {
+            ostr << "Node " << chunk << " does not exist";
+            break;
+        }
+
+        if (node == NULL) {
+            ostr << "Node is NULL";
+            break;
+        }
+
+        std::vector<BackendStat*> backends;
+        node->get_backends(backends);
+
+        ostr << "Node has " << backends.size() << " backends\n";
+
+        std::string key = chunk;
+        key += '/';
+        for (size_t i = 0; i < backends.size(); ++i)
+            ostr << "  " << key + std::to_string(backends[i]->backend_id) << '\n';
+    } while (0);
+
+    response()->write(ostr.str());
+}
+
+void on_backend_info::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+
+    do {
+        const char *slash = std::strchr(chunk, '/');
+        if (slash == NULL) {
+            ostr << "Invalid backend id '" << chunk << "'\n"
+                    "Syntax: <host>:<port>:<family>/<backend id>";
+            break;
+        }
+
+        std::string node_name(chunk, slash - chunk);
+        int backend_id = atoi(slash + 1);
+
+        Node *node;
+        if (!m_app.get_storage().get_node(node_name, node)) {
+            ostr << "Node " << node_name << " does not exist";
+            break;
+        }
+
+        BackendStat *backend;
+        if (!node->get_backend(backend_id, backend)) {
+            ostr << "Backend " << backend_id << " does not exist";
+            break;
+        }
+
+        backend->print_info(ostr);
+    } while (0);
+
+    response()->write(ostr.str());
+}
+
+void on_fs_info::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+
+    do {
+        FS *fs;
+        if (!m_app.get_storage().get_fs(chunk, fs)) {
+            ostr << "Found no FS '" << chunk << '\'';
+            break;
+        }
+
+        fs->print_info(ostr);
+    } while (0);
+
+    response()->write(ostr.str());
+}
+
+void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+
+    do {
+        FS *fs;
+        if (!m_app.get_storage().get_fs(chunk, fs)) {
+            ostr << "Found no FS '" << chunk << '\'';
+            break;
+        }
+
+        std::vector<BackendStat*> backends;
+        fs->get_backends(backends);
+
+        ostr << "There are " << backends.size() << " backends\n";
+        if (backends.empty())
+            break;
+
+        for (size_t i = 0; i < backends.size(); ++i) {
+            const BackendStat *stat = backends[i];
+            ostr << "  " << stat->node->get_key() << '/' << stat->backend_id << '\n';
+        }
+    } while (0);
+
+    response()->write(ostr.str());
+}

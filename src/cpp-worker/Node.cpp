@@ -126,45 +126,52 @@ BackendStat::BackendStat()
     std::memset(this, 0, sizeof(*this));
 }
 
-std::ostream & operator << (std::ostream & ostr, const BackendStat & stat)
+void BackendStat::print_info(std::ostream & ostr) const
 {
     ostr << "BackendStat {"
-         << "\n    ts_sec: " << stat.ts_sec
-         << "\n    ts_usec: " << stat.ts_usec
-         << "\n    backend_id: " << stat.backend_id
-         << "\n    state: " << stat.state
-         << "\n    vfs_blocks: " << stat.vfs_blocks
-         << "\n    vfs_bavail: " << stat.vfs_bavail
-         << "\n    vfs_bsize: " << stat.vfs_bsize
-         << "\n    records_total: " << stat.records_total
-         << "\n    records_removed: " << stat.records_removed
-         << "\n    records_removed_size: " << stat.records_removed_size
-         << "\n    base_size: " << stat.base_size
-         << "\n    fsid: " << stat.fsid
-         << "\n    defrag_state: " << stat.defrag_state
-         << "\n    want_defrag: " << stat.want_defrag
-         << "\n    read_ios: " << stat.read_ios
-         << "\n    write_ios: " << stat.write_ios
-         << "\n    error: " << stat.error
-         << "\n    blob_size_limit: " << stat.blob_size_limit
-         << "\n    max_blob_base_size: " << stat.max_blob_base_size
-         << "\n    blob_size: " << stat.blob_size
-         << "\n    group: " << stat.group
-         << "\n    vfs_free_space: " << stat.vfs_free_space
-         << "\n    vfs_total_space: " << stat.vfs_total_space
-         << "\n    vfs_used_space: " << stat.vfs_used_space
-         << "\n    records: " << stat.records
-         << "\n    free_space: " << stat.free_space
-         << "\n    total_space: " << stat.total_space
-         << "\n    used_space: " << stat.used_space
-         << "\n    fragmentation: " << stat.fragmentation
-         << "\n    read_rps: " << stat.read_rps
-         << "\n    write_rps: " << stat.write_rps
-         << "\n    max_read_rps: " << stat.max_read_rps
-         << "\n    max_write_rps: " << stat.max_write_rps
-         << "\n    status: " << BackendStat::status_str(stat.status)
+         << "\n    ts_sec: " << ts_sec
+         << "\n    ts_usec: " << ts_usec
+         << "\n    backend_id: " << backend_id
+         << "\n    state: " << state
+         << "\n    vfs_blocks: " << vfs_blocks
+         << "\n    vfs_bavail: " << vfs_bavail
+         << "\n    vfs_bsize: " << vfs_bsize
+         << "\n    records_total: " << records_total
+         << "\n    records_removed: " << records_removed
+         << "\n    records_removed_size: " << records_removed_size
+         << "\n    base_size: " << base_size
+         << "\n    fsid: " << fsid
+         << "\n    defrag_state: " << defrag_state
+         << "\n    want_defrag: " << want_defrag
+         << "\n    read_ios: " << read_ios
+         << "\n    write_ios: " << write_ios
+         << "\n    error: " << error
+         << "\n    blob_size_limit: " << blob_size_limit
+         << "\n    max_blob_base_size: " << max_blob_base_size
+         << "\n    blob_size: " << blob_size
+         << "\n    group: " << group
+         << "\n    vfs_free_space: " << vfs_free_space
+         << "\n    vfs_total_space: " << vfs_total_space
+         << "\n    vfs_used_space: " << vfs_used_space
+         << "\n    records: " << records
+         << "\n    free_space: " << free_space
+         << "\n    total_space: " << total_space
+         << "\n    used_space: " << used_space
+         << "\n    fragmentation: " << fragmentation
+         << "\n    read_rps: " << read_rps
+         << "\n    write_rps: " << write_rps
+         << "\n    max_read_rps: " << max_read_rps
+         << "\n    max_write_rps: " << max_write_rps;
+
+    if (fs != NULL)
+        ostr << "\n    fs: " << fs->get_key();
+    else
+        ostr << "\n    fs: NULL";
+
+    ostr << "\n    status: " << BackendStat::status_str(status)
+         << "\n    disabled: " << disabled
+         << "\n    read_only: " << read_only
          << "\n}";
-    return ostr;
 }
 
 const char *BackendStat::status_str(Status status)
@@ -193,26 +200,18 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_port(port),
     m_family(family),
     m_download_state(DownloadStateEmpty)
-{}
-
-void Node::set_download_state(DownloadState state)
 {
-    m_download_state = state;
     m_download_data.reserve(4096);
 }
 
-ThreadPool::Job *Node::create_backend_parse_job()
+std::string Node::get_key() const
 {
-    BackendJob *job = new BackendJob(this);
-    job->pick_data(m_download_data);
-    return job;
-}
-
-ThreadPool::Job *Node::create_procfs_parse_job()
-{
-    ProcfsJob *job = new ProcfsJob(this);
-    job->pick_data(m_download_data);
-    return job;
+    std::string res = m_host;
+    res += ':';
+    res += std::to_string(m_port);
+    res += ':';
+    res += std::to_string(m_family);
+    return res;
 }
 
 void Node::update(const NodeStat & stat)
@@ -344,10 +343,45 @@ void Node::handle_backend(const BackendStat & new_stat)
     m_storage.handle_backend(stat);
 }
 
+ThreadPool::Job *Node::create_backend_parse_job()
+{
+    BackendJob *job = new BackendJob(this);
+    job->pick_data(m_download_data);
+    return job;
+}
+
+ThreadPool::Job *Node::create_procfs_parse_job()
+{
+    ProcfsJob *job = new ProcfsJob(this);
+    job->pick_data(m_download_data);
+    return job;
+}
+
 size_t Node::get_backend_count() const
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
     return m_backends.size();
+}
+
+void Node::get_backends(std::vector<BackendStat*> & backends)
+{
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+
+    backends.reserve(m_backends.size());
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        backends.push_back(&it->second);
+}
+
+bool Node::get_backend(int id, BackendStat *& stat)
+{
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+
+    auto it = m_backends.find(id);
+    if (it != m_backends.end()) {
+        stat = &it->second;
+        return true;
+    }
+    return false;
 }
 
 void Node::print_info(std::ostream & ostr) const
