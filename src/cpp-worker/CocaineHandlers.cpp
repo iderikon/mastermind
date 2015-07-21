@@ -92,6 +92,7 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     ostr << namespaces.size() << " namespaces\n";
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_group_info::on_chunk(const char *chunk, size_t size)
@@ -116,6 +117,7 @@ void on_group_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_list_nodes::on_chunk(const char *chunk, size_t size)
@@ -137,6 +139,7 @@ void on_list_nodes::on_chunk(const char *chunk, size_t size)
     }
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_node_info::on_chunk(const char *chunk, size_t size)
@@ -153,6 +156,7 @@ void on_node_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_node_list_backends::on_chunk(const char *chunk, size_t size)
@@ -182,6 +186,7 @@ void on_node_list_backends::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_backend_info::on_chunk(const char *chunk, size_t size)
@@ -215,6 +220,7 @@ void on_backend_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_fs_info::on_chunk(const char *chunk, size_t size)
@@ -232,6 +238,7 @@ void on_fs_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
@@ -259,6 +266,7 @@ void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_list_namespaces::on_chunk(const char *chunk, size_t size)
@@ -277,6 +285,7 @@ void on_list_namespaces::on_chunk(const char *chunk, size_t size)
     }
 
     response()->write(ostr.str());
+    response()->close();
 }
 
 void on_group_couple_info::on_chunk(const char *chunk, size_t size)
@@ -307,4 +316,5 @@ void on_group_couple_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
 }
