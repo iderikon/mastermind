@@ -157,6 +157,9 @@ public:
     void add_download_data(const char *data, size_t size)
     { m_download_data.insert(m_download_data.end(), data, data + size); }
 
+    void drop_download_data()
+    { m_download_data.clear(); }
+
     ThreadPool::Job *create_backend_parse_job();
 
     ThreadPool::Job *create_procfs_parse_job();

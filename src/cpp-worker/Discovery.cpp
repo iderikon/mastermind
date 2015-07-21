@@ -278,8 +278,12 @@ int Discovery::start()
                     BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
                             "Node %s statistics: backend done", node->get_host().c_str());
 
-                    ThreadPool::Job *job = node->create_backend_parse_job();
-                    m_app.get_thread_pool().dispatch(job);
+                    if (msg->data.result == CURLE_OK) {
+                        ThreadPool::Job *job = node->create_backend_parse_job();
+                        m_app.get_thread_pool().dispatch(job);
+                    } else {
+                        node->drop_download_data();
+                    }
 
                     node->set_download_state(Node::DownloadStateProcfs);
                     easy = create_easy_handle(node, "procfs");
@@ -292,8 +296,13 @@ int Discovery::start()
                     BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
                             "Node %s statistics: procfs done", node->get_host().c_str());
 
-                    ThreadPool::Job *job = node->create_procfs_parse_job();
-                    m_app.get_thread_pool().dispatch(job);
+                    if (msg->data.result == CURLE_OK) {
+                        ThreadPool::Job *job = node->create_procfs_parse_job();
+                        m_app.get_thread_pool().dispatch(job);
+                    } else {
+                        node->drop_download_data();
+                    }
+
                     node->set_download_state(Node::DownloadStateEmpty);
                 }
             }
