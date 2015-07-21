@@ -17,6 +17,8 @@
 
 #include "CocaineHandlers.h"
 #include "Couple.h"
+#include "Discovery.h"
+#include "DiscoveryTimer.h"
 #include "FS.h"
 #include "Group.h"
 #include "Node.h"
@@ -316,5 +318,16 @@ void on_group_couple_info::on_chunk(const char *chunk, size_t size)
     } while (0);
 
     response()->write(ostr.str());
+    response()->close();
+}
+
+void on_force_update::on_chunk(const char *chunk, size_t size)
+{
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Request to force update");
+
+    m_app.get_discovery_timer().disarm();
+    m_app.get_discovery().dispatch_start();
+
+    response()->write("Update has been scheduled");
     response()->close();
 }

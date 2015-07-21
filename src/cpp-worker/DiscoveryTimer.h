@@ -46,6 +46,7 @@ public:
     void trigger();
 
     int arm(Launch launch);
+    int disarm();
 
     static void handler(int sig, siginfo_t *si, void *uc);
 

@@ -111,6 +111,16 @@ int DiscoveryTimer::arm(Launch launch)
     return timer_settime(m_timer_id, 0, &its, NULL);
 }
 
+int DiscoveryTimer::disarm()
+{
+    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Stopping the timer");
+
+    struct itimerspec its;
+    memset(&its, 0, sizeof(its));
+
+    return timer_settime(m_timer_id, 0, &its, NULL);
+}
+
 void DiscoveryTimer::handler(int sig, siginfo_t *si, void *uc)
 {
     DiscoveryTimer *self = (DiscoveryTimer *) si->si_value.sival_ptr;

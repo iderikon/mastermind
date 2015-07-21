@@ -330,7 +330,7 @@ int Discovery::start()
 
 void Discovery::dispatch_start()
 {
-    m_app.get_thread_pool().dispatch(new DiscoveryStart(*this));
+    m_app.get_thread_pool().dispatch_after(new DiscoveryStart(*this));
 }
 
 CURL *Discovery::create_easy_handle(Node *node, const char *stat)
