@@ -279,3 +279,32 @@ void on_list_namespaces::on_chunk(const char *chunk, size_t size)
     response()->write(ostr.str());
 }
 
+void on_group_couple_info::on_chunk(const char *chunk, size_t size)
+{
+    std::ostringstream ostr;
+
+    do {
+        char c;
+        int group_id;
+        if (sscanf(chunk, "%d%c", &group_id, &c) != 1) {
+            ostr << "Invalid group id " << group_id;
+            break;
+        }
+
+        Group *group;
+        if (!m_app.get_storage().get_group(group_id, group)) {
+            ostr << "Group " << group_id << " does not exist";
+            break;
+        }
+
+        Couple *couple = group->get_couple();
+        if (couple == NULL) {
+            ostr << "Couple is NULL";
+            break;
+        }
+
+        couple->print_info(ostr);
+    } while (0);
+
+    response()->write(ostr.str());
+}

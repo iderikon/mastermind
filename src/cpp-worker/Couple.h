@@ -20,6 +20,7 @@
 
 #include "RWSpinLock.h"
 
+#include <iostream>
 #include <vector>
 
 class Group;
@@ -60,6 +61,8 @@ public:
 
     const char *get_status_text() const
     { return m_status_text; }
+
+    void print_info(std::ostream & ostr) const;
 
 private:
     std::vector<Group*> m_groups;

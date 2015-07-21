@@ -123,6 +123,23 @@ void Couple::update_status()
     // TODO: account job
 }
 
+void Couple::print_info(std::ostream & ostr) const
+{
+    ostr << "Couple {\n"
+            "  groups: [ ";
+
+    {
+        ReadGuard<RWSpinLock> guard(m_groups_lock);
+        for (size_t i = 0; i < m_groups.size(); ++i)
+            ostr << m_groups[i]->get_id() << ' ';
+    }
+
+    ostr << "]\n"
+            "  status: " << status_str(m_status) << "\n"
+            "  status_text: '" << m_status_text << "'\n"
+            "}";
+}
+
 const char *Couple::status_str(Status status)
 {
     switch (status)
