@@ -227,6 +227,9 @@ int Discovery::start()
             continue;
         }
 
+        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling backend download for node %s",
+                node.get_key().c_str());
+
         node.set_download_state(Node::DownloadStateBackend);
         CURL *easy = create_easy_handle(&node, "backend");
         if (easy == NULL)
@@ -275,15 +278,20 @@ int Discovery::start()
                 curl_easy_cleanup(easy);
 
                 if (node->get_download_state() == Node::DownloadStateBackend) {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-                            "Node %s statistics: backend done", node->get_host().c_str());
-
                     if (msg->data.result == CURLE_OK) {
+                        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
+                                "Node %s statistics: backend done", node->get_key().c_str());
+
                         ThreadPool::Job *job = node->create_backend_parse_job();
                         m_app.get_thread_pool().dispatch(job);
                     } else {
+                        BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s statistics: "
+                                "backend failed, result: %d", node->get_key().c_str(), msg->data.result);
                         node->drop_download_data();
                     }
+
+                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling procfs download for node %s",
+                            node->get_key().c_str());
 
                     node->set_download_state(Node::DownloadStateProcfs);
                     easy = create_easy_handle(node, "procfs");
@@ -293,13 +301,16 @@ int Discovery::start()
                         curl_multi_socket_action(m_curl_handle, CURL_SOCKET_TIMEOUT, 0, &running_handles);
 
                 } else if (node->get_download_state() == Node::DownloadStateProcfs) {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-                            "Node %s statistics: procfs done", node->get_host().c_str());
-
                     if (msg->data.result == CURLE_OK) {
+                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
+                            "Node %s statistics: procfs done", node->get_key().c_str());
+
                         ThreadPool::Job *job = node->create_procfs_parse_job();
                         m_app.get_thread_pool().dispatch(job);
                     } else {
+                        BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s statistics: "
+                                "procfs failed, result: %d", node->get_key().c_str(), msg->data.result);
+
                         node->drop_download_data();
                     }
 

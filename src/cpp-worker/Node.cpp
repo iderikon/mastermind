@@ -201,17 +201,13 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_family(family),
     m_download_state(DownloadStateEmpty)
 {
-    m_download_data.reserve(4096);
-}
+    m_key = m_host;
+    m_key += ':';
+    m_key += std::to_string(m_port);
+    m_key += ':';
+    m_key += std::to_string(m_family);
 
-std::string Node::get_key() const
-{
-    std::string res = m_host;
-    res += ':';
-    res += std::to_string(m_port);
-    res += ':';
-    res += std::to_string(m_family);
-    return res;
+    m_download_data.reserve(4096);
 }
 
 void Node::update(const NodeStat & stat)

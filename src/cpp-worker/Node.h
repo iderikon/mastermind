@@ -139,7 +139,8 @@ public:
     int get_family() const
     { return m_family; }
 
-    std::string get_key() const;
+    const std::string & get_key() const
+    { return m_key; }
 
     const NodeStat & get_stat() const
     { return m_stat; }
@@ -178,6 +179,8 @@ private:
     std::string m_host;
     int m_port;
     int m_family;
+
+    std::string m_key;
 
     DownloadState m_download_state;
     std::vector<char> m_download_data;

@@ -73,7 +73,8 @@ Group::Group(int id, Storage & storage)
     m_clean(true),
     m_status(INIT),
     m_frozen(false),
-    m_version(0)
+    m_version(0),
+    m_namespace(NULL)
 {
     m_service.migrating = false;
 }
@@ -111,6 +112,9 @@ void Group::process_metadata()
         for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
             backends.push_back(*it);
     }
+
+    if (m_id == 1)
+        sleep(20);
 
     LockGuard<SpinLock> guard(m_metadata_lock);
 
