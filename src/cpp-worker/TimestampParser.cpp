@@ -53,3 +53,17 @@ TimestampParser::TimestampParser()
     super(timestamp_folders, sizeof(timestamp_folders)/sizeof(timestamp_folders[0]),
             timestamp_uint_info, (uint8_t *) &m_ts)
 {}
+
+std::string TimestampParser::ts_user_friendly(time_t sec, int usec)
+{
+    struct tm tm_buf;
+    struct tm *res = localtime_r(&sec, &tm_buf);
+    if (res == NULL)
+        return std::string();
+
+    char buf[64];
+    sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%06d",
+            res->tm_year + 1900, res->tm_mon, res->tm_mday,
+            res->tm_hour, res->tm_min, res->tm_sec, usec);
+    return std::string(buf);
+}

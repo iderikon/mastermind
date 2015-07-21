@@ -392,7 +392,7 @@ void Node::print_info(std::ostream & ostr) const
             "  family: " << m_family << "\n"
             "  download_state: " << download_state_str(m_download_state) << "\n"
             "  Stat {\n"
-            "    ts: [ " << m_stat.ts_sec << ' ' << m_stat.ts_usec << " ]\n"
+            "    ts: " << TimestampParser::ts_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
             "    la: " << m_stat.la1 << "\n"
             "    tx_bytes: " << m_stat.tx_bytes << "\n"
             "    rx_bytes: " << m_stat.rx_bytes << "\n"

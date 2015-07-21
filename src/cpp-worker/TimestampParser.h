@@ -20,6 +20,9 @@
 
 #include "Parser.h"
 
+#include <ctime>
+#include <string>
+
 class TimestampParser : public Parser
 {
     typedef Parser super;
@@ -32,6 +35,8 @@ public:
 
     size_t get_ts_usec() const
     { return m_ts.usec; }
+
+    static std::string ts_user_friendly(time_t sec, int usec);
 
 public:
     struct TS {
