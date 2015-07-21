@@ -57,9 +57,40 @@ bool ThreadPool::Job::check_ready()
     return (--m_nr_deps == 0);
 }
 
+class ThreadPool::Aggregator : public ThreadPool::Job
+{
+public:
+    Aggregator(ThreadPool & thread_pool)
+        : m_thread_pool(thread_pool)
+    {}
+
+    void add(Job *job)
+    {
+        m_jobs.push_back(job);
+    }
+
+    virtual void execute()
+    {
+        if (m_next != NULL) {
+            for (size_t i = 0; i < m_jobs.size(); ++i) {
+                assert(!m_jobs[i]->has_next());
+                m_jobs[i]->add_next(m_next);
+            }
+        }
+
+        for (size_t i = 0; i < m_jobs.size(); ++i)
+            m_thread_pool.dispatch(m_jobs[i]);
+    }
+
+private:
+    ThreadPool & m_thread_pool;
+    std::vector<Job*> m_jobs;
+};
+
 ThreadPool::ThreadPool()
     :
-    m_running(NrThreads, NULL)
+    m_running(NrThreads, NULL),
+    m_active_aggregator(NULL)
 {
 }
 
@@ -88,16 +119,8 @@ void ThreadPool::dispatch_after(Job *job)
 
     LockGuard<SpinLock> guard(m_jobs_lock);
 
-    bool have_running = false;
-    for (int i = 0; i < NrThreads; ++i) {
-        if (m_running[i] != NULL) {
-            have_running = true;
-            break;
-        }
-    }
-
     bool run_now = false;
-    if (!have_running && m_pending.empty() && m_scheduled.empty()) {
+    if (!have_running() && m_pending.empty() && m_scheduled.empty()) {
         run_now = true;
         m_scheduled.push_back(job);
     } else {
@@ -115,7 +138,7 @@ void ThreadPool::dispatch_after(Job *job)
             }
         }
 
-        for (size_t i = 0; i < m_running.size(); ++i) {
+        for (int i = 0; i < NrThreads; ++i) {
             Job *j = m_running[i];
             if (j) {
                 if (j->has_next()) {
@@ -137,12 +160,82 @@ void ThreadPool::dispatch_after(Job *job)
             }
             j->add_next(job);
         }
+
+        m_active_aggregator = NULL;
     }
 
     guard.release();
 
     if (run_now)
         m_sem.post();
+}
+
+void ThreadPool::dispatch_aggregate(Job *job)
+{
+    assert(job != NULL);
+
+    std::auto_ptr<Aggregator> new_aggregator;
+    if (m_active_aggregator == NULL) {
+        new_aggregator.reset(new Aggregator(*this));
+        new_aggregator->add(job);
+    }
+
+    LockGuard<SpinLock> guard(m_jobs_lock);
+
+    if (m_active_aggregator != NULL) {
+        m_active_aggregator->add(job);
+        guard.release();
+        return;
+    }
+
+    if (!have_running() && m_pending.empty() && m_scheduled.empty()) {
+        m_scheduled.push_back(job);
+        guard.release();
+
+        m_sem.post();
+        return;
+    }
+
+    Job *j = NULL;
+    do {
+        bool have_next = false;
+        for (int i = 0; i < NrThreads; ++i) {
+            j = m_running[i];
+            if (j && j->has_next()) {
+                have_next = true;
+                break;
+            }
+        }
+        if (have_next)
+            break;
+        for (size_t i = 0; i < m_scheduled.size(); ++i) {
+            j = m_scheduled[i];
+            if (j && j->has_next()) {
+                have_next = true;
+                break;
+            }
+        }
+        if (have_next)
+            break;
+        for (auto it = m_pending.begin(); it != m_pending.end(); ++it) {
+            j = *it;
+            if (j && j->has_next()) {
+                have_next = true;
+                break;
+            }
+        }
+        if (!have_next)
+            j = NULL;
+    } while (0);
+
+    if (j) {
+        j->add_next(new_aggregator.get());
+        m_active_aggregator = new_aggregator.release();
+    } else {
+        m_scheduled.push_back(job);
+        guard.release();
+        m_sem.post();
+    }
 }
 
 void ThreadPool::dispatch_pending(Job *job)
@@ -196,6 +289,9 @@ void ThreadPool::thread_func(int thr_id)
 
             assert(m_running[thr_id] == NULL);
             m_running[thr_id] = job;
+
+            if (job == m_active_aggregator)
+                m_active_aggregator = NULL;
         }
 
         if (job) {

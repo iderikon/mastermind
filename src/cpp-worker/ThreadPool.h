@@ -21,6 +21,7 @@
 #include "Semaphore.h"
 #include "SpinLock.h"
 
+#include <atomic>
 #include <set>
 #include <thread>
 #include <vector>
@@ -62,10 +63,12 @@ public:
             m_nr_deps = 0;
         }
 
-    private:
         Job *m_next;
-        int m_nr_deps;
+        std::atomic<int> m_nr_deps;
     };
+
+private:
+    class Aggregator;
 
 public:
     ThreadPool();
@@ -77,6 +80,7 @@ public:
     void start();
     void dispatch(Job *job);
     void dispatch_after(Job *job);
+    void dispatch_aggregate(Job *job);
     void dispatch_pending(Job *job);
     void execute_pending(Job *job);
     void stop();
@@ -85,6 +89,15 @@ public:
 private:
     void thread_func(int thr_id);
 
+    bool have_running() const
+    {
+        for (int i = 0; i < NrThreads; ++i) {
+            if (m_running[i] != NULL)
+                return true;
+        }
+        return false;
+    }
+
 private:
     std::thread m_threads[NrThreads];
     Semaphore m_sem;
@@ -92,6 +105,7 @@ private:
     std::set<Job*> m_pending;
     std::vector<Job*> m_scheduled;
     std::vector<Job*> m_running;
+    Aggregator *m_active_aggregator;
     SpinLock m_jobs_lock;
 };
 
