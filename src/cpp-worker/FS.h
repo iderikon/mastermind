@@ -25,7 +25,7 @@
 
 #include "RWSpinLock.h"
 
-class BackendStat;
+class Backend;
 class Storage;
 
 struct FSStat
@@ -56,12 +56,12 @@ public:
 
     std::string get_key() const;
 
-    void add_backend(BackendStat *stat);
-    void remove_backend(BackendStat *stat);
-    void get_backends(std::vector<BackendStat*> & backends) const;
+    void add_backend(Backend *backend);
+    void remove_backend(Backend *backend);
+    void get_backends(std::vector<Backend*> & backends) const;
     size_t get_backend_count() const;
 
-    void update(const BackendStat & stat);
+    void update(const Backend & backend);
     void update_status();
 
     Status get_status() const
@@ -76,7 +76,7 @@ private:
 
     FSStat m_stat;
 
-    std::set<BackendStat*> m_backends;
+    std::set<Backend*> m_backends;
     mutable RWSpinLock m_backends_lock;
 
     Status m_status;

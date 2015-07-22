@@ -15,6 +15,7 @@
  * License along with this library.
  */
 
+#include "Backend.h"
 #include "CocaineHandlers.h"
 #include "Couple.h"
 #include "Discovery.h"
@@ -163,11 +164,12 @@ void on_node_info::on_chunk(const char *chunk, size_t size)
 
 void on_node_list_backends::on_chunk(const char *chunk, size_t size)
 {
+    const char *name = chunk;
     std::ostringstream ostr;
     do {
         Node *node;
-        if (!m_app.get_storage().get_node(chunk, node)) {
-            ostr << "Node " << chunk << " does not exist";
+        if (!m_app.get_storage().get_node(name, node)) {
+            ostr << "Node " << name << " does not exist";
             break;
         }
 
@@ -176,15 +178,13 @@ void on_node_list_backends::on_chunk(const char *chunk, size_t size)
             break;
         }
 
-        std::vector<BackendStat*> backends;
+        std::vector<Backend*> backends;
         node->get_backends(backends);
 
         ostr << "Node has " << backends.size() << " backends\n";
 
-        std::string key = chunk;
-        key += '/';
         for (size_t i = 0; i < backends.size(); ++i)
-            ostr << "  " << key + std::to_string(backends[i]->backend_id) << '\n';
+            ostr << "  " << name << '/' << backends[i]->get_stat().backend_id << '\n';
     } while (0);
 
     response()->write(ostr.str());
@@ -212,7 +212,7 @@ void on_backend_info::on_chunk(const char *chunk, size_t size)
             break;
         }
 
-        BackendStat *backend;
+        Backend *backend;
         if (!node->get_backend(backend_id, backend)) {
             ostr << "Backend " << backend_id << " does not exist";
             break;
@@ -254,7 +254,7 @@ void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
             break;
         }
 
-        std::vector<BackendStat*> backends;
+        std::vector<Backend*> backends;
         fs->get_backends(backends);
 
         ostr << "There are " << backends.size() << " backends\n";
@@ -262,8 +262,8 @@ void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
             break;
 
         for (size_t i = 0; i < backends.size(); ++i) {
-            const BackendStat *stat = backends[i];
-            ostr << "  " << stat->node->get_key() << '/' << stat->backend_id << '\n';
+            const Backend & backend = *backends[i];
+            ostr << "  " << backend.get_node().get_key() << '/' << backend.get_stat().backend_id << '\n';
         }
     } while (0);
 

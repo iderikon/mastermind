@@ -18,6 +18,7 @@
 #ifndef __8424595a_92d5_49dd_ad9d_798dd37ce961
 #define __8424595a_92d5_49dd_ad9d_798dd37ce961
 
+#include "Backend.h"
 #include "RWSpinLock.h"
 #include "ThreadPool.h"
 
@@ -29,77 +30,6 @@
 class FS;
 class Node;
 class Storage;
-
-struct BackendStat
-{
-    BackendStat();
-
-    enum Status
-    {
-        INIT = 0,
-        OK,
-        RO,
-        BAD,
-        STALLED,
-        BROKEN
-    };
-
-    uint64_t ts_sec;
-    uint64_t ts_usec;
-    uint64_t backend_id;
-    uint64_t state;
-
-    uint64_t vfs_blocks;
-    uint64_t vfs_bavail;
-    uint64_t vfs_bsize;
-
-    uint64_t records_total;
-    uint64_t records_removed;
-    uint64_t records_removed_size;
-    uint64_t base_size;
-
-    uint64_t fsid;
-    uint64_t defrag_state;
-    uint64_t want_defrag;
-
-    uint64_t read_ios;
-    uint64_t write_ios;
-    uint64_t error;
-
-    uint64_t blob_size_limit;
-    uint64_t max_blob_base_size;
-    uint64_t blob_size;
-    uint64_t group;
-
-
-    uint64_t vfs_free_space;
-    uint64_t vfs_total_space;
-    uint64_t vfs_used_space;
-
-    uint64_t records;
-
-    uint64_t free_space;
-    uint64_t total_space;
-    uint64_t used_space;
-
-    double fragmentation;
-
-    int read_rps;
-    int write_rps;
-    int max_read_rps;
-    int max_write_rps;
-
-    FS *fs;
-    Node *node;
-
-    Status status;
-    int disabled;
-    int read_only;
-
-    void print_info(std::ostream & ostr) const;
-
-    static const char *status_str(Status status);
-};
 
 struct NodeStat
 {
@@ -166,8 +96,8 @@ public:
     ThreadPool::Job *create_procfs_parse_job();
 
     size_t get_backend_count() const;
-    void get_backends(std::vector<BackendStat*> & backends);
-    bool get_backend(int id, BackendStat *& stat);
+    void get_backends(std::vector<Backend*> & backends);
+    bool get_backend(int id, Backend *& backend);
 
     void print_info(std::ostream & ostr) const;
 
@@ -187,7 +117,7 @@ private:
 
     NodeStat m_stat;
 
-    std::map<int, BackendStat> m_backends;
+    std::map<int, Backend> m_backends;
     mutable RWSpinLock m_backends_lock;
 };
 

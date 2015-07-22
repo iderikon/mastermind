@@ -15,6 +15,7 @@
  * License along with this library.
  */
 
+#include "Backend.h"
 #include "FS.h"
 #include "Guard.h"
 #include "Node.h"
@@ -39,25 +40,22 @@ std::string FS::get_key() const
     return m_host + "/" + std::to_string(m_fsid);
 }
 
-void FS::add_backend(BackendStat *backend)
+void FS::add_backend(Backend *backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
     m_backends.insert(backend);
 }
 
-void FS::remove_backend(BackendStat *backend)
+void FS::remove_backend(Backend *backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
     m_backends.erase(backend);
 }
 
-void FS::get_backends(std::vector<BackendStat*> & backends) const
+void FS::get_backends(std::vector<Backend*> & backends) const
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
-
-    backends.reserve(m_backends.size());
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        backends.push_back(*it);
+    backends.assign(m_backends.begin(), m_backends.end());
 }
 
 size_t FS::get_backend_count() const
@@ -66,11 +64,12 @@ size_t FS::get_backend_count() const
     return m_backends.size();
 }
 
-void FS::update(const BackendStat & stat)
+void FS::update(const Backend & backend)
 {
+    const BackendStat & stat = backend.get_stat();
     m_stat.ts_sec = stat.ts_sec;
     m_stat.ts_usec = stat.ts_usec;
-    m_stat.total_space = stat.vfs_total_space;
+    m_stat.total_space = backend.get_vfs_total_space();
 }
 
 void FS::update_status()
@@ -80,11 +79,11 @@ void FS::update_status()
     uint64_t total_space = 0;
     {
         ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-            const BackendStat & bstat = **it;
-            if (bstat.status != BackendStat::OK && bstat.status != BackendStat::BROKEN)
+        for (Backend *backend : m_backends) {
+            Backend::Status status = backend->get_status();
+            if (status != Backend::OK && status != Backend::BROKEN)
                 continue;
-            total_space += bstat.total_space;
+            total_space += backend->get_total_space();
         }
     }
 

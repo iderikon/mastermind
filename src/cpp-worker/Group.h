@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-class BackendStat;
+class Backend;
 class Couple;
 class Namespace;
 class Storage;
@@ -46,7 +46,7 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Group(BackendStat & stat, Storage & storage);
+    Group(Backend & backend, Storage & storage);
     Group(int id, Storage & storage);
 
     int get_id() const
@@ -64,7 +64,7 @@ public:
     Namespace *get_namespace()
     { return m_namespace; }
 
-    void update_backend(BackendStat & stat);
+    void update_backend(Backend & backend);
 
     void save_metadata(const char *metadata, size_t size);
 
@@ -90,7 +90,7 @@ private:
     Storage & m_storage;
     Couple *m_couple;
 
-    std::set<BackendStat*> m_backends;
+    std::set<Backend*> m_backends;
     mutable RWSpinLock m_backends_lock;
 
     bool m_clean;

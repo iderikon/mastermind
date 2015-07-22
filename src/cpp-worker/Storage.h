@@ -54,7 +54,7 @@ public:
     void get_nodes(std::vector<Node*> & nodes);
     bool get_node(const std::string & key, Node *& node);
 
-    void handle_backend(BackendStat & backend);
+    void handle_backend(Backend & backend, bool existed);
 
     void get_group_ids(std::vector<int> & groups) const;
     void get_groups(std::vector<Group*> & groups);

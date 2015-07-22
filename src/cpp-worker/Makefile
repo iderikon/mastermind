@@ -14,7 +14,7 @@ SOURCES = Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp \
 		  BackendParser.cpp TimestampParser.cpp ThreadPool.cpp \
 		  Storage.cpp Group.cpp Couple.cpp DiscoveryTimer.cpp \
 		  ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp \
-		  Namespace.cpp FS.cpp FilterParser.cpp main.cpp
+		  Namespace.cpp FS.cpp FilterParser.cpp Backend.cpp main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 %.o: %.cpp $(DEPS)

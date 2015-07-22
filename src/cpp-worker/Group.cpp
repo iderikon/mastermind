@@ -15,6 +15,7 @@
  * License along with this library.
  */
 
+#include "Backend.h"
 #include "Config.h"
 #include "Couple.h"
 #include "Group.h"
@@ -50,9 +51,9 @@ bool parse_couple(msgpack::object & obj, std::vector<int> & couple)
 
 } // unnamed namespace
 
-Group::Group(BackendStat & stat, Storage & storage)
+Group::Group(Backend & backend, Storage & storage)
     :
-    m_id(stat.group),
+    m_id(backend.get_stat().group),
     m_storage(storage),
     m_couple(NULL),
     m_clean(true),
@@ -61,7 +62,7 @@ Group::Group(BackendStat & stat, Storage & storage)
     m_version(0),
     m_namespace(NULL)
 {
-    m_backends.insert(&stat);
+    m_backends.insert(&backend);
     m_service.migrating = false;
 }
 
@@ -79,10 +80,10 @@ Group::Group(int id, Storage & storage)
     m_service.migrating = false;
 }
 
-void Group::update_backend(BackendStat & stat)
+void Group::update_backend(Backend & backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
-    m_backends.insert(&stat);
+    m_backends.insert(&backend);
 }
 
 void Group::save_metadata(const char *metadata, size_t size)
@@ -104,13 +105,11 @@ void Group::process_metadata()
     if (m_clean)
         return;
 
-    std::vector<BackendStat*> backends;
+    std::vector<Backend*> backends;
 
     {
         ReadGuard<RWSpinLock> guard(m_backends_lock);
-        backends.reserve(m_backends.size());
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-            backends.push_back(*it);
+        backends.assign(m_backends.begin(), m_backends.end());
     }
 
     if (m_id == 1)
@@ -297,13 +296,13 @@ void Group::process_metadata()
         bool have_other = false;
 
         for (size_t i = 0; i < backends.size(); ++i) {
-            BackendStat::Status b_status = backends[i]->status;
-            if (b_status == BackendStat::BAD) {
+            Backend::Status b_status = backends[i]->get_status();
+            if (b_status == Backend::BAD) {
                 have_bad = true;
                 break;
-            } else if (b_status == BackendStat::RO) {
+            } else if (b_status == Backend::RO) {
                 have_ro = true;
-            } else if (b_status != BackendStat::OK) {
+            } else if (b_status != Backend::OK) {
                 have_other = true;
             }
         }
@@ -372,16 +371,8 @@ void Group::print_info(std::ostream & ostr) const
             if (i != 1)
                 ostr << "              ";
 
-            const Node *node = (*it)->node;
-            if (node != NULL) {
-                std::string key = node->get_host() + ":" + std::to_string(node->get_port())
-                    + ":" + std::to_string(node->get_family());
-                ostr << key << '/';
-            } else {
-                ostr << "<null>/";
-            }
+            ostr << (*it)->get_node().get_key() << '/' << (*it)->get_stat().backend_id;
 
-            ostr << (*it)->backend_id;
             if (i < m_backends.size())
                 ostr << '\n';
         }

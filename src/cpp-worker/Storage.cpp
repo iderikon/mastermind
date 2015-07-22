@@ -173,11 +173,11 @@ bool Storage::get_node(const std::string & key, Node *& node)
     return false;
 }
 
-void Storage::handle_backend(BackendStat & backend)
+void Storage::handle_backend(Backend & backend, bool existed)
 {
-    {
+    if (existed) {
         ReadGuard<RWMutex> guard(m_groups_lock);
-        auto it = m_groups.find(backend.group);
+        auto it = m_groups.find(backend.get_stat().group);
         if (it != m_groups.end()) {
             guard.release();
             it->second.update_backend(backend);
@@ -187,12 +187,12 @@ void Storage::handle_backend(BackendStat & backend)
 
     {
         WriteGuard<RWMutex> guard(m_groups_lock);
-        auto it = m_groups.lower_bound(backend.group);
-        if (it != m_groups.end() && it->first == int(backend.group)) {
+        auto it = m_groups.lower_bound(backend.get_stat().group);
+        if (it != m_groups.end() && it->first == int(backend.get_stat().group)) {
             guard.release();
             it->second.update_backend(backend);
         } else {
-            m_groups.insert(it, std::make_pair(backend.group, Group(backend, *this)));
+            m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend, *this)));
         }
     }
 }

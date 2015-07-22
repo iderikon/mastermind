@@ -165,7 +165,7 @@ bool BackendParser::EndObject(rapidjson::SizeType nr_members)
         m_stat.ts_sec = m_ts_sec;
         m_stat.ts_usec = m_ts_usec;
         m_node->handle_backend(m_stat);
-        new (&m_stat) BackendStat;
+        std::memset(&m_stat, 0, sizeof(m_stat));
     }
 
     return super::EndObject(nr_members);

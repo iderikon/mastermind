@@ -121,78 +121,6 @@ NodeStat::NodeStat()
     std::memset(this, 0, sizeof(*this));
 }
 
-BackendStat::BackendStat()
-{
-    std::memset(this, 0, sizeof(*this));
-}
-
-void BackendStat::print_info(std::ostream & ostr) const
-{
-    ostr << "BackendStat {"
-         << "\n    ts_sec: " << ts_sec
-         << "\n    ts_usec: " << ts_usec
-         << "\n    backend_id: " << backend_id
-         << "\n    state: " << state
-         << "\n    vfs_blocks: " << vfs_blocks
-         << "\n    vfs_bavail: " << vfs_bavail
-         << "\n    vfs_bsize: " << vfs_bsize
-         << "\n    records_total: " << records_total
-         << "\n    records_removed: " << records_removed
-         << "\n    records_removed_size: " << records_removed_size
-         << "\n    base_size: " << base_size
-         << "\n    fsid: " << fsid
-         << "\n    defrag_state: " << defrag_state
-         << "\n    want_defrag: " << want_defrag
-         << "\n    read_ios: " << read_ios
-         << "\n    write_ios: " << write_ios
-         << "\n    error: " << error
-         << "\n    blob_size_limit: " << blob_size_limit
-         << "\n    max_blob_base_size: " << max_blob_base_size
-         << "\n    blob_size: " << blob_size
-         << "\n    group: " << group
-         << "\n    vfs_free_space: " << vfs_free_space
-         << "\n    vfs_total_space: " << vfs_total_space
-         << "\n    vfs_used_space: " << vfs_used_space
-         << "\n    records: " << records
-         << "\n    free_space: " << free_space
-         << "\n    total_space: " << total_space
-         << "\n    used_space: " << used_space
-         << "\n    fragmentation: " << fragmentation
-         << "\n    read_rps: " << read_rps
-         << "\n    write_rps: " << write_rps
-         << "\n    max_read_rps: " << max_read_rps
-         << "\n    max_write_rps: " << max_write_rps;
-
-    if (fs != NULL)
-        ostr << "\n    fs: " << fs->get_key();
-    else
-        ostr << "\n    fs: NULL";
-
-    ostr << "\n    status: " << BackendStat::status_str(status)
-         << "\n    disabled: " << disabled
-         << "\n    read_only: " << read_only
-         << "\n}";
-}
-
-const char *BackendStat::status_str(Status status)
-{
-    switch (status) {
-    case INIT:
-        return "INIT";
-    case OK:
-        return "OK";
-    case RO:
-        return "RO";
-    case BAD:
-        return "BAD";
-    case STALLED:
-        return "STALLED";
-    case BROKEN:
-        return "BROKEN";
-    }
-    return "UNKNOWN";
-}
-
 Node::Node(Storage & storage, const char *host, int port, int family)
     :
     m_storage(storage),
@@ -243,100 +171,15 @@ void Node::handle_backend(const BackendStat & new_stat)
         return;
 
     if (found) {
-        BackendStat & existing = it->second;
         guard.release();
-
-        double ts1 = double(existing.ts_sec) + double(existing.ts_usec) / 1000000.0;
-        double ts2 = double(new_stat.ts_sec) + double(new_stat.ts_usec) / 1000000.0;
-        double d_ts = ts2 - ts1;
-
-        if (d_ts > 1.0) {
-            existing.read_rps = int(double(new_stat.read_ios - existing.read_ios) / d_ts);
-            existing.write_rps = int(double(new_stat.write_ios - existing.write_ios) / d_ts);
-
-            // XXX RPS_FORMULA
-            existing.max_read_rps = int(std::max(double(existing.read_rps) /
-                        std::max(m_stat.load_average, 0.01), 100.0));
-            existing.max_write_rps = int(std::max(double(existing.write_rps) /
-                        std::max(m_stat.load_average, 0.01), 100.0));
-        }
+        it->second.update(new_stat);
     } else {
-        it = m_backends.insert(it, std::make_pair(new_stat.backend_id, new_stat));
+        it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
         guard.release();
+        it->second.init(new_stat);
     }
 
-    BackendStat & stat = it->second;
-
-    stat.ts_sec = new_stat.ts_sec;
-    stat.ts_usec = new_stat.ts_usec;
-    stat.backend_id = new_stat.backend_id;
-    stat.state = new_stat.state;
-
-    stat.vfs_blocks = new_stat.vfs_blocks;
-    stat.vfs_bavail = new_stat.vfs_bavail;
-    stat.vfs_bsize = new_stat.vfs_bsize;
-
-    stat.records_total = new_stat.records_total;
-    stat.records_removed = new_stat.records_removed;
-    stat.records_removed_size = new_stat.records_removed_size;
-
-    stat.fsid = new_stat.fsid;
-    stat.defrag_state = new_stat.defrag_state;
-    stat.want_defrag = new_stat.want_defrag;
-
-    stat.read_ios = new_stat.read_ios;
-    stat.write_ios = new_stat.write_ios;
-    stat.error = new_stat.error;
-
-    stat.blob_size_limit = new_stat.blob_size_limit;
-    stat.max_blob_base_size = new_stat.max_blob_base_size;
-    stat.blob_size = new_stat.blob_size;
-    stat.group = new_stat.group;
-
-    stat.vfs_total_space = stat.vfs_blocks * stat.vfs_bsize;
-    stat.vfs_free_space = stat.vfs_bavail * stat.vfs_bsize;
-    stat.vfs_used_space = stat.vfs_total_space - stat.vfs_free_space;
-
-    stat.records = stat.records_total - stat.records_removed;
-    stat.fragmentation = double(stat.records_removed) /
-        double(std::max(stat.records_total, 1UL));
-
-    if (stat.fs == NULL) {
-        stat.fs = m_storage.get_fs(m_host, stat.fsid);
-        stat.fs->add_backend(&stat);
-    } else if (stat.fs->get_fsid() != stat.fsid) {
-        stat.fs->remove_backend(&stat);
-        stat.fs = m_storage.get_fs(m_host, stat.fsid);
-        stat.fs->add_backend(&stat);
-    }
-
-    stat.fs->update(stat);
-
-    stat.node = this;
-
-    if (stat.blob_size_limit) {
-        // vfs_total_space can be less than blob_size_limit in case of misconfiguration
-        stat.total_space = std::min(stat.blob_size_limit, stat.vfs_total_space);
-        stat.used_space = stat.base_size;
-        stat.free_space = std::min(
-                uint64_t(std::max(0L, int64_t(stat.total_space) - int64_t(stat.used_space))),
-                stat.vfs_free_space);
-    } else {
-        stat.total_space = stat.vfs_total_space;
-        stat.free_space = stat.vfs_free_space;
-        stat.used_space = stat.vfs_used_space;
-    }
-
-    if (stat.error || stat.disabled)
-        stat.status = BackendStat::STALLED;
-    else if (stat.fs->get_status() == FS::BROKEN)
-        stat.status = BackendStat::BROKEN;
-    else if (stat.read_only)
-        stat.status = BackendStat::RO;
-    else
-        stat.status = BackendStat::OK;
-
-    m_storage.handle_backend(stat);
+    m_storage.handle_backend(it->second, found);
 }
 
 ThreadPool::Job *Node::create_backend_parse_job()
@@ -359,22 +202,21 @@ size_t Node::get_backend_count() const
     return m_backends.size();
 }
 
-void Node::get_backends(std::vector<BackendStat*> & backends)
+void Node::get_backends(std::vector<Backend*> & backends)
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
-
     backends.reserve(m_backends.size());
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
         backends.push_back(&it->second);
 }
 
-bool Node::get_backend(int id, BackendStat *& stat)
+bool Node::get_backend(int id, Backend *& backend)
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
 
     auto it = m_backends.find(id);
     if (it != m_backends.end()) {
-        stat = &it->second;
+        backend = &it->second;
         return true;
     }
     return false;
