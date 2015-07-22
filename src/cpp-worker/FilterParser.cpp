@@ -21,26 +21,33 @@
 
 enum FilterKey
 {
-    Namespaces  = 2,
-    Couples     = 4,
-    Groups      = 8,
-    Backends    = 0x10,
-    Nodes       = 0x20,
-    Filesystems = 0x40
+    FilterSec   = 2,
+    Namespaces  = 4,
+    Couples     = 8,
+    Groups      = 0x10,
+    Backends    = 0x20,
+    Nodes       = 0x40,
+    Filesystems = 0x80
 };
 
 static const Parser::Folder filter_1[] = {
-    { "namespaces",  0, Namespaces },
-    { "couples",     0, Couples },
-    { "groups",      0, Groups },
-    { "backends",    0, Backends },
-    { "nodes",       0, Nodes },
-    { "filesystems", 0, Filesystems },
+    { "filter", 0, FilterSec },
+    { NULL, 0, 0 }
+};
+
+static const Parser::Folder filter_2[] = {
+    { "namespaces",  FilterSec, Namespaces  },
+    { "couples",     FilterSec, Couples     },
+    { "groups",      FilterSec, Groups      },
+    { "backends",    FilterSec, Backends    },
+    { "nodes",       FilterSec, Nodes       },
+    { "filesystems", FilterSec, Filesystems },
     { NULL, 0, 0 }
 };
 
 static const Parser::Folder * const filter_folders[] = {
-    filter_1
+    filter_1,
+    filter_2
 };
 
 static const Parser::UIntInfo filter_uint_info[] = {
@@ -58,29 +65,27 @@ FilterParser::FilterParser(Filter & filter)
 bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy)
 {
     if (m_array_depth != 1)
-        return false;
+        return true;
 
     std::string string(str, length);
 
     switch (m_keys - 1)
     {
-    case Namespaces:
+    case FilterSec|Namespaces:
         m_filter.namespaces.emplace_back(std::move(string));
         break;
-    case Couples:
+    case FilterSec|Couples:
         m_filter.couples.emplace_back(std::move(string));
         break;
-    case Backends:
+    case FilterSec|Backends:
         m_filter.backends.emplace_back(std::move(string));
         break;
-    case Nodes:
+    case FilterSec|Nodes:
         m_filter.nodes.emplace_back(std::move(string));
         break;
-    case Filesystems:
+    case FilterSec|Filesystems:
         m_filter.filesystems.emplace_back(std::move(string));
         break;
-    default:
-        return false;
     }
 
     return true;
@@ -89,10 +94,10 @@ bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy
 bool FilterParser::UInteger(uint64_t val)
 {
     if (m_array_depth != 1)
-        return false;
+        return true;
 
-    if (m_keys != (Groups|1))
-        return false;
+    if (m_keys != (FilterSec|Groups|1))
+        return true;
 
     m_filter.groups.push_back(int(val));
     return true;
