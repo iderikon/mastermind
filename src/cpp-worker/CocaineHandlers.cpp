@@ -325,9 +325,19 @@ void on_force_update::on_chunk(const char *chunk, size_t size)
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Request to force update");
 
-    m_app.get_discovery_timer().disarm();
-    m_app.get_discovery().dispatch_start();
+    std::string resp("Update has been scheduled");
 
-    response()->write("Update has been scheduled");
+    do {
+        if (m_app.get_discovery().in_progress()) {
+            resp = "Discovery is in progress";
+            BH_LOG(m_app.get_logger(), DNET_LOG_INFO, resp);
+            break;
+        }
+
+        m_app.get_discovery_timer().disarm();
+        m_app.get_discovery().schedule_start();
+    } while (0);
+
+    response()->write(resp);
     response()->close();
 }

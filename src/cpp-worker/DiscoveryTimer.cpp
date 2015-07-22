@@ -88,7 +88,7 @@ void DiscoveryTimer::stop()
 
 void DiscoveryTimer::trigger()
 {
-    m_app.get_discovery().dispatch_start();
+    m_app.get_discovery().schedule_start();
 }
 
 int DiscoveryTimer::arm(Launch launch)

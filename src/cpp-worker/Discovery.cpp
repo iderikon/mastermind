@@ -118,7 +118,8 @@ Discovery::Discovery(WorkerApplication & app)
     m_http_port(10025),
     m_epollfd(-1),
     m_curl_handle(NULL),
-    m_timeout_ms(0)
+    m_timeout_ms(0),
+    m_in_progress(false)
 {
     m_discovery_start = new DiscoveryStart(*this);
 }
@@ -194,6 +195,8 @@ void Discovery::resolve_nodes()
 int Discovery::start()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Starting discovery");
+
+    m_in_progress = true;
 
     resolve_nodes();
 
@@ -328,8 +331,9 @@ int Discovery::start()
     return 0;
 }
 
-void Discovery::dispatch_start()
+void Discovery::schedule_start()
 {
+    m_in_progress = true;
     m_app.get_thread_pool().dispatch_after(new DiscoveryStart(*this));
 }
 

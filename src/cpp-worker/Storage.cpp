@@ -16,6 +16,7 @@
  */
 
 #include "Couple.h"
+#include "Discovery.h"
 #include "DiscoveryTimer.h"
 #include "FS.h"
 #include "Group.h"
@@ -47,6 +48,7 @@ public:
         m_storage.update_groups();
         m_storage.update_couples();
 
+        m_storage.get_app().get_discovery().end();
         m_storage.arm_timer();
     }
 

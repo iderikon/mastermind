@@ -41,7 +41,12 @@ public:
 
     int start();
 
-    void dispatch_start();
+    bool in_progress() const
+    { return m_in_progress; }
+    void end()
+    { m_in_progress = false; }
+
+    void schedule_start();
 
 private:
     CURL *create_easy_handle(Node *node, const char *stat);
@@ -70,6 +75,8 @@ private:
     int m_epollfd;
     CURLM *m_curl_handle;
     long m_timeout_ms;
+
+    bool m_in_progress;
 };
 
 #endif
