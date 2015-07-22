@@ -64,7 +64,8 @@ public:
     Namespace *get_namespace()
     { return m_namespace; }
 
-    void update_backend(Backend & backend);
+    bool has_backend() const;
+    void add_backend(Backend & backend);
 
     void save_metadata(const char *metadata, size_t size);
 

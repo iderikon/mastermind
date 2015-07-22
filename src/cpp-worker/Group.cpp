@@ -80,7 +80,14 @@ Group::Group(int id, Storage & storage)
     m_service.migrating = false;
 }
 
-void Group::update_backend(Backend & backend)
+bool Group::has_backend(Backend & backend)
+{
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+    auto it = m_backends.find(&backend);
+    return (it != m_backends.end());
+}
+
+void Group::add_backend(Backend & backend)
 {
     WriteGuard<RWSpinLock> guard(m_backends_lock);
     m_backends.insert(&backend);

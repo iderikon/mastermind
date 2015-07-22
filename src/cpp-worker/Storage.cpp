@@ -180,7 +180,9 @@ void Storage::handle_backend(Backend & backend, bool existed)
         auto it = m_groups.find(backend.get_stat().group);
         if (it != m_groups.end()) {
             guard.release();
-            it->second.update_backend(backend);
+            Group & group = it->second;
+            if (!group.has_backend(backend))
+                group.add_backend(backend);
             return;
         }
     }
