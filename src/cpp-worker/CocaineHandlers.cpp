@@ -55,7 +55,12 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     storage.get_couples(couples);
 
     std::vector<FS*> filesystems;
-    storage.get_filesystems(filesystems);
+    std::vector<FS*> node_filesystems;
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        nodes[i]->get_filesystems(node_filesystems);
+        filesystems.insert(filesystems.end(), node_filesystems.begin(), node_filesystems.end());
+        node_filesystems.clear();
+    }
 
     std::map<Group::Status, int> group_status;
     for (size_t i = 0; i < groups.size(); ++i)
@@ -228,11 +233,27 @@ void on_backend_info::on_chunk(const char *chunk, size_t size)
 void on_fs_info::on_chunk(const char *chunk, size_t size)
 {
     std::ostringstream ostr;
+    std::string key(chunk);
 
     do {
+        size_t pos = key.rfind('/');
+        if (pos == std::string::npos) {
+            ostr << "Invalid FS key '" << key << '\'';
+            break;
+        }
+
+        unsigned long long fsid = std::stoull(key.substr(pos + 1));
+        std::string node_key = key.substr(0, pos);
+
+        Node *node;
+        if (!m_app.get_storage().get_node(node_key, node)) {
+            ostr << "Node '" << node_key << "' does not exist";
+            break;
+        }
+
         FS *fs;
-        if (!m_app.get_storage().get_fs(chunk, fs)) {
-            ostr << "Found no FS '" << chunk << '\'';
+        if (!node->get_fs(uint64_t(fsid), fs)) {
+            ostr << "Found no FS '" << key << '\'';
             break;
         }
 
@@ -246,11 +267,27 @@ void on_fs_info::on_chunk(const char *chunk, size_t size)
 void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
 {
     std::ostringstream ostr;
+    std::string key(chunk);
 
     do {
+        size_t pos = key.rfind('/');
+        if (pos == std::string::npos) {
+            ostr << "Invalid FS key '" << key << '\'';
+            break;
+        }
+
+        unsigned long long fsid = std::stoull(key.substr(pos + 1));
+        std::string node_key = key.substr(0, pos);
+
+        Node *node;
+        if (!m_app.get_storage().get_node(node_key, node)) {
+            ostr << "Node '" << node_key << "' does not exist";
+            break;
+        }
+
         FS *fs;
-        if (!m_app.get_storage().get_fs(chunk, fs)) {
-            ostr << "Found no FS '" << chunk << '\'';
+        if (!node->get_fs(uint64_t(fsid), fs)) {
+            ostr << "Found no FS '" << key << '\'';
             break;
         }
 

@@ -44,7 +44,7 @@ Backend::Backend(Node & node)
 void Backend::init(const BackendStat & stat)
 {
     memcpy(&m_stat, &stat, sizeof(m_stat));
-    m_fs = m_node.get_storage().get_fs(m_node.get_host(), stat.fsid);
+    m_fs = m_node.get_fs(stat.fsid);
     recalculate();
 }
 
@@ -67,7 +67,7 @@ void Backend::update(const BackendStat & stat)
 
     if (m_stat.fsid != stat.fsid) {
         m_fs->remove_backend(this);
-        m_fs = m_node.get_storage().get_fs(m_node.get_host(), stat.fsid);
+        m_fs = m_node.get_fs(stat.fsid);
         m_fs->add_backend(this);
     }
 

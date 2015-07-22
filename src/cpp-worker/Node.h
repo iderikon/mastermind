@@ -99,6 +99,12 @@ public:
     void get_backends(std::vector<Backend*> & backends);
     bool get_backend(int id, Backend *& backend);
 
+    void update_filesystems();
+
+    FS *get_fs(uint64_t fsid);
+    bool get_fs(uint64_t fsid, FS *& fs);
+    void get_filesystems(std::vector<FS*> & filesystems);
+
     void print_info(std::ostream & ostr) const;
 
     static const char *download_state_str(DownloadState state);
@@ -119,6 +125,9 @@ private:
 
     std::map<int, Backend> m_backends;
     mutable RWSpinLock m_backends_lock;
+
+    std::map<uint64_t, FS> m_filesystems;
+    mutable RWSpinLock m_filesystems_lock;
 };
 
 #endif

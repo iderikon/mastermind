@@ -65,10 +65,6 @@ public:
     Namespace *get_namespace(const std::string & name);
     void get_namespaces(std::vector<Namespace*> & namespaces);
 
-    FS *get_fs(const std::string & host, uint64_t fsid);
-    bool get_fs(const std::string & key, FS *& fs);
-    void get_filesystems(std::vector<FS*> & filesystems);
-
     void schedule_update(ioremap::elliptics::session & session);
     void update_filesystems();
     void update_groups();
@@ -128,9 +124,6 @@ private:
 
     std::map<std::string, Namespace> m_namespaces;
     mutable RWSpinLock m_namespaces_lock;
-
-    std::map<std::string, FS> m_filesystems;
-    mutable RWSpinLock m_filesystems_lock;
 };
 
 #endif

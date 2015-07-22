@@ -156,8 +156,8 @@ void Storage::get_nodes(std::vector<Node *> & nodes)
 {
     ReadGuard<RWMutex> guard(m_nodes_lock);
 
-    auto it = m_nodes.begin();
-    for (; it != m_nodes.end(); ++it)
+    nodes.reserve(m_nodes.size());
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
         nodes.push_back(&it->second);
 }
 
@@ -265,47 +265,6 @@ void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
         namespaces.push_back(&it->second);
 }
 
-FS *Storage::get_fs(const std::string & host, uint64_t fsid)
-{
-    std::string key = host + '/' + std::to_string(fsid);
-
-    {
-        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        auto it = m_filesystems.find(key);
-        if (it != m_filesystems.end())
-            return &it->second;
-    }
-
-    {
-        WriteGuard<RWSpinLock> guard(m_filesystems_lock);
-        auto it = m_filesystems.lower_bound(key);
-        if (it == m_filesystems.end() || it->first != key)
-            it = m_filesystems.insert(it, std::make_pair(key, FS(*this, host, fsid)));
-        return &it->second;
-    }
-}
-
-bool Storage::get_fs(const std::string & key, FS *& fs)
-{
-    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-
-    auto it = m_filesystems.find(key);
-    if (it != m_filesystems.end()) {
-        fs = &it->second;
-        return true;
-    }
-    return false;
-}
-
-void Storage::get_filesystems(std::vector<FS*> & filesystems)
-{
-    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-
-    filesystems.reserve(m_filesystems.size());
-    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-        filesystems.push_back(&it->second);
-}
-
 void Storage::schedule_update(elliptics::session & session)
 {
     std::vector<int> group_id(1);
@@ -343,17 +302,11 @@ void Storage::schedule_update(elliptics::session & session)
 
 void Storage::update_filesystems()
 {
-    std::vector<FS*> filesystems;
+    std::vector<Node*> nodes;
+    get_nodes(nodes);
 
-    {
-        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        filesystems.reserve(m_filesystems.size());
-        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-            filesystems.push_back(&it->second);
-    }
-
-    for (size_t i = 0; i < filesystems.size(); ++i)
-        filesystems[i]->update_status();
+    for (Node *node : nodes)
+        node->update_filesystems();
 }
 
 void Storage::update_groups()

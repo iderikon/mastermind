@@ -46,15 +46,19 @@ public:
     static const char *status_str(Status status);
 
 public:
-    FS(Storage & storage, const std::string & host, uint64_t fsid);
+    FS(Node & node, uint64_t fsid);
 
-    const std::string & get_host() const
-    { return m_host; }
+    Node & get_node()
+    { return m_node; }
+
+    const Node & get_node() const
+    { return m_node; }
 
     uint64_t get_fsid() const
     { return m_fsid; }
 
-    std::string get_key() const;
+    const std::string & get_key() const
+    { return m_key; }
 
     void add_backend(Backend *backend);
     void remove_backend(Backend *backend);
@@ -70,9 +74,10 @@ public:
     void print_info(std::ostream & ostr) const;
 
 private:
-    Storage & m_storage;
-    const std::string m_host;
+    Node & m_node;
     uint64_t m_fsid;
+
+    std::string m_key;
 
     FSStat m_stat;
 

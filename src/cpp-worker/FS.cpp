@@ -23,21 +23,17 @@
 #include "TimestampParser.h"
 #include "WorkerApplication.h"
 
-FS::FS(Storage & storage, const std::string & host, uint64_t fsid)
+FS::FS(Node & node, uint64_t fsid)
     :
-    m_storage(storage),
-    m_host(host),
+    m_node(node),
     m_fsid(fsid),
     m_status(OK)
 {
     m_stat.ts_sec = 0;
     m_stat.ts_usec = 0;
     m_stat.total_space = 0;
-}
 
-std::string FS::get_key() const
-{
-    return m_host + "/" + std::to_string(m_fsid);
+    m_key = node.get_host() + "/" + std::to_string(fsid);
 }
 
 void FS::add_backend(Backend *backend)
@@ -89,15 +85,15 @@ void FS::update_status()
 
     m_status = (total_space <= m_stat.total_space) ? OK : BROKEN;
     if (m_status != prev)
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
+        BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_INFO,
                 "FS %s/%lu status change %d -> %d",
-                m_host.c_str(), m_fsid, int(prev), int(m_status));
+                m_node.get_key().c_str(), m_fsid, int(prev), int(m_status));
 }
 
 void FS::print_info(std::ostream & ostr) const
 {
     ostr << "FS {\n"
-            "  host: " << m_host << "\n"
+            "  node: " << m_node.get_key() << "\n"
             "  fsid: " << m_fsid << "\n"
             "  Stat {\n"
             "    ts: " << TimestampParser::ts_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"

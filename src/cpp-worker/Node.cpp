@@ -222,6 +222,54 @@ bool Node::get_backend(int id, Backend *& backend)
     return false;
 }
 
+void Node::update_filesystems()
+{
+    std::vector<FS*> filesystems;
+    get_filesystems(filesystems);
+
+    for (FS *fs : filesystems)
+        fs->update_status();
+}
+
+FS *Node::get_fs(uint64_t fsid)
+{
+    {
+        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+        auto it = m_filesystems.find(fsid);
+        if (it != m_filesystems.end())
+            return &it->second;
+    }
+
+    {
+        WriteGuard<RWSpinLock> guard(m_filesystems_lock);
+        auto it = m_filesystems.lower_bound(fsid);
+        if (it == m_filesystems.end() || it->first != fsid)
+            it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
+        return &it->second;
+    }
+}
+
+bool Node::get_fs(uint64_t fsid, FS *& fs)
+{
+    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+
+    auto it = m_filesystems.find(fsid);
+    if (it != m_filesystems.end()) {
+        fs = &it->second;
+        return true;
+    }
+    return false;
+}
+
+void Node::get_filesystems(std::vector<FS*> & filesystems)
+{
+    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+
+    filesystems.reserve(m_filesystems.size());
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+        filesystems.push_back(&it->second);
+}
+
 void Node::print_info(std::ostream & ostr) const
 {
     ostr << "Node {\n"
