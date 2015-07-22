@@ -192,7 +192,7 @@ void Storage::handle_backend(Backend & backend, bool existed)
         auto it = m_groups.lower_bound(backend.get_stat().group);
         if (it != m_groups.end() && it->first == int(backend.get_stat().group)) {
             guard.release();
-            it->second.update_backend(backend);
+            it->second.add_backend(backend);
         } else {
             m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend, *this)));
         }

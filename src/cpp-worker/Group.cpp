@@ -80,7 +80,7 @@ Group::Group(int id, Storage & storage)
     m_service.migrating = false;
 }
 
-bool Group::has_backend(Backend & backend)
+bool Group::has_backend(Backend & backend) const
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
     auto it = m_backends.find(&backend);
