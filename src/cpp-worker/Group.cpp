@@ -119,9 +119,6 @@ void Group::process_metadata()
         backends.assign(m_backends.begin(), m_backends.end());
     }
 
-    if (m_id == 1)
-        sleep(20);
-
     LockGuard<SpinLock> guard(m_metadata_lock);
 
     if (m_clean)
