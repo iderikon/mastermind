@@ -77,6 +77,9 @@ public:
     const Node & get_node() const
     { return m_node; }
 
+    const std::string & get_key() const
+    { return m_key; }
+
     const BackendStat & get_stat() const
     { return m_stat; }
 
@@ -111,6 +114,8 @@ public:
 private:
     Node & m_node;
     FS *m_fs;
+
+    std::string m_key;
 
     BackendStat m_stat;
 

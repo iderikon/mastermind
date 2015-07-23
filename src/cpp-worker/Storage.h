@@ -75,6 +75,8 @@ public:
 
     void arm_timer();
 
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer);
+
 public:
     struct CoupleKey
     {

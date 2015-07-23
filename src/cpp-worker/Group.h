@@ -19,9 +19,9 @@
 #define __046c58ff_e6c4_49a6_a920_eee87b111685
 
 #include "RWSpinLock.h"
-#include "SpinLock.h"
 
 #include <iostream>
+#include <rapidjson/writer.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -84,6 +84,7 @@ public:
     { return m_frozen; }
 
     void print_info(std::ostream & ostr) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
     int m_id;
@@ -98,7 +99,7 @@ private:
     std::vector<char> m_metadata;
     std::string m_status_text;
     Status m_status;
-    mutable SpinLock m_metadata_lock;
+    mutable RWSpinLock m_metadata_lock;
 
     bool m_frozen;
     int m_version;

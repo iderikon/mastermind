@@ -95,7 +95,7 @@ void Group::add_backend(Backend & backend)
 
 void Group::save_metadata(const char *metadata, size_t size)
 {
-    LockGuard<SpinLock> guard(m_metadata_lock);
+    WriteGuard<RWSpinLock> guard(m_metadata_lock);
 
     if (!m_metadata.empty() && m_metadata.size() == size &&
             !std::memcmp(&m_metadata[0], metadata, size)) {
@@ -119,7 +119,7 @@ void Group::process_metadata()
         backends.assign(m_backends.begin(), m_backends.end());
     }
 
-    LockGuard<SpinLock> guard(m_metadata_lock);
+    WriteGuard<RWSpinLock> guard(m_metadata_lock);
 
     if (m_clean)
         return;
@@ -344,13 +344,13 @@ bool Group::metadata_equals(const Group & other) const
 
 void Group::set_status_text(const std::string & status_text)
 {
-    LockGuard<SpinLock> guard(m_metadata_lock);
+    WriteGuard<RWSpinLock> guard(m_metadata_lock);
     m_status_text = status_text;
 }
 
 void Group::get_status_text(std::string & status_text) const
 {
-    LockGuard<SpinLock> guard(m_metadata_lock);
+    ReadGuard<RWSpinLock> guard(m_metadata_lock);
     status_text = m_status_text;
 }
 
@@ -400,6 +400,55 @@ void Group::print_info(std::ostream & ostr) const
             "    job_id: '" << m_service.job_id << "'\n"
             "  }\n"
             "}";
+}
+
+void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+{
+    writer.StartObject();
+
+    writer.Key("id");
+    writer.Uint64(m_id);
+
+    if (m_couple != NULL) {
+        writer.Key("couple");
+        writer.String(m_couple->get_key().c_str());
+    }
+
+    writer.Key("backends");
+    writer.StartArray();
+    {
+        ReadGuard<RWSpinLock> guard(m_backends_lock);
+        for (Backend *backend : m_backends)
+            writer.String(backend->get_key().c_str());
+    }
+    writer.EndArray();
+
+    {
+        ReadGuard<RWSpinLock> guard(m_metadata_lock);
+
+        writer.Key("status_text");
+        writer.String(m_status_text.c_str());
+        writer.Key("status");
+        writer.String(status_str(m_status));
+        writer.Key("frozen");
+        writer.Bool(m_frozen);
+        writer.Key("version");
+        writer.Uint64(m_version);
+        writer.Key("namespace");
+        writer.String(m_namespace != NULL ? m_namespace->get_name().c_str() : "");
+
+        if (m_service.migrating || !m_service.job_id.empty()) {
+            writer.Key("service");
+            writer.StartObject();
+            writer.Key("migrating");
+            writer.Bool(m_service.migrating);
+            writer.Key("job_id");
+            writer.String(m_service.job_id.c_str());
+            writer.EndObject();
+        }
+    }
+
+    writer.EndObject();
 }
 
 const char *Group::status_str(Status status)

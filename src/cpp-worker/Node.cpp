@@ -314,26 +314,22 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
     writer.Double(m_stat.rx_rate);
 
     writer.Key("filesystems");
-    writer.StartObject();
+    writer.StartArray();
     {
         ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
-            writer.Key(std::to_string(it->first).c_str());
+        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
             it->second.print_json(writer);
-        }
     }
-    writer.EndObject();
+    writer.EndArray();
 
     writer.Key("backends");
-    writer.StartObject();
+    writer.StartArray();
     {
         ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-            writer.Key(std::to_string(it->first).c_str());
+        for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
             it->second.print_json(writer);
-        }
     }
-    writer.EndObject();
+    writer.EndArray();
 
     writer.EndObject();
 }

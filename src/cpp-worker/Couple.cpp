@@ -146,6 +146,27 @@ void Couple::print_info(std::ostream & ostr) const
             "}";
 }
 
+void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+{
+    writer.StartObject();
+
+    writer.Key("groups");
+    writer.StartArray();
+    {
+        ReadGuard<RWSpinLock> guard(m_groups_lock);
+        for (Group *group : m_groups)
+            writer.Uint64(group->get_id());
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String(status_str(m_status));
+    writer.Key("status_text");
+    writer.String(m_status_text);
+
+    writer.EndObject();
+}
+
 const char *Couple::status_str(Status status)
 {
     switch (status)

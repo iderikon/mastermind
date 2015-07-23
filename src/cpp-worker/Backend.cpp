@@ -45,6 +45,7 @@ void Backend::init(const BackendStat & stat)
 {
     memcpy(&m_stat, &stat, sizeof(m_stat));
     m_fs = m_node.get_fs(stat.fsid);
+    m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
     recalculate();
 }
 

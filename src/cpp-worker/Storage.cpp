@@ -385,3 +385,37 @@ void Storage::arm_timer()
         BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to arm timer: %s", strerror(err));
     }
 }
+
+void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer)
+{
+    std::vector<Node*> nodes;
+    get_nodes(nodes);
+
+    std::vector<Group*> groups;
+    get_groups(groups);
+
+    std::vector<Couple*> couples;
+    get_couples(couples);
+
+    writer.StartObject();
+
+    writer.Key("nodes");
+    writer.StartArray();
+    for (Node *node : nodes)
+        node->print_json(writer);
+    writer.EndArray();
+
+    writer.Key("groups");
+    writer.StartArray();
+    for (Group *group : groups)
+        group->print_json(writer);
+    writer.EndArray();
+
+    writer.Key("couples");
+    writer.StartArray();
+    for (Couple *couple : couples)
+        couple->print_json(writer);
+    writer.EndArray();
+
+    writer.EndObject();
+}

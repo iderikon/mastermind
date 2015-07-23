@@ -21,6 +21,7 @@
 #include "RWSpinLock.h"
 
 #include <iostream>
+#include <rapidjson/writer.h>
 #include <vector>
 
 class Group;
@@ -65,6 +66,7 @@ public:
     { return m_status_text; }
 
     void print_info(std::ostream & ostr) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
     std::vector<Group*> m_groups;
