@@ -20,6 +20,7 @@
 
 #include <curl/curl.h>
 #include <elliptics/session.hpp>
+#include <sys/time.h>
 
 #include <map>
 #include <memory>
@@ -43,10 +44,13 @@ public:
 
     bool in_progress() const
     { return m_in_progress; }
-    void end()
-    { m_in_progress = false; }
+
+    void end();
 
     void schedule_start();
+
+    double get_last_duration() const
+    { return m_last_duration; }
 
 private:
     CURL *create_easy_handle(Node *node, const char *stat);
@@ -76,6 +80,8 @@ private:
     CURLM *m_curl_handle;
     long m_timeout_ms;
 
+    timeval m_start_tv;
+    double m_last_duration;
     bool m_in_progress;
 };
 

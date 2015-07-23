@@ -119,6 +119,8 @@ Discovery::Discovery(WorkerApplication & app)
     m_epollfd(-1),
     m_curl_handle(NULL),
     m_timeout_ms(0),
+    m_start_tv{0, 0},
+    m_last_duration(0.0),
     m_in_progress(false)
 {
     m_discovery_start = new DiscoveryStart(*this);
@@ -197,6 +199,7 @@ int Discovery::start()
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Starting discovery");
 
     m_in_progress = true;
+    gettimeofday(&m_start_tv, NULL);
 
     resolve_nodes();
 
@@ -329,6 +332,18 @@ int Discovery::start()
     m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app.get_storage(), *m_session));
 
     return 0;
+}
+
+void Discovery::end()
+{
+    struct timeval end_tv;
+    gettimeofday(&end_tv, NULL);
+
+    double ts1 = double(m_start_tv.tv_sec) + double(m_start_tv.tv_usec) / 1000000.0;
+    double ts2 = double(end_tv.tv_sec) + double(end_tv.tv_usec) / 1000000.0;
+
+    m_last_duration = ts2 - ts1;
+    m_in_progress = false;
 }
 
 void Discovery::schedule_start()

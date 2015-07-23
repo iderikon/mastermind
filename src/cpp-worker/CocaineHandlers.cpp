@@ -97,7 +97,8 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     std::vector<Namespace*> namespaces;
     storage.get_namespaces(namespaces);
 
-    ostr << namespaces.size() << " namespaces\n";
+    ostr << namespaces.size() << " namespaces\n"
+            "Last discovery/update duration: " << m_app.get_discovery().get_last_duration() << " seconds";
 
     response()->write(ostr.str());
     response()->close();
