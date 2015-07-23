@@ -18,6 +18,7 @@
 #ifndef __f8057e8e_b6f5_475b_bb31_771928953bf8
 #define __f8057e8e_b6f5_475b_bb31_771928953bf8
 
+#include "CocaineHandlers.h"
 #include "Couple.h"
 #include "Group.h"
 #include "Namespace.h"
@@ -74,6 +75,8 @@ public:
     void create_couple(const std::vector<int> & groups_ids, Group *group);
 
     void arm_timer();
+
+    void get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer);
 

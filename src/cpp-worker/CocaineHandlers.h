@@ -231,5 +231,24 @@ private:
     WorkerApplication & m_app;
 };
 
+class on_get_snapshot :
+    public cocaine::framework::handler<WorkerApplication>,
+    public std::enable_shared_from_this<on_get_snapshot>
+{
+public:
+    typedef cocaine::framework::handler<WorkerApplication> super;
+
+    on_get_snapshot(WorkerApplication & app)
+        :
+        super(app),
+        m_app(app)
+    {}
+
+    void on_chunk(const char *chunk, size_t size);
+
+private:
+    WorkerApplication & m_app;
+};
+
 #endif
 

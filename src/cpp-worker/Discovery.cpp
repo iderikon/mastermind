@@ -20,7 +20,6 @@
 #include "Guard.h"
 #include "Node.h"
 #include "Storage.h"
-#include "ThreadPool.h"
 #include "WorkerApplication.h"
 
 #include <sys/epoll.h>
@@ -124,6 +123,7 @@ Discovery::Discovery(WorkerApplication & app)
     m_in_progress(false)
 {
     m_discovery_start = new DiscoveryStart(*this);
+    m_snapshot_jobs.reserve(512);
 }
 
 Discovery::~Discovery()
@@ -343,13 +343,33 @@ void Discovery::end()
     double ts2 = double(end_tv.tv_sec) + double(end_tv.tv_usec) / 1000000.0;
 
     m_last_duration = ts2 - ts1;
+
+    LockGuard<SpinLock> guard(m_progress_lock);
+
+    for (ThreadPool::Job *job : m_snapshot_jobs)
+        m_app.get_thread_pool().dispatch_aggregate(job);
+    m_snapshot_jobs.clear();
     m_in_progress = false;
 }
 
 void Discovery::schedule_start()
 {
+    DiscoveryStart *start_job = new DiscoveryStart(*this);
+
+    LockGuard<SpinLock> guard(m_progress_lock);
+
     m_in_progress = true;
-    m_app.get_thread_pool().dispatch_after(new DiscoveryStart(*this));
+    m_app.get_thread_pool().dispatch_after(start_job);
+}
+
+void Discovery::take_over_snapshot(ThreadPool::Job *job)
+{
+    LockGuard<SpinLock> guard(m_progress_lock);
+
+    if (!m_in_progress)
+        m_app.get_thread_pool().dispatch_aggregate(job);
+    else
+        m_snapshot_jobs.push_back(job);
 }
 
 CURL *Discovery::create_easy_handle(Node *node, const char *stat)

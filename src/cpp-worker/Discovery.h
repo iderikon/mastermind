@@ -18,6 +18,9 @@
 #ifndef __d3b51655_27e8_4227_a7eb_a598183c39cd
 #define __d3b51655_27e8_4227_a7eb_a598183c39cd
 
+#include "SpinLock.h"
+#include "ThreadPool.h"
+
 #include <curl/curl.h>
 #include <elliptics/session.hpp>
 #include <sys/time.h>
@@ -48,6 +51,8 @@ public:
     void end();
 
     void schedule_start();
+
+    void take_over_snapshot(ThreadPool::Job *job);
 
     double get_last_duration() const
     { return m_last_duration; }
@@ -82,7 +87,10 @@ private:
 
     timeval m_start_tv;
     double m_last_duration;
+
     bool m_in_progress;
+    std::vector<ThreadPool::Job*> m_snapshot_jobs;
+    mutable SpinLock m_progress_lock;
 };
 
 #endif

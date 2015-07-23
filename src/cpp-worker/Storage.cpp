@@ -115,6 +115,34 @@ private:
     UpdateJobToggle *m_toggle;
 };
 
+class SnapshotJob : public ThreadPool::Job
+{
+public:
+    SnapshotJob(Storage & storage, const std::string & request,
+            std::shared_ptr<on_get_snapshot> handler)
+        :
+        m_storage(storage),
+        m_request(request),
+        m_handler(handler)
+    {}
+
+    virtual void execute()
+    {
+        rapidjson::StringBuffer buf;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+        m_storage.print_json(writer);
+
+        std::string reply = buf.GetString();
+        m_handler->response()->write(reply);
+        m_handler->response()->close();
+    }
+
+private:
+    Storage & m_storage;
+    std::string m_request;
+    std::shared_ptr<on_get_snapshot> m_handler;
+};
+
 } // unnamed namespace
 
 Storage::Storage(WorkerApplication & app)
@@ -384,6 +412,11 @@ void Storage::arm_timer()
         int err = errno;
         BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to arm timer: %s", strerror(err));
     }
+}
+
+void Storage::get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler)
+{
+    m_app.get_discovery().take_over_snapshot(new SnapshotJob(*this, request, handler));
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer)

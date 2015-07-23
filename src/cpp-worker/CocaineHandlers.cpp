@@ -379,3 +379,12 @@ void on_force_update::on_chunk(const char *chunk, size_t size)
     response()->write(resp);
     response()->close();
 }
+
+void on_get_snapshot::on_chunk(const char *chunk, size_t size)
+{
+    std::string request(chunk, size);
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Snapshot requested: '%s'", request.c_str());
+
+    m_app.get_storage().get_snapshot(request, shared_from_this());
+}
