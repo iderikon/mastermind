@@ -168,13 +168,13 @@ void Group::process_metadata()
                 if (kv.val.type == msgpack::type::POSITIVE_INTEGER) {
                     version = int(kv.val.via.u64);
                 } else {
-                    ostr << "invalid 'version' value type " << kv.val.type;
+                    ostr << "Invalid 'version' value type " << kv.val.type;
                     break;
                 }
             }
             else if (size == 6 && !std::strncmp(ptr, "couple", 6)) {
                 if (!parse_couple(kv.val, couple)) {
-                    ostr << "couldn't parse 'couple'" << std::endl;
+                    ostr << "Couldn't parse 'couple'" << std::endl;
                     break;
                 }
             }
@@ -182,7 +182,7 @@ void Group::process_metadata()
                 if (kv.val.type == msgpack::type::RAW) {
                     ns.assign(kv.val.via.raw.ptr, kv.val.via.raw.size);
                 } else {
-                    ostr << "invalid 'namespace' value type " << kv.val.type;
+                    ostr << "Invalid 'namespace' value type " << kv.val.type;
                     break;
                 }
             }
@@ -190,7 +190,7 @@ void Group::process_metadata()
                 if (kv.val.type == msgpack::type::BOOLEAN) {
                     frozen = kv.val.via.boolean;
                 } else {
-                    ostr << "invalid 'frozen' value type " << kv.val.type;
+                    ostr << "Invalid 'frozen' value type " << kv.val.type;
                     break;
                 }
             }
@@ -220,7 +220,7 @@ void Group::process_metadata()
                                 service_job_id.assign(
                                         srv_kv.val.via.raw.ptr, srv_kv.val.via.raw.size);
                             } else {
-                                ostr << "invalid 'job_id' value type " << srv_kv.val.type;
+                                ostr << "Invalid 'job_id' value type " << srv_kv.val.type;
                                 ok = false;
                                 break;
                             }
@@ -229,7 +229,7 @@ void Group::process_metadata()
                     if (!ok)
                         break;
                 } else {
-                    ostr << "invalid 'service' value type " << kv.val.type;
+                    ostr << "Invalid 'service' value type " << kv.val.type;
                     break;
                 }
             }
@@ -239,7 +239,7 @@ void Group::process_metadata()
         version = 1;
         ns = "default";
         if (!parse_couple(obj, couple))
-            ostr << "couldn't parse couple (format of version 1)";
+            ostr << "Couldn't parse couple (format of version 1)";
     }
 
     if (!ostr.str().empty()) {
@@ -257,7 +257,7 @@ void Group::process_metadata()
         m_namespace = m_storage.get_namespace(ns);
     } else if (m_namespace->get_name() != ns) {
         m_status = BAD;
-        ostr << "group moved to another namespace: '"
+        ostr << "Group moved to another namespace: '"
              << m_namespace->get_name() << "' -> '"
              << ns << '\'';
         m_status_text = ostr.str();
@@ -269,7 +269,7 @@ void Group::process_metadata()
             std::vector<int> couple_groups;
             m_couple->get_group_ids(couple_groups);
 
-            ostr << "couple in group metadata [ ";
+            ostr << "Couple in group metadata [ ";
             for (size_t i = 0; i < couple.size(); ++i)
                 ostr << couple[i] << ' ';
             ostr << "] doesn't match to existing one [ ";
@@ -288,7 +288,7 @@ void Group::process_metadata()
 
     if (backends.empty()) {
         m_status = INIT;
-        m_status_text = "no node backends";
+        m_status_text = "No node backends";
     } else if (backends.size() > 1 && m_storage.get_app().get_config().forbidden_dht_groups) {
         m_status = BROKEN;
 
@@ -313,24 +313,24 @@ void Group::process_metadata()
 
         if (have_bad) {
             m_status = BROKEN;
-            m_status_text = "some of backends are in state BROKEN";
+            m_status_text = "Some of backends are in state BROKEN";
         } else if (have_ro) {
             if (m_service.migrating) {
                 m_status = MIGRATING;
-                ostr << "group is migrating, job id is '" << m_service.job_id << '\'';
+                ostr << "Group is migrating, job id is '" << m_service.job_id << '\'';
                 m_status_text = ostr.str();
                 // TODO: check whether the job was initiated
             } else {
                 m_status = RO;
-                m_status_text = "group is read-only because it has read-only backends";
+                m_status_text = "Group is read-only because it has read-only backends";
             }
         } else if (have_other) {
             m_status = BAD;
-            m_status_text = "group is in state BAD because some of "
+            m_status_text = "Group is in state BAD because some of "
                 "backends are not in state OK";
         } else {
             m_status = COUPLED;
-            m_status_text = "group is OK";
+            m_status_text = "Group is OK";
         }
     }
 }

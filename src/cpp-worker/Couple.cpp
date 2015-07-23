@@ -68,7 +68,7 @@ void Couple::update_status()
 
     if (m_groups.empty()) {
         m_status = BAD;
-        m_status_text = "couple has no groups";
+        m_status_text = "Couple has no groups";
         return;
     }
 
@@ -82,7 +82,7 @@ void Couple::update_status()
     for (size_t i = 1; i < m_groups.size(); ++i) {
         if (!g->metadata_equals(*m_groups[i])) {
             m_status = BAD;
-            m_status_text = "groups have different metadata";
+            m_status_text = "Groups have different metadata";
             return;
         }
 
@@ -93,7 +93,7 @@ void Couple::update_status()
 
     if (have_frozen) {
         m_status = FROZEN;
-        m_status_text = "some groups are frozen";
+        m_status_text = "Some groups are frozen";
         return;
     }
 
@@ -101,7 +101,7 @@ void Couple::update_status()
         // TODO: forbidden unmatched group total space
         // TODO: full
         m_status = OK;
-        m_status_text = "couple is OK";
+        m_status_text = "Couple is OK";
         return;
     }
 
@@ -109,21 +109,21 @@ void Couple::update_status()
         Group::Status status = statuses[i];
         if (status == Group::INIT) {
             m_status = INIT;
-            m_status_text = "some groups are uninitialized";
+            m_status_text = "Some groups are uninitialized";
         } else if (status == Group::BAD) {
             m_status = BAD;
-            m_status_text = "some groups are in state BAD";
+            m_status_text = "Some groups are in state BAD";
         } else if (status == Group::BROKEN) {
             m_status = BROKEN;
-            m_status_text = "some groups are in state BROKEN";
+            m_status_text = "Some groups are in state BROKEN";
         } else if (status == Group::RO || status == Group::MIGRATING) {
             m_status = BAD;
-            m_status_text = "some groups are read-only";
+            m_status_text = "Some groups are read-only";
         }
     }
 
     m_status = BAD;
-    m_status_text = "couple is BAD for unknown reason";
+    m_status_text = "Couple is BAD for unknown reason";
 
     // TODO: account job
 }
