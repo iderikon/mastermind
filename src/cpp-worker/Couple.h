@@ -44,8 +44,10 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Couple();
     Couple(const std::vector<Group*> & groups);
+
+    const std::string & get_key() const
+    { return m_key; }
 
     bool check(const std::vector<int> & groups) const;
 
@@ -66,6 +68,7 @@ public:
 
 private:
     std::vector<Group*> m_groups;
+    std::string m_key;
     mutable RWSpinLock m_groups_lock;
 
     Status m_status;

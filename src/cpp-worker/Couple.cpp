@@ -44,8 +44,13 @@ bool Couple::check(const std::vector<int> & groups) const
 
 void Couple::bind_groups()
 {
-    for (size_t i = 0; i < m_groups.size(); ++i)
+    m_key.clear();
+    for (size_t i = 0; i < m_groups.size(); ++i) {
         m_groups[i]->set_couple(this);
+        m_key += std::to_string(m_groups[i]->get_id());
+        if (i != (m_groups.size() - 1))
+            m_key += ':';
+    }
 }
 
 void Couple::get_group_ids(std::vector<int> & groups) const
@@ -126,6 +131,7 @@ void Couple::update_status()
 void Couple::print_info(std::ostream & ostr) const
 {
     ostr << "Couple {\n"
+            "  key: " << m_key << "\n"
             "  groups: [ ";
 
     {
