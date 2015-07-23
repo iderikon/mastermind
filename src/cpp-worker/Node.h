@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <map>
+#include <rapidjson/writer.h>
 #include <string>
 #include <vector>
 
@@ -106,6 +107,7 @@ public:
     void get_filesystems(std::vector<FS*> & filesystems);
 
     void print_info(std::ostream & ostr) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
     static const char *download_state_str(DownloadState state);
 

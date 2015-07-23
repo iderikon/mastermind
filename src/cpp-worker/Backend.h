@@ -23,6 +23,7 @@ class FS;
 
 #include <cstdint>
 #include <iostream>
+#include <rapidjson/writer.h>
 
 struct BackendStat
 {
@@ -103,6 +104,7 @@ public:
     { return m_status; }
 
     void print_info(std::ostream & ostr) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
     static const char *status_str(Status status);
 
@@ -130,7 +132,7 @@ private:
     int m_max_write_rps;
 
     Status m_status;
-    int m_read_only;
+    bool m_read_only;
     bool m_disabled;
 };
 

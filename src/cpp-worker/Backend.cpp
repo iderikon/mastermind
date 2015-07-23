@@ -37,7 +37,7 @@ Backend::Backend(Node & node)
     m_max_read_rps(0),
     m_max_write_rps(0),
     m_status(INIT),
-    m_read_only(0),
+    m_read_only(false),
     m_disabled(false)
 {}
 
@@ -151,6 +151,95 @@ void Backend::print_info(std::ostream & ostr) const
             "  disabled: " << m_disabled << "\n"
             "  read_only: " << m_read_only << "\n"
             "}";
+}
+
+void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+{
+    writer.StartObject();
+
+    writer.Key("timestamp");
+    writer.StartObject();
+    writer.Key("tv_sec");
+    writer.Uint64(m_stat.ts_sec);
+    writer.Key("tv_usec");
+    writer.Uint64(m_stat.ts_usec);
+    writer.EndObject();
+
+    writer.Key("node");
+    writer.String(m_node.get_key().c_str());
+    writer.Key("backend_id");
+    writer.Uint64(m_stat.backend_id);
+    writer.Key("state");
+    writer.Uint64(m_stat.state);
+    writer.Key("vfs_blocks");
+    writer.Uint64(m_stat.vfs_blocks);
+    writer.Key("vfs_bavail");
+    writer.Uint64(m_stat.vfs_bavail);
+    writer.Key("vfs_bsize");
+    writer.Uint64(m_stat.vfs_bsize);
+    writer.Key("records_total");
+    writer.Uint64(m_stat.records_total);
+    writer.Key("records_removed");
+    writer.Uint64(m_stat.records_removed);
+    writer.Key("records_removed_size");
+    writer.Uint64(m_stat.records_removed_size);
+    writer.Key("base_size");
+    writer.Uint64(m_stat.base_size);
+    writer.Key("fsid");
+    writer.Uint64(m_stat.fsid);
+    writer.Key("defrag_state");
+    writer.Uint64(m_stat.defrag_state);
+    writer.Key("want_defrag");
+    writer.Uint64(m_stat.want_defrag);
+    writer.Key("read_ios");
+    writer.Uint64(m_stat.read_ios);
+    writer.Key("write_ios");
+    writer.Uint64(m_stat.write_ios);
+    writer.Key("error");
+    writer.Uint64(m_stat.error);
+    writer.Key("blob_size_limit");
+    writer.Uint64(m_stat.blob_size_limit);
+    writer.Key("max_blob_base_size");
+    writer.Uint64(m_stat.max_blob_base_size);
+    writer.Key("blob_size");
+    writer.Uint64(m_stat.blob_size);
+    writer.Key("group");
+    writer.Uint64(m_stat.group);
+
+    writer.Key("vfs_free_space");
+    writer.Uint64(m_vfs_free_space);
+    writer.Key("vfs_total_space");
+    writer.Uint64(m_vfs_total_space);
+    writer.Key("vfs_used_space");
+    writer.Uint64(m_vfs_used_space);
+    writer.Key("records");
+    writer.Uint64(m_records);
+    writer.Key("free_space");
+    writer.Uint64(m_free_space);
+    writer.Key("total_space");
+    writer.Uint64(m_total_space);
+    writer.Key("used_space");
+    writer.Uint64(m_used_space);
+    writer.Key("fragmentation");
+    writer.Double(m_fragmentation);
+    writer.Key("read_rps");
+    writer.Uint64(m_read_rps);
+    writer.Key("write_rps");
+    writer.Uint64(m_write_rps);
+    writer.Key("max_read_rps");
+    writer.Uint64(m_max_read_rps);
+    writer.Key("max_write_rps");
+    writer.Uint64(m_max_write_rps);
+    writer.Key("status");
+    writer.String(status_str(m_status));
+
+    // XXX
+    writer.Key("read_only");
+    writer.Bool(m_read_only);
+    writer.Key("disabled");
+    writer.Bool(m_disabled);
+
+    writer.EndObject();
 }
 
 const char *Backend::status_str(Status status)

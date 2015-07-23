@@ -19,6 +19,7 @@
 #define __c065a812_f800_4562_8686_a77b1e60e201
 
 #include <cstdint>
+#include <rapidjson/writer.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -72,6 +73,7 @@ public:
     { return m_status; }
 
     void print_info(std::ostream & ostr) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
     Node & m_node;

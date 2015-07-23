@@ -290,6 +290,54 @@ void Node::print_info(std::ostream & ostr) const
             "}";
 }
 
+void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+{
+    writer.StartObject();
+
+    writer.Key("timestamp");
+    writer.StartObject();
+    writer.Key("tv_sec");
+    writer.Uint64(m_stat.ts_sec);
+    writer.Key("tv_usec");
+    writer.Uint64(m_stat.ts_usec);
+    writer.EndObject();
+
+    writer.Key("tx_bytes");
+    writer.Uint64(m_stat.tx_bytes);
+    writer.Key("rx_bytes");
+    writer.Uint64(m_stat.rx_bytes);
+    writer.Key("load_average");
+    writer.Double(m_stat.load_average);
+    writer.Key("tx_rate");
+    writer.Double(m_stat.tx_rate);
+    writer.Key("rx_rate");
+    writer.Double(m_stat.rx_rate);
+
+    writer.Key("filesystems");
+    writer.StartObject();
+    {
+        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+            writer.Key(std::to_string(it->first).c_str());
+            it->second.print_json(writer);
+        }
+    }
+    writer.EndObject();
+
+    writer.Key("backends");
+    writer.StartObject();
+    {
+        ReadGuard<RWSpinLock> guard(m_backends_lock);
+        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+            writer.Key(std::to_string(it->first).c_str());
+            it->second.print_json(writer);
+        }
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+}
+
 const char *Node::download_state_str(DownloadState state)
 {
     switch (state)
