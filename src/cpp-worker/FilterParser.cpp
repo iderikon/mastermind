@@ -22,16 +22,18 @@
 enum FilterKey
 {
     FilterSec   = 2,
-    Namespaces  = 4,
-    Couples     = 8,
-    Groups      = 0x10,
-    Backends    = 0x20,
-    Nodes       = 0x40,
-    Filesystems = 0x80
+    ItemTypes   = 4,
+    Namespaces  = 8,
+    Couples     = 0x10,
+    Groups      = 0x20,
+    Backends    = 0x40,
+    Nodes       = 0x80,
+    Filesystems = 0x100
 };
 
 static const Parser::Folder filter_1[] = {
-    { "filter", 0, FilterSec },
+    { "filter",     0, FilterSec },
+    { "item_types", 0, ItemTypes },
     { NULL, 0, 0 }
 };
 
@@ -86,6 +88,19 @@ bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy
     case FilterSec|Filesystems:
         m_filter.filesystems.emplace_back(std::move(string));
         break;
+    case ItemTypes:
+        if (length == 5 && !std::strncmp(str, "group", 5))
+            m_filter.item_types |= Filter::Group;
+        else if (length == 6 && !std::strncmp(str, "couple", 6))
+            m_filter.item_types |= Filter::Couple;
+        else if (length == 4 && !std::strncmp(str, "node", 4))
+            m_filter.item_types |= Filter::Node;
+        else if (length == 7 && !std::strncmp(str, "backend", 7))
+            m_filter.item_types |= Filter::Backend;
+        else if (length == 2 && !std::strncmp(str, "fs", 2))
+            m_filter.item_types |= Filter::FS;
+        else
+            return false;
     }
 
     return true;

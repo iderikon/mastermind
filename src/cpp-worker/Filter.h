@@ -18,17 +18,32 @@
 #ifndef __8ad6cf0b_8b75_48cc_87b4_b532d146d6d5
 #define __8ad6cf0b_8b75_48cc_87b4_b532d146d6d5
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 struct Filter
 {
+    enum ItemType {
+        Group   = 1,
+        Couple  = 2,
+        Node    = 4,
+        Backend = 8,
+        FS      = 0x10
+    };
+
+    Filter()
+        : item_types(0)
+    {}
+
     std::vector<std::string> namespaces;
     std::vector<std::string> couples;
     std::vector<int> groups;
     std::vector<std::string> backends;
     std::vector<std::string> nodes;
     std::vector<std::string> filesystems;
+
+    uint32_t item_types;
 };
 
 #endif
