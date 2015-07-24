@@ -18,8 +18,9 @@
 #ifndef __399b96bc_e6ca_4613_afad_b47d434d2bea
 #define __399b96bc_e6ca_4613_afad_b47d434d2bea
 
-class Node;
+class Group;
 class FS;
+class Node;
 
 #include <cstdint>
 #include <iostream>
@@ -77,6 +78,14 @@ public:
     const Node & get_node() const
     { return m_node; }
 
+    FS *get_fs() const
+    { return m_fs; }
+
+    void set_group(Group *group)
+    { m_group = group; }
+    Group *get_group() const
+    { return m_group; }
+
     const std::string & get_key() const
     { return m_key; }
 
@@ -114,6 +123,7 @@ public:
 private:
     Node & m_node;
     FS *m_fs;
+    Group *m_group;
 
     std::string m_key;
 

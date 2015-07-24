@@ -24,6 +24,8 @@
 Backend::Backend(Node & node)
     :
     m_node(node),
+    m_fs(NULL),
+    m_group(NULL),
     m_vfs_free_space(0),
     m_vfs_total_space(0),
     m_vfs_used_space(0),

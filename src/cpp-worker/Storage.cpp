@@ -222,8 +222,9 @@ void Storage::handle_backend(Backend & backend, bool existed)
             guard.release();
             it->second.add_backend(backend);
         } else {
-            m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend, *this)));
+            it = m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend, *this)));
         }
+        backend.set_group(&it->second);
     }
 }
 
