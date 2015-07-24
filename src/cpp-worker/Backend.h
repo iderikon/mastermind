@@ -19,6 +19,7 @@
 #define __399b96bc_e6ca_4613_afad_b47d434d2bea
 
 class Group;
+class Filter;
 class FS;
 class Node;
 
@@ -114,6 +115,8 @@ public:
 
     Status get_status() const
     { return m_status; }
+
+    bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;

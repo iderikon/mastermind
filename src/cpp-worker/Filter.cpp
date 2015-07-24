@@ -15,39 +15,16 @@
  * License along with this library.
  */
 
-#ifndef __8ad6cf0b_8b75_48cc_87b4_b532d146d6d5
-#define __8ad6cf0b_8b75_48cc_87b4_b532d146d6d5
+#include "Filter.h"
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include <algorithm>
 
-struct Filter
+void Filter::sort()
 {
-    enum ItemType {
-        Group     = 1,
-        Couple    = 2,
-        Namespace = 4,
-        Node      = 8,
-        Backend   = 0x10,
-        FS        = 0x20
-    };
-
-    Filter()
-        : item_types(0)
-    {}
-
-    std::vector<std::string> namespaces;
-    std::vector<std::string> couples;
-    std::vector<int> groups;
-    std::vector<std::string> backends;
-    std::vector<std::string> nodes;
-    std::vector<std::string> filesystems;
-
-    uint32_t item_types;
-
-    void sort();
-};
-
-#endif
-
+    std::sort(namespaces.begin(), namespaces.end());
+    std::sort(couples.begin(), couples.end());
+    std::sort(groups.begin(), groups.end());
+    std::sort(backends.begin(), backends.end());
+    std::sort(nodes.begin(), nodes.end());
+    std::sort(filesystems.begin(), filesystems.end());
+}

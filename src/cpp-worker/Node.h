@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+class Filter;
 class FS;
 class Node;
 class Storage;
@@ -105,6 +106,8 @@ public:
     FS *get_fs(uint64_t fsid);
     bool get_fs(uint64_t fsid, FS *& fs);
     void get_filesystems(std::vector<FS*> & filesystems);
+
+    bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;

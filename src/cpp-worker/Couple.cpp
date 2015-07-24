@@ -15,9 +15,14 @@
  * License along with this library.
  */
 
+#include "Backend.h"
 #include "Couple.h"
+#include "Filter.h"
+#include "FS.h"
 #include "Group.h"
 #include "Guard.h"
+#include "Namespace.h"
+#include "Node.h"
 
 #include <algorithm>
 
@@ -126,6 +131,82 @@ void Couple::update_status()
     m_status_text = "Couple is BAD for unknown reason";
 
     // TODO: account job
+}
+
+bool Couple::match(const Filter & filter, uint32_t item_types) const
+{
+    if ((item_types & Filter::Couple) && !filter.couples.empty()) {
+        if (!std::binary_search(filter.couples.begin(), filter.couples.end(), m_key))
+            return false;
+    }
+
+    bool check_groups = (item_types & Filter::Group) && !filter.groups.empty();
+    bool check_namespace = (item_types && Filter::Namespace) && !filter.namespaces.empty();
+    bool check_nodes = (item_types & Filter::Node) && !filter.nodes.empty();
+    bool check_backends = (item_types & Filter::Backend) && !filter.backends.empty();
+    bool check_fs = (item_types & Filter::FS) && !filter.filesystems.empty();
+
+    if (!check_groups && !check_namespace && !check_nodes && !check_backends && !check_fs)
+        return true;
+
+    ReadGuard<RWSpinLock> guard(m_groups_lock);
+
+    if (m_groups.empty())
+        return false;
+
+    if (check_namespace) {
+        Namespace *ns = m_groups[0]->get_namespace();
+        if (ns == NULL)
+            return false;
+
+        if (!std::binary_search(filter.namespaces.begin(), filter.namespaces.end(),
+                    ns->get_name()))
+            return false;
+    }
+
+    if (check_groups) {
+        bool found = false;
+        for (Group *group : m_groups) {
+            if (std::binary_search(filter.groups.begin(), filter.groups.end(),
+                        group->get_id())) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return false;
+    }
+
+    bool found_backend = false;
+    bool found_node = false;
+    bool found_fs = false;
+
+    std::vector<Backend*> backends;
+    for (Group *group : m_groups) {
+        group->get_backends(backends);
+        for (Backend *backend : backends) {
+            if (check_backends && !found_backend) {
+                if (std::binary_search(filter.backends.begin(), filter.backends.end(),
+                            backend->get_key()))
+                    found_backend = true;
+            }
+            if (check_nodes && !found_node) {
+                if (std::binary_search(filter.nodes.begin(), filter.nodes.end(),
+                            backend->get_node().get_key()))
+                    found_node = true;
+            }
+            if (check_fs && !found_fs) {
+                if (backend->get_fs() != NULL && std::binary_search(filter.filesystems.begin(),
+                            filter.filesystems.end(), backend->get_fs()->get_key()))
+                    found_fs = true;
+            }
+            if (check_backends == found_backend && check_nodes == found_node && check_fs == found_fs)
+                return true;
+        }
+        backends.clear();
+    }
+
+    return false;
 }
 
 void Couple::print_info(std::ostream & ostr) const
