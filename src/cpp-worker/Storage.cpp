@@ -43,8 +43,10 @@ public:
 
     void handle_completion()
     {
-        if (! --m_nr_groups)
+        if (! --m_nr_groups) {
             m_thread_pool.execute_pending(m_update_job);
+            delete this;
+        }
     }
 
 private:
