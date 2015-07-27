@@ -19,7 +19,6 @@
 #include "Discovery.h"
 #include "DiscoveryTimer.h"
 #include "Filter.h"
-#include "FilterParser.h"
 #include "FS.h"
 #include "Group.h"
 #include "Guard.h"
@@ -31,6 +30,28 @@
 #include <elliptics/session.hpp>
 
 using namespace ioremap;
+
+class Storage::UpdateJobToggle
+{
+public:
+    UpdateJobToggle(ThreadPool & thread_pool, ThreadPool::Job *job, int nr_groups)
+        :
+        m_thread_pool(thread_pool),
+        m_update_job(job),
+        m_nr_groups(nr_groups)
+    {}
+
+    void handle_completion()
+    {
+        if (! --m_nr_groups)
+            m_thread_pool.execute_pending(m_update_job);
+    }
+
+private:
+    ThreadPool & m_thread_pool;
+    ThreadPool::Job *m_update_job;
+    std::atomic<int> m_nr_groups;
+};
 
 namespace {
 
@@ -66,33 +87,11 @@ private:
     Storage & m_storage;
 };
 
-class UpdateJobToggle
-{
-public:
-    UpdateJobToggle(ThreadPool & thread_pool, UpdateJob *job, int nr_groups)
-        :
-        m_thread_pool(thread_pool),
-        m_update_job(job),
-        m_nr_groups(nr_groups)
-    {}
-
-    void handle_completion()
-    {
-        if (! --m_nr_groups)
-            m_thread_pool.execute_pending(m_update_job);
-    }
-
-private:
-    ThreadPool & m_thread_pool;
-    UpdateJob *m_update_job;
-    std::atomic<int> m_nr_groups;
-};
-
 class GroupMetadataHandler
 {
 public:
     GroupMetadataHandler(elliptics::session & session,
-            Group *group, UpdateJobToggle *toggle)
+            Group *group, Storage::UpdateJobToggle *toggle)
         :
         m_session(session.clone()),
         m_group(group),
@@ -122,45 +121,24 @@ public:
 private:
     elliptics::session m_session;
     Group *m_group;
-    UpdateJobToggle *m_toggle;
+    Storage::UpdateJobToggle *m_toggle;
 };
 
 class SnapshotJob : public ThreadPool::Job
 {
 public:
-    SnapshotJob(Storage & storage, const std::string & request,
+    SnapshotJob(Storage & storage, const Filter & filter,
             std::shared_ptr<on_get_snapshot> handler)
         :
         m_storage(storage),
-        m_request(request),
+        m_filter(filter),
         m_handler(handler)
     {}
 
     virtual void execute()
     {
-        Filter filter;
-
-        if (!m_request.empty()) {
-            FilterParser parser(filter);
-
-            rapidjson::Reader reader;
-            rapidjson::StringStream ss(m_request.c_str());
-            reader.Parse(ss, parser);
-
-            if (!parser.good()) {
-                m_handler->response()->error(-1, "Incorrect filter syntax");
-                m_handler->response()->close();
-            }
-        }
-
         Storage::Entries entries;
-        m_storage.select(filter, entries);
-
-        if (!entries.backends.empty()) {
-            for (Backend *backend : entries.backends)
-                entries.nodes.push_back(&backend->get_node());
-            remove_duplicates(entries.nodes);
-        }
+        m_storage.select(m_filter, entries);
 
         rapidjson::StringBuffer buf;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
@@ -173,8 +151,107 @@ public:
 
 private:
     Storage & m_storage;
-    std::string m_request;
+    Filter m_filter;
     std::shared_ptr<on_get_snapshot> m_handler;
+};
+
+class RefreshEntries : public ThreadPool::Job
+{
+public:
+    RefreshEntries(const Storage::Entries & entries,
+            std::shared_ptr<on_refresh> handler)
+        :
+        m_entries(entries),
+        m_handler(handler)
+    {}
+
+    static void perform(const Storage::Entries & entries,
+            std::shared_ptr<on_refresh> & handler)
+    {
+        for (Node *node : entries.nodes)
+            node->update_filesystems();
+
+        for (Group *group : entries.groups)
+            group->process_metadata();
+
+        for (Couple *couple : entries.couples)
+            couple->update_status();
+
+        handler->response()->write("Refresh done");
+        handler->response()->close();
+    }
+
+    virtual void execute()
+    {
+        perform(m_entries, m_handler);
+    }
+
+private:
+    Storage::Entries m_entries;
+    std::shared_ptr<on_refresh> m_handler;
+};
+
+class RefreshGroupDownload : public ThreadPool::Job
+{
+public:
+    RefreshGroupDownload(WorkerApplication & app,
+            const Storage::Entries & entries,
+            std::shared_ptr<on_refresh> handler)
+        :
+        m_app(app),
+        m_session(app.get_discovery().get_session().clone()),
+        m_entries(entries),
+        m_handler(handler)
+    {}
+
+    virtual void execute()
+    {
+        if (m_entries.groups.empty())
+            RefreshEntries::perform(m_entries, m_handler);
+        else
+            m_app.get_storage().schedule_refresh(m_entries, m_session, m_handler);
+    }
+
+private:
+    WorkerApplication & m_app;
+    elliptics::session m_session;
+    Storage::Entries m_entries;
+    std::shared_ptr<on_refresh> m_handler;
+};
+
+class RefreshStart : public ThreadPool::Job
+{
+public:
+    RefreshStart(WorkerApplication & app, const Filter & filter,
+            std::shared_ptr<on_refresh> handler)
+        :
+        m_app(app),
+        m_filter(filter),
+        m_handler(handler)
+    {}
+
+    virtual void execute()
+    {
+        Storage::Entries entries;
+        m_app.get_storage().select(m_filter, entries);
+
+        if (m_app.get_discovery().in_progress()) {
+            m_handler->response()->write("Discovery is in progress");
+            m_handler->response()->close();
+            return;
+        }
+
+        if (!entries.nodes.empty())
+            m_app.get_discovery().discover_nodes(entries.nodes);
+
+        m_app.get_thread_pool().dispatch_after(new RefreshGroupDownload(
+                    m_app, entries, m_handler));
+    }
+
+private:
+    WorkerApplication & m_app;
+    Filter m_filter;
+    std::shared_ptr<on_refresh> m_handler;
 };
 
 } // unnamed namespace
@@ -346,9 +423,6 @@ void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
 
 void Storage::schedule_update(elliptics::session & session)
 {
-    std::vector<int> group_id(1);
-    elliptics::key key("symmetric_groups");
-
     ReadGuard<RWMutex> guard(m_groups_lock);
 
     if (m_groups.empty()) {
@@ -360,23 +434,41 @@ void Storage::schedule_update(elliptics::session & session)
     UpdateJobToggle *toggle = new UpdateJobToggle(m_app.get_thread_pool(), update, m_groups.size());
     m_app.get_thread_pool().dispatch_pending(update);
 
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
-        Group *group = &it->second;
-        group_id[0] = group->get_id();
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+        schedule_metadata_download(session, toggle, &it->second);
+}
 
-        GroupMetadataHandler *handler = new GroupMetadataHandler(session, group, toggle);
+void Storage::schedule_refresh(const Entries & entries, elliptics::session & session,
+        std::shared_ptr<on_refresh> handler)
+{
+    RefreshEntries *refresh = new RefreshEntries(entries, handler);
+    UpdateJobToggle *toggle = new UpdateJobToggle(m_app.get_thread_pool(), refresh, entries.groups.size());
+    m_app.get_thread_pool().dispatch_pending(refresh);
 
-        elliptics::session *new_session = handler->get_session();
-        new_session->set_namespace("metabalancer");
-        new_session->set_groups(group_id);
+    for (Group *group : entries.groups)
+        schedule_metadata_download(session, toggle, group);
+}
 
-        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-                "Scheduling metadata download for group %d", group_id[0]);
+void Storage::schedule_metadata_download(elliptics::session & session,
+        UpdateJobToggle *toggle, Group *group)
+{
+    std::vector<int> group_id(1);
+    group_id[0] = group->get_id();
 
-        elliptics::async_read_result res = new_session->read_data(key, group_id, 0, 0);
-        res.connect(std::bind(&GroupMetadataHandler::result, handler, std::placeholders::_1),
-                std::bind(&GroupMetadataHandler::final, handler, std::placeholders::_1));
-    }
+    static const elliptics::key key("symmetric_groups");
+
+    GroupMetadataHandler *handler = new GroupMetadataHandler(session, group, toggle);
+
+    elliptics::session *new_session = handler->get_session();
+    new_session->set_namespace("metabalancer");
+    new_session->set_groups(group_id);
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
+            "Scheduling metadata download for group %d", group_id[0]);
+
+    elliptics::async_read_result res = new_session->read_data(key, group_id, 0, 0);
+    res.connect(std::bind(&GroupMetadataHandler::result, handler, std::placeholders::_1),
+            std::bind(&GroupMetadataHandler::final, handler, std::placeholders::_1));
 }
 
 void Storage::update_filesystems()
@@ -827,13 +919,27 @@ void Storage::select(Filter & filter, Entries & entries)
                 }
                 backends.clear();
             }
+            have_backends = true;
         }
+    }
+
+    if (have_backends || have_fs) {
+        for (Backend *backend : entries.backends)
+            entries.nodes.push_back(&backend->get_node());
+        for (FS *fs : entries.filesystems)
+            entries.nodes.push_back(&fs->get_node());
+        remove_duplicates(entries.nodes);
     }
 }
 
-void Storage::get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler)
+void Storage::get_snapshot(const Filter & filter, std::shared_ptr<on_get_snapshot> handler)
 {
-    m_app.get_discovery().take_over_snapshot(new SnapshotJob(*this, request, handler));
+    m_app.get_discovery().take_over_snapshot(new SnapshotJob(*this, filter, handler));
+}
+
+void Storage::refresh(const Filter & filter, std::shared_ptr<on_refresh> handler)
+{
+    m_app.get_thread_pool().dispatch_after(new RefreshStart(m_app, filter, handler));
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries)

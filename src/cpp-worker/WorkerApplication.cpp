@@ -80,6 +80,7 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
 
     d.on<on_force_update>("force_update", *this);
     d.on<on_get_snapshot>("get_snapshot", *this);
+    d.on<on_refresh>("refresh", *this);
 
     m_thread_pool->start();
     m_discovery_timer->start();

@@ -209,6 +209,19 @@ int Discovery::start()
     if (nodes.empty())
         return 0;
 
+    if (discover_nodes(nodes) != 0)
+        return -1;
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Discovery completed successfully");
+
+    assert(m_session != NULL);
+    m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app.get_storage(), *m_session));
+
+    return 0;
+}
+
+int Discovery::discover_nodes(const std::vector<Node*> & nodes)
+{
     CurlGuard guard(m_curl_handle, m_epollfd);
 
     m_curl_handle = curl_multi_init();
@@ -326,16 +339,14 @@ int Discovery::start()
         } while (msg);
     }
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Discovery completed successfully");
-
-    assert(m_session != NULL);
-    m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app.get_storage(), *m_session));
-
     return 0;
 }
 
 void Discovery::end()
 {
+    if (!m_in_progress)
+        return;
+
     struct timeval end_tv;
     gettimeofday(&end_tv, NULL);
 

@@ -80,6 +80,9 @@ public:
     void get_namespaces(std::vector<Namespace*> & namespaces);
 
     void schedule_update(ioremap::elliptics::session & session);
+    void schedule_refresh(const Entries & entries, ioremap::elliptics::session & session,
+            std::shared_ptr<on_refresh> handler);
+
     void update_filesystems();
     void update_groups();
     void update_couples();
@@ -91,9 +94,17 @@ public:
 
     void select(Filter & filter, Entries & entries);
 
-    void get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler);
+    void get_snapshot(const Filter & filter, std::shared_ptr<on_get_snapshot> handler);
+    void refresh(const Filter & filter, std::shared_ptr<on_refresh> handler);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries);
+
+public:
+    class UpdateJobToggle;
+
+private:
+    void schedule_metadata_download(ioremap::elliptics::session & session,
+            UpdateJobToggle *toggle, Group *group);
 
 public:
     struct CoupleKey

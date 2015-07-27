@@ -20,6 +20,7 @@
 #include "Couple.h"
 #include "Discovery.h"
 #include "DiscoveryTimer.h"
+#include "FilterParser.h"
 #include "FS.h"
 #include "Group.h"
 #include "Node.h"
@@ -34,6 +35,20 @@ struct NSVolumeSort
         return (ns1->get_couple_count() > ns2->get_couple_count());
     }
 };
+
+int parse_filter(const std::string & request, Filter & filter)
+{
+    FilterParser parser(filter);
+
+    rapidjson::Reader reader;
+    rapidjson::StringStream ss(request.c_str());
+    reader.Parse(ss, parser);
+
+    if (!parser.good())
+        return -1;
+
+    return 0;
+}
 
 } // unnamed namespace
 
@@ -386,5 +401,34 @@ void on_get_snapshot::on_chunk(const char *chunk, size_t size)
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Snapshot requested: '%s'", request.c_str());
 
-    m_app.get_storage().get_snapshot(request, shared_from_this());
+    Filter filter;
+
+    if (!request.empty()) {
+        if (parse_filter(request, filter) != 0) {
+            response()->error(-1, "Incorrect filter syntax");
+            response()->close();
+            return;
+        }
+    }
+
+    m_app.get_storage().get_snapshot(filter, shared_from_this());
+}
+
+void on_refresh::on_chunk(const char *chunk, size_t size)
+{
+    std::string request(chunk, size);
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Refresh requested: '%s'", request.c_str());
+
+    Filter filter;
+
+    if (!request.empty()) {
+        if (parse_filter(request, filter) != 0) {
+            response()->error(-1, "Incorrect filter syntax");
+            response()->close();
+            return;
+        }
+    }
+
+    m_app.get_storage().refresh(filter, shared_from_this());
 }

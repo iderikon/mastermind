@@ -41,9 +41,13 @@ public:
 
     int init();
 
+    ioremap::elliptics::session & get_session()
+    { return *m_session; }
+
     void resolve_nodes();
 
     int start();
+    int discover_nodes(const std::vector<Node*> & nodes);
 
     bool in_progress() const
     { return m_in_progress; }
