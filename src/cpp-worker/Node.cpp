@@ -380,27 +380,33 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("rx_rate");
     writer.Double(m_stat.rx_rate);
 
-    writer.Key("filesystems");
-    writer.StartArray();
-    {
-        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
-            if (filesystems == NULL || std::binary_search(filesystems->begin(), filesystems->end(), &it->second))
-                it->second.print_json(writer);
+    if (filesystems || backends == NULL) {
+        writer.Key("filesystems");
+        writer.StartArray();
+        {
+            ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+            for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+                if (filesystems == NULL || std::binary_search(filesystems->begin(),
+                            filesystems->end(), &it->second))
+                    it->second.print_json(writer);
+            }
         }
+        writer.EndArray();
     }
-    writer.EndArray();
 
-    writer.Key("backends");
-    writer.StartArray();
-    {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-            if (backends == NULL || std::binary_search(backends->begin(), backends->end(), &it->second))
-                it->second.print_json(writer);
+    if (backends || filesystems == NULL) {
+        writer.Key("backends");
+        writer.StartArray();
+        {
+            ReadGuard<RWSpinLock> guard(m_backends_lock);
+            for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+                if (backends == NULL || std::binary_search(backends->begin(),
+                            backends->end(), &it->second))
+                    it->second.print_json(writer);
+            }
         }
+        writer.EndArray();
     }
-    writer.EndArray();
 
     writer.EndObject();
 }
