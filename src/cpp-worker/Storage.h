@@ -45,6 +45,18 @@ class WorkerApplication;
 class Storage
 {
 public:
+    struct Entries
+    {
+        std::vector<Couple*> couples;
+        std::vector<Group*> groups;
+        std::vector<Backend*> backends;
+        std::vector<Node*> nodes;
+        std::vector<FS*> filesystems;
+
+        void sort();
+    };
+
+public:
     Storage(WorkerApplication & app);
     ~Storage();
 
@@ -64,6 +76,7 @@ public:
     void get_couples(std::vector<Couple*> & couples);
 
     Namespace *get_namespace(const std::string & name);
+    bool get_namespace(const std::string & name, Namespace *& ns);
     void get_namespaces(std::vector<Namespace*> & namespaces);
 
     void schedule_update(ioremap::elliptics::session & session);
@@ -76,9 +89,11 @@ public:
 
     void arm_timer();
 
+    void select(Filter & filter, Entries & entries);
+
     void get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler);
 
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer);
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries);
 
 public:
     struct CoupleKey

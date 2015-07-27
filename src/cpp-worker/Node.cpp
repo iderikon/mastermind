@@ -355,7 +355,9 @@ void Node::print_info(std::ostream & ostr) const
             "}";
 }
 
-void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        const std::vector<Backend*> *backends,
+        const std::vector<FS*> *filesystems) const
 {
     writer.StartObject();
 
@@ -382,8 +384,10 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
     writer.StartArray();
     {
         ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-            it->second.print_json(writer);
+        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+            if (filesystems == NULL || std::binary_search(filesystems->begin(), filesystems->end(), &it->second))
+                it->second.print_json(writer);
+        }
     }
     writer.EndArray();
 
@@ -391,8 +395,10 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
     writer.StartArray();
     {
         ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-            it->second.print_json(writer);
+        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+            if (backends == NULL || std::binary_search(backends->begin(), backends->end(), &it->second))
+                it->second.print_json(writer);
+        }
     }
     writer.EndArray();
 

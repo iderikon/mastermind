@@ -18,6 +18,8 @@
 #include "Couple.h"
 #include "Discovery.h"
 #include "DiscoveryTimer.h"
+#include "Filter.h"
+#include "FilterParser.h"
 #include "FS.h"
 #include "Group.h"
 #include "Guard.h"
@@ -31,6 +33,14 @@
 using namespace ioremap;
 
 namespace {
+
+template<typename T>
+void remove_duplicates(std::vector<T> & v)
+{
+    std::sort(v.begin(), v.end());
+    auto it = std::unique(v.begin(), v.end());
+    v.erase(it, v.end());
+}
 
 class UpdateJob : public ThreadPool::Job
 {
@@ -128,9 +138,33 @@ public:
 
     virtual void execute()
     {
+        Filter filter;
+
+        if (!m_request.empty()) {
+            FilterParser parser(filter);
+
+            rapidjson::Reader reader;
+            rapidjson::StringStream ss(m_request.c_str());
+            reader.Parse(ss, parser);
+
+            if (!parser.good()) {
+                m_handler->response()->error(-1, "Incorrect filter syntax");
+                m_handler->response()->close();
+            }
+        }
+
+        Storage::Entries entries;
+        m_storage.select(filter, entries);
+
+        if (!entries.backends.empty()) {
+            for (Backend *backend : entries.backends)
+                entries.nodes.push_back(&backend->get_node());
+            remove_duplicates(entries.nodes);
+        }
+
         rapidjson::StringBuffer buf;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-        m_storage.print_json(writer);
+        m_storage.print_json(writer, entries);
 
         std::string reply = buf.GetString();
         m_handler->response()->write(reply);
@@ -144,6 +178,15 @@ private:
 };
 
 } // unnamed namespace
+
+void Storage::Entries::sort()
+{
+    std::sort(couples.begin(), couples.end());
+    std::sort(groups.begin(), groups.end());
+    std::sort(backends.begin(), backends.end());
+    std::sort(nodes.begin(), nodes.end());
+    std::sort(filesystems.begin(), filesystems.end());
+}
 
 Storage::Storage(WorkerApplication & app)
     : m_app(app)
@@ -269,20 +312,27 @@ void Storage::get_couples(std::vector<Couple*> & couples)
 
 Namespace *Storage::get_namespace(const std::string & name)
 {
-    {
-        ReadGuard<RWSpinLock> guard(m_namespaces_lock);
-        auto it = m_namespaces.find(name);
-        if (it != m_namespaces.end())
-            return &it->second;
-    }
+    Namespace *ns;
+    if (get_namespace(name, ns))
+        return ns;
 
-    {
-        WriteGuard<RWSpinLock> guard(m_namespaces_lock);
-        auto it = m_namespaces.lower_bound(name);
-        if (it == m_namespaces.end() || it->first != name)
-            it = m_namespaces.insert(it, std::make_pair(name, Namespace(name)));
-        return &it->second;
+    WriteGuard<RWSpinLock> guard(m_namespaces_lock);
+    auto it = m_namespaces.lower_bound(name);
+    if (it == m_namespaces.end() || it->first != name)
+        it = m_namespaces.insert(it, std::make_pair(name, Namespace(name)));
+    return &it->second;
+}
+
+bool Storage::get_namespace(const std::string & name, Namespace *& ns)
+{
+    ReadGuard<RWSpinLock> guard(m_namespaces_lock);
+
+    auto it = m_namespaces.find(name);
+    if (it != m_namespaces.end()) {
+        ns = &it->second;
+        return true;
     }
+    return false;
 }
 
 void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
@@ -415,12 +465,378 @@ void Storage::arm_timer()
     }
 }
 
+void Storage::select(Filter & filter, Entries & entries)
+{
+    filter.sort();
+
+    bool have_groups = false;
+    bool have_couples = false;
+    bool have_nodes = false;
+    bool have_backends = false;
+    bool have_fs = false;
+
+    if (filter.item_types & Filter::Group) {
+        if (!filter.groups.empty()) {
+            std::vector<Group*> candidate_groups;
+            {
+                ReadGuard<RWMutex> guard(m_groups_lock);
+                for (int id : filter.groups) {
+                    auto it = m_groups.find(id);
+                    if (it != m_groups.end())
+                        candidate_groups.push_back(&it->second);
+                }
+            }
+            for (Group *group : candidate_groups) {
+                if (group->match(filter, ~Filter::Group))
+                    entries.groups.push_back(group);
+            }
+            have_groups = true;
+        }
+    }
+
+    if (filter.item_types & Filter::Couple) {
+        std::vector<Couple*> candidate_couples;
+        if (!filter.couples.empty()) {
+            std::vector<int> group_ids;
+            group_ids.reserve(4);
+
+            ReadGuard<RWMutex> guard(m_couples_lock);
+
+            for (const std::string & couple_key_str : filter.couples) {
+                if (couple_key_str.empty())
+                    continue;
+
+                size_t start = 0;
+                size_t pos;
+                do {
+                    pos = couple_key_str.find(':', start);
+                    group_ids.push_back(std::stoi(couple_key_str.substr(start, pos - start)));
+                    start = pos + 1;
+                } while (pos != std::string::npos);
+
+                auto it = m_couples.find(CoupleKey(group_ids));
+                if (it != m_couples.end())
+                    candidate_couples.push_back(&it->second);
+
+                group_ids.clear();
+            }
+
+            guard.release();
+
+            for (Couple *couple : candidate_couples) {
+                if (couple->match(filter, ~Filter::Couple))
+                    entries.couples.push_back(couple);
+            }
+            have_couples = true;
+        } else if (have_groups) {
+            for (Group *group : entries.groups) {
+                if (group->get_couple() != NULL)
+                    candidate_couples.push_back(group->get_couple());
+            }
+            remove_duplicates(candidate_couples);
+            for (Couple *couple : candidate_couples) {
+                if (couple->match(filter, ~Filter::Group))
+                    entries.couples.push_back(couple);
+            }
+            have_couples = true;
+        } else if (!filter.namespaces.empty()) {
+            for (const std::string & name : filter.namespaces) {
+                Namespace *ns;
+                if (get_namespace(name, ns)) {
+                    std::vector<Couple*> couples;
+                    ns->get_couples(couples);
+                    for (Couple *couple : couples) {
+                        if (couple->match(filter, ~Filter::Namespace))
+                            entries.couples.push_back(couple);
+                    }
+                }
+            }
+            have_couples = true;
+        } else {
+            std::vector<Couple*> couples;
+            get_couples(couples);
+            for (Couple *couple : couples) {
+                if (couple->match(filter))
+                    entries.couples.push_back(couple);
+            }
+        }
+    }
+
+    if (have_couples && !have_groups && (filter.item_types & Filter::Group)) {
+        std::vector<Group*> candidate_groups;
+        for (Couple *couple : entries.couples) {
+            couple->get_groups(candidate_groups);
+            for (Group *group : candidate_groups) {
+                if (group->match(filter, ~Filter::Couple & ~Filter::Group))
+                    entries.groups.push_back(group);
+            }
+            candidate_groups.clear();
+        }
+        have_groups = true;
+    }
+
+    if (filter.item_types & Filter::Node) {
+        if (!filter.nodes.empty()) {
+            std::vector<Node*> candidate_nodes;
+            {
+                ReadGuard<RWMutex> guard(m_nodes_lock);
+                for (const std::string & key : filter.nodes) {
+                    auto it = m_nodes.find(key);
+                    if (it != m_nodes.end())
+                        candidate_nodes.push_back(&it->second);
+                }
+            }
+            for (Node *node : candidate_nodes) {
+                if (node->match(filter, ~Filter::Node))
+                    entries.nodes.push_back(node);
+            }
+            have_nodes = true;
+        } else if (have_groups) {
+            std::vector<Node*> candidate_nodes;
+            std::vector<Backend*> backends;
+            for (Group *group : entries.groups) {
+                group->get_backends(backends);
+                for (Backend *backend : backends)
+                    candidate_nodes.push_back(&backend->get_node());
+                backends.clear();
+            }
+            remove_duplicates(candidate_nodes);
+            for (Node *node : candidate_nodes) {
+                if (node->match(filter, ~Filter::Group))
+                    entries.nodes.push_back(node);
+            }
+            have_nodes = true;
+        } else if (have_couples) {
+            std::vector<Node*> candidate_nodes;
+            std::vector<Group*> groups;
+            std::vector<Backend*> backends;
+            for (Couple *couple : entries.couples) {
+                couple->get_groups(groups);
+                for (Group *group : groups) {
+                    group->get_backends(backends);
+                    for (Backend *backend : backends)
+                        candidate_nodes.push_back(&backend->get_node());
+                    backends.clear();
+                }
+                groups.clear();
+            }
+            remove_duplicates(candidate_nodes);
+            for (Node *node : candidate_nodes) {
+                if (node->match(filter, ~Filter::Couple))
+                    entries.nodes.push_back(node);
+            }
+            have_nodes = true;
+        } else {
+            std::vector<Node*> nodes;
+            get_nodes(nodes);
+            for (Node *node : nodes) {
+                if (node->match(filter))
+                    entries.nodes.push_back(node);
+            }
+            have_nodes = true;
+        }
+    }
+
+    if (filter.item_types & Filter::Backend) {
+        if (!filter.backends.empty()) {
+            Node *node = NULL;
+            for (const std::string & backend_key : filter.backends) {
+                size_t pos = backend_key.rfind('/');
+                if (pos == std::string::npos)
+                    continue;
+                std::string node_key = backend_key.substr(0, pos);
+                if (node == NULL || node->get_key() != node_key) {
+                    if (!get_node(node_key, node))
+                        continue;
+                }
+                Backend *backend;
+                if (node->get_backend(std::stoi(backend_key.substr(pos + 1)), backend)) {
+                    if (backend->match(filter, ~Filter::Backend))
+                        entries.backends.push_back(backend);
+                }
+            }
+            have_backends = true;
+        } else if (have_groups) {
+            std::vector<Backend*> backends;
+            for (Group *group : entries.groups) {
+                group->get_backends(backends);
+                for (Backend *backend : backends) {
+                    if (backend->match(filter, ~Filter::Group))
+                        entries.backends.push_back(backend);
+                }
+                backends.clear();
+            }
+            have_backends = true;
+        } else if (have_couples) {
+            std::vector<Group*> groups;
+            std::vector<Backend*> backends;
+            for (Couple *couple : entries.couples) {
+                couple->get_groups(groups);
+                for (Group *group : groups) {
+                    group->get_backends(backends);
+                    for (Backend *backend : backends) {
+                        if (backend->match(filter, ~Filter::Couple))
+                            entries.backends.push_back(backend);
+                    }
+                    backends.clear();
+                }
+                groups.clear();
+            }
+            have_backends = true;
+        } else if (have_nodes) {
+            std::vector<Backend*> backends;
+            for (Node *node : entries.nodes) {
+                node->get_backends(backends);
+                for (Backend *backend : backends) {
+                    if (backend->match(filter, ~Filter::Node))
+                        entries.backends.push_back(backend);
+                }
+                backends.clear();
+            }
+            have_backends = true;
+        }
+    }
+
+    if (filter.item_types & Filter::FS) {
+        if (!filter.filesystems.empty()) {
+            Node *node = NULL;
+            for (const std::string & fs_key : filter.filesystems) {
+                size_t pos = fs_key.rfind('/');
+                if (pos == std::string::npos)
+                    continue;
+                std::string node_key = fs_key.substr(0, pos);
+                if (node == NULL || node->get_key() != node_key) {
+                    if (!get_node(node_key, node))
+                        continue;
+                }
+                FS *fs;
+                if (node->get_fs(std::stoull(fs_key.substr(pos + 1)), fs)) {
+                    if (fs->match(filter, ~Filter::FS))
+                        entries.filesystems.push_back(fs);
+                }
+            }
+            have_fs = true;
+        } else if (have_backends) {
+            std::vector<FS*> candidate_fs;
+            for (Backend *backend : entries.backends) {
+                FS *fs = backend->get_fs();
+                if (fs == NULL)
+                    continue;
+                candidate_fs.push_back(fs);
+            }
+            remove_duplicates(candidate_fs);
+            for (FS *fs : candidate_fs) {
+                if (fs->match(filter, ~Filter::Backend))
+                    entries.filesystems.push_back(fs);
+            }
+            have_fs = true;
+        } else if (have_nodes) {
+            std::vector<FS*> candidate_fs;
+            for (Node *node : entries.nodes) {
+                node->get_filesystems(candidate_fs);
+                for (FS *fs : candidate_fs) {
+                    if (fs->match(filter, ~Filter::Node))
+                        entries.filesystems.push_back(fs);
+                }
+                candidate_fs.clear();
+            }
+            have_fs = true;
+        } else if (have_groups) {
+            std::vector<Backend*> backends;
+            std::vector<FS*> candidate_fs;
+            for (Group *group : entries.groups) {
+                group->get_backends(backends);
+                for (Backend *backend : backends) {
+                    FS *fs = backend->get_fs();
+                    if (fs == NULL)
+                        continue;
+                    candidate_fs.push_back(fs);
+                }
+                backends.clear();
+            }
+            remove_duplicates(candidate_fs);
+            for (FS *fs : candidate_fs) {
+                if (fs->match(filter, ~Filter::Group))
+                    entries.filesystems.push_back(fs);
+            }
+            have_fs = true;
+        } else if (have_couples) {
+            std::vector<Group*> groups;
+            std::vector<Backend*> backends;
+            std::vector<FS*> candidate_fs;
+            for (Couple *couple : entries.couples) {
+                couple->get_groups(groups);
+                for (Group *group : groups) {
+                    group->get_backends(backends);
+                    for (Backend *backend : backends) {
+                        FS *fs = backend->get_fs();
+                        if (fs == NULL)
+                            continue;
+                        candidate_fs.push_back(fs);
+                    }
+                    backends.clear();
+                }
+                groups.clear();
+            }
+            remove_duplicates(candidate_fs);
+            for (FS *fs : candidate_fs) {
+                if (fs->match(filter, ~Filter::Couple))
+                    entries.filesystems.push_back(fs);
+            }
+            have_fs = true;
+        } else {
+            std::vector<Backend*> backends;
+            std::vector<Node*> nodes;
+            get_nodes(nodes);
+            for (Node *node : nodes) {
+                node->get_backends(backends);
+                for (Backend *backend : backends) {
+                    FS *fs = backend->get_fs();
+                    if (fs == NULL)
+                        continue;
+                    if (fs->match(filter))
+                        entries.filesystems.push_back(fs);
+                }
+                backends.clear();
+            }
+            have_fs = true;
+        }
+    }
+
+    if (!have_backends && (filter.item_types & Filter::Backend)) {
+        if (have_fs) {
+            std::vector<Backend*> backends;
+            for (FS *fs : entries.filesystems) {
+                fs->get_backends(backends);
+                for (Backend *backend : backends) {
+                    if (backend->match(filter, ~Filter::FS))
+                        entries.backends.push_back(backend);
+                }
+                backends.clear();
+            }
+            have_backends = true;
+        } else {
+            std::vector<Backend*> backends;
+            std::vector<Node*> nodes;
+            get_nodes(nodes);
+            for (Node *node : nodes) {
+                node->get_backends(backends);
+                for (Backend *backend : backends) {
+                    if (backend->match(filter))
+                        entries.backends.push_back(backend);
+                }
+                backends.clear();
+            }
+        }
+    }
+}
+
 void Storage::get_snapshot(const std::string & request, std::shared_ptr<on_get_snapshot> handler)
 {
     m_app.get_discovery().take_over_snapshot(new SnapshotJob(*this, request, handler));
 }
 
-void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer)
+void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries)
 {
     std::vector<Node*> nodes;
     get_nodes(nodes);
@@ -431,23 +847,28 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer)
     std::vector<Couple*> couples;
     get_couples(couples);
 
+    entries.sort();
+
     writer.StartObject();
+
+    std::vector<Backend*> *backends = (entries.backends.empty() ? NULL : &entries.backends);
+    std::vector<FS*> *filesystems = (entries.filesystems.empty() ? NULL : &entries.filesystems);
 
     writer.Key("nodes");
     writer.StartArray();
-    for (Node *node : nodes)
-        node->print_json(writer);
+    for (Node *node : entries.nodes)
+        node->print_json(writer, backends, filesystems);
     writer.EndArray();
 
     writer.Key("groups");
     writer.StartArray();
-    for (Group *group : groups)
+    for (Group *group : entries.groups)
         group->print_json(writer);
     writer.EndArray();
 
     writer.Key("couples");
     writer.StartArray();
-    for (Couple *couple : couples)
+    for (Couple *couple : entries.couples)
         couple->print_json(writer);
     writer.EndArray();
 

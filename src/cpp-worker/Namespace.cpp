@@ -29,3 +29,9 @@ size_t Namespace::get_couple_count() const
     ReadGuard<RWSpinLock> guard(m_couples_lock);
     return m_couples.size();
 }
+
+void Namespace::get_couples(std::vector<Couple*> & couples) const
+{
+    ReadGuard<RWSpinLock> guard(m_couples_lock);
+    couples.assign(m_couples.begin(), m_couples.end());
+}

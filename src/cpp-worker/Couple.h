@@ -57,6 +57,7 @@ public:
     void bind_groups();
 
     void get_group_ids(std::vector<int> & groups) const;
+    void get_groups(std::vector<Group*> & groups) const;
 
     void update_status();
 

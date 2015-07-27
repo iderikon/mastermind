@@ -22,6 +22,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 class Couple;
 
@@ -38,6 +39,7 @@ public:
     void add_couple(Couple *couple);
 
     size_t get_couple_count() const;
+    void get_couples(std::vector<Couple*> & couples) const;
 
 private:
     const std::string m_name;

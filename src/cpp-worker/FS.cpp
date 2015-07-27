@@ -34,7 +34,7 @@ FS::FS(Node & node, uint64_t fsid)
     m_stat.ts_usec = 0;
     m_stat.total_space = 0;
 
-    m_key = node.get_host() + "/" + std::to_string(fsid);
+    m_key = node.get_key() + "/" + std::to_string(fsid);
 }
 
 void FS::add_backend(Backend *backend)

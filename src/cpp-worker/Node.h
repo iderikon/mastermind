@@ -110,7 +110,9 @@ public:
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            const std::vector<Backend*> *backends,
+            const std::vector<FS*> *filesystems) const;
 
     static const char *download_state_str(DownloadState state);
 
