@@ -115,5 +115,10 @@ int WorkerApplication::load_config()
         return -1;
     }
 
+    if (m_config.reserved_space == 0) {
+        BH_LOG(*m_logger, DNET_LOG_ERROR, "Incorrect value 0 for reserved_space");
+        return -1;
+    }
+
     return 0;
 }

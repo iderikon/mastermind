@@ -37,11 +37,13 @@ struct Config
     Config()
         :
         monitor_port(10025),
-        forbidden_dht_groups(0)
+        forbidden_dht_groups(0),
+        reserved_space(112742891519)
     {}
 
     uint64_t monitor_port;
     uint64_t forbidden_dht_groups;
+    uint64_t reserved_space;
     std::vector<NodeInfo> nodes;
 };
 

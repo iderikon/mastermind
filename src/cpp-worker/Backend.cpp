@@ -34,6 +34,7 @@ Backend::Backend(Node & node)
     m_free_space(0),
     m_total_space(0),
     m_used_space(0),
+    m_effective_space(0),
     m_fragmentation(0.0),
     m_read_rps(0),
     m_write_rps(0),
@@ -99,6 +100,11 @@ void Backend::recalculate()
         m_free_space = m_vfs_free_space;
         m_used_space = m_vfs_used_space;
     }
+
+    double share = double(m_total_space) / double(m_vfs_total_space);
+    int64_t free_space_req_share =
+        std::ceil(double(m_node.get_storage().get_app().get_config().reserved_space) * share);
+    m_effective_space = std::max(0L, int64_t(m_total_space) - free_space_req_share);
 
     m_fs->update(*this);
 
@@ -196,6 +202,7 @@ void Backend::print_info(std::ostream & ostr) const
             "  free_space: " << m_free_space << "\n"
             "  total_space: " << m_total_space << "\n"
             "  used_space: " << m_used_space << "\n"
+            "  effective_space: " << m_effective_space << "\n"
             "  fragmentation: " << m_fragmentation << "\n"
             "  read_rps: " << m_read_rps << "\n"
             "  write_rps: " << m_write_rps << "\n"

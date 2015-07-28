@@ -104,14 +104,17 @@ public:
     uint64_t get_vfs_used_space() const
     { return m_vfs_used_space; }
 
-    uint64_t get_records;
-
     uint64_t get_free_space() const
     { return m_free_space; }
     uint64_t get_total_space() const
     { return m_total_space; }
     uint64_t get_used_space() const
     { return m_used_space; }
+    uint64_t get_effective_space() const
+    { return m_effective_space; }
+
+    bool full() const
+    { return m_used_space >= m_effective_space; }
 
     Status get_status() const
     { return m_status; }
@@ -141,6 +144,7 @@ private:
     uint64_t m_free_space;
     uint64_t m_total_space;
     uint64_t m_used_space;
+    uint64_t m_effective_space;
 
     double m_fragmentation;
 

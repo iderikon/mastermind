@@ -23,13 +23,15 @@ enum ConfigKey
 {
     Elliptics          = 2,
     ForbiddenDhtGroups = 4,
-    Nodes              = 8,
-    MonitorPort        = 0x10
+    ReservedSpace      = 8,
+    Nodes              = 0x10,
+    MonitorPort        = 0x20
 };
 
 static const Parser::Folder config_1[] = {
     { "elliptics",            0, Elliptics          },
     { "forbidden_dht_groups", 0, ForbiddenDhtGroups },
+    { "reserved_space",       0, ReservedSpace      },
     { NULL, 0, 0 }
 };
 

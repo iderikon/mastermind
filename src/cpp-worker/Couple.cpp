@@ -110,9 +110,22 @@ void Couple::update_status()
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
         // TODO: forbidden unmatched group total space
-        // TODO: full
-        m_status = OK;
-        m_status_text = "Couple is OK";
+
+        bool full = false;
+        for (Group *group : m_groups) {
+            if (group->full()) {
+                full = true;
+                break;
+            }
+        }
+
+        if (full) {
+            m_status = FULL;
+            m_status_text = "Couple is FULL";
+        } else {
+            m_status = OK;
+            m_status_text = "Couple is OK";
+        }
         return;
     }
 

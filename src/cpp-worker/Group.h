@@ -69,6 +69,8 @@ public:
     void add_backend(Backend & backend);
     void get_backends(std::vector<Backend*> & backends) const;
 
+    bool full() const;
+
     void save_metadata(const char *metadata, size_t size);
 
     void process_metadata();
