@@ -105,10 +105,10 @@ bool Group::full() const
 {
     ReadGuard<RWSpinLock> guard(m_backends_lock);
     for (const Backend *backend : m_backends) {
-        if (backend->full())
-            return true;
+        if (!backend->full())
+            return false;
     }
-    return false;
+    return true;
 }
 
 void Group::save_metadata(const char *metadata, size_t size)
