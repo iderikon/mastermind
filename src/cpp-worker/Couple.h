@@ -46,7 +46,7 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Couple(const std::vector<Group*> & groups);
+    Couple(const std::vector<Group*> & groups, bool forbidden_unmatched_space);
 
     const std::string & get_key() const
     { return m_key; }
@@ -76,6 +76,8 @@ private:
     std::vector<Group*> m_groups;
     std::string m_key;
     mutable RWSpinLock m_groups_lock;
+
+    bool m_forbidden_unmatched_space;
 
     Status m_status;
     const char *m_status_text;

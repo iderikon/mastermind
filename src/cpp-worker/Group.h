@@ -70,6 +70,7 @@ public:
     void get_backends(std::vector<Backend*> & backends) const;
 
     bool full() const;
+    uint64_t get_total_space() const;
 
     void save_metadata(const char *metadata, size_t size);
 

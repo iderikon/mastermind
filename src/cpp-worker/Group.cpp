@@ -111,6 +111,16 @@ bool Group::full() const
     return true;
 }
 
+uint64_t Group::get_total_space() const
+{
+    uint64_t res = 0;
+
+    ReadGuard<RWSpinLock> guard(m_backends_lock);
+    for (const Backend *backend : m_backends)
+        res += backend->get_total_space();
+    return res;
+}
+
 void Group::save_metadata(const char *metadata, size_t size)
 {
     WriteGuard<RWSpinLock> guard(m_metadata_lock);

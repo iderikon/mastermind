@@ -21,22 +21,24 @@
 
 enum ConfigKey
 {
-    Elliptics          = 2,
-    ForbiddenDhtGroups = 4,
-    ReservedSpace      = 8,
-    Nodes              = 0x10,
-    MonitorPort        = 0x20
+    Elliptics                         = 2,
+    ForbiddenDhtGroups                = 4,
+    ForbiddenUnmatchedGroupTotalSpace = 8,
+    ReservedSpace                     = 0x10,
+    Nodes                             = 0x20,
+    MonitorPort                       = 0x40
 };
 
 static const Parser::Folder config_1[] = {
-    { "elliptics",            0, Elliptics          },
-    { "forbidden_dht_groups", 0, ForbiddenDhtGroups },
-    { "reserved_space",       0, ReservedSpace      },
+    { "elliptics",                             0, Elliptics                         },
+    { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
+    { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
+    { "reserved_space",                        0, ReservedSpace                     },
     { NULL, 0, 0 }
 };
 
 static const Parser::Folder config_2[] = {
-    { "nodes",        Elliptics, Nodes },
+    { "nodes",        Elliptics, Nodes       },
     { "monitor_port", Elliptics, MonitorPort },
     { NULL, 0, 0 }
 };
@@ -47,8 +49,10 @@ static const Parser::Folder * const config_folders[] = {
 };
 
 static const Parser::UIntInfo config_uint_info[] = {
-    { Elliptics|MonitorPort, SET, offsetof(Config, monitor_port)         },
-    { ForbiddenDhtGroups,    SET, offsetof(Config, forbidden_dht_groups) },
+    { Elliptics|MonitorPort,             SET, offsetof(Config, monitor_port)                          },
+    { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
+    { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
+    { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
     { 0, 0, 0 }
 };
 

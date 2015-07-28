@@ -542,7 +542,8 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
 
         auto it = m_couples.lower_bound(key);
         if (it == m_couples.end() || it->first != key) {
-            it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
+            it = m_couples.insert(it, std::make_pair(
+                        key, Couple(groups, m_app.get_config().forbidden_unmatched_group_total_space)));
 
             Couple & couple = it->second;
             couple.bind_groups();

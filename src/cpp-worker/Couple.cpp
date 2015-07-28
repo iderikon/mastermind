@@ -26,8 +26,9 @@
 
 #include <algorithm>
 
-Couple::Couple(const std::vector<Group*> & groups)
+Couple::Couple(const std::vector<Group*> & groups, bool forbidden_unmatched_space)
     :
+    m_forbidden_unmatched_space(forbidden_unmatched_space),
     m_status(INIT),
     m_status_text("")
 {
@@ -109,7 +110,14 @@ void Couple::update_status()
     }
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
-        // TODO: forbidden unmatched group total space
+        if (m_forbidden_unmatched_space) {
+            for (size_t i = 1; i < m_groups.size(); ++i) {
+                if (m_groups[i]->get_total_space() != m_groups[0]->get_total_space()) {
+                    m_status = BROKEN;
+                    m_status_text = "Couple has unequal total space in groups";
+                }
+            }
+        }
 
         bool full = false;
         for (Group *group : m_groups) {
