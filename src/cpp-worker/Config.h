@@ -22,8 +22,9 @@
 #include <string>
 #include <vector>
 
-#define CONFIG_FILE "/etc/elliptics/mastermind.conf"
-#define LOG_FILE    "/var/log/mastermind/mastermind-stat.log"
+#define CONFIG_FILE        "/etc/elliptics/mastermind.conf"
+#define LOG_FILE           "/var/log/mastermind/mastermind-stat.log"
+#define ELLIPTICS_LOG_FILE "/var/log/mastermind/elliptics-stat.log"
 
 struct Config
 {
@@ -39,13 +40,15 @@ struct Config
         monitor_port(10025),
         forbidden_dht_groups(0),
         forbidden_unmatched_group_total_space(0),
-        reserved_space(112742891519)
+        reserved_space(112742891519),
+        dnet_log_mask(3)
     {}
 
     uint64_t monitor_port;
     uint64_t forbidden_dht_groups;
     uint64_t forbidden_unmatched_group_total_space;
     uint64_t reserved_space;
+    uint64_t dnet_log_mask;
     std::vector<NodeInfo> nodes;
 };
 

@@ -54,12 +54,17 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     m_discovery = new Discovery(*this);
     m_discovery_timer = new DiscoveryTimer(*this, 60);
 
-    m_logger = new ioremap::elliptics::file_logger(LOG_FILE, DNET_LOG_INFO);
+    load_config();
+
+    m_logger = new ioremap::elliptics::file_logger(
+            LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
     if (!m_logger)
         throw worker_error("failed to open log file " LOG_FILE);
 
-    if (load_config())
-        throw worker_error("failed to load config");
+    m_elliptics_logger = new ioremap::elliptics::file_logger(
+            ELLIPTICS_LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
+    if (!m_elliptics_logger)
+        throw worker_error("failed to open log file " ELLIPTICS_LOG_FILE);
 
     if (m_discovery->init())
         throw worker_error("failed to initialize discovery");
@@ -100,25 +105,19 @@ int WorkerApplication::load_config()
     ConfigParser parser(m_config);
 
     FILE *f = fopen(CONFIG_FILE, "rb");
-    if (f == NULL) {
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "Cannot open " CONFIG_FILE);
-        return -1;
-    }
+    if (f == NULL)
+        throw worker_error("Cannot open " CONFIG_FILE);
 
     static char buf[65536];
     rapidjson::FileReadStream is(f, buf, sizeof(buf));
     rapidjson::Reader reader;
     reader.Parse(is, parser);
 
-    if (!parser.good()) {
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "Error parsing " CONFIG_FILE);
-        return -1;
-    }
+    if (!parser.good())
+        throw worker_error("Error parsing " CONFIG_FILE);
 
-    if (m_config.reserved_space == 0) {
-        BH_LOG(*m_logger, DNET_LOG_ERROR, "Incorrect value 0 for reserved_space");
-        return -1;
-    }
+    if (m_config.reserved_space == 0)
+        throw worker_error("Incorrect value 0 for reserved_space");
 
     return 0;
 }

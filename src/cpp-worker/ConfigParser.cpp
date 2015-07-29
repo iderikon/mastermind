@@ -25,8 +25,9 @@ enum ConfigKey
     ForbiddenDhtGroups                = 4,
     ForbiddenUnmatchedGroupTotalSpace = 8,
     ReservedSpace                     = 0x10,
-    Nodes                             = 0x20,
-    MonitorPort                       = 0x40
+    DnetLogMask                       = 0x20,
+    Nodes                             = 0x40,
+    MonitorPort                       = 0x80
 };
 
 static const Parser::Folder config_1[] = {
@@ -34,6 +35,7 @@ static const Parser::Folder config_1[] = {
     { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
     { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
     { "reserved_space",                        0, ReservedSpace                     },
+    { "dnet_log_mask",                         0, DnetLogMask                       },
     { NULL, 0, 0 }
 };
 
@@ -53,6 +55,7 @@ static const Parser::UIntInfo config_uint_info[] = {
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
+    { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },
     { 0, 0, 0 }
 };
 

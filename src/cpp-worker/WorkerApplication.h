@@ -37,6 +37,9 @@ public:
     ioremap::elliptics::logger_base & get_logger()
     { return *m_logger; }
 
+    ioremap::elliptics::logger_base & get_elliptics_logger()
+    { return *m_elliptics_logger; }
+
     const Config & get_config() const
     { return m_config; }
 
@@ -57,6 +60,7 @@ private:
 
 private:
     ioremap::elliptics::logger_base *m_logger;
+    ioremap::elliptics::logger_base *m_elliptics_logger;
 
     Config m_config;
 

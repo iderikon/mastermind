@@ -147,7 +147,7 @@ int Discovery::init()
 
     m_http_port = config.monitor_port;
 
-    m_node.reset(new elliptics::node(elliptics::logger(m_app.get_logger(), blackhole::log::attributes_t())));
+    m_node.reset(new elliptics::node(elliptics::logger(m_app.get_elliptics_logger(), blackhole::log::attributes_t())));
 
     BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Initializing discovery");
 
