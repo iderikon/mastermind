@@ -38,17 +38,25 @@ struct Config
     Config()
         :
         monitor_port(10025),
+        wait_timeout(10),
         forbidden_dht_groups(0),
         forbidden_unmatched_group_total_space(0),
         reserved_space(112742891519),
-        dnet_log_mask(3)
+        dnet_log_mask(3),
+        net_thread_num(3),
+        io_thread_num(3),
+        nonblocking_io_thread_num(3)
     {}
 
     uint64_t monitor_port;
+    uint64_t wait_timeout;
     uint64_t forbidden_dht_groups;
     uint64_t forbidden_unmatched_group_total_space;
     uint64_t reserved_space;
     uint64_t dnet_log_mask;
+    uint64_t net_thread_num;
+    uint64_t io_thread_num;
+    uint64_t nonblocking_io_thread_num;
     std::vector<NodeInfo> nodes;
 };
 

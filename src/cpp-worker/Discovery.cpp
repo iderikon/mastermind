@@ -147,7 +147,15 @@ int Discovery::init()
 
     m_http_port = config.monitor_port;
 
-    m_node.reset(new elliptics::node(elliptics::logger(m_app.get_elliptics_logger(), blackhole::log::attributes_t())));
+    dnet_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.wait_timeout = config.wait_timeout;
+    cfg.net_thread_num = config.net_thread_num;
+    cfg.io_thread_num = config.io_thread_num;
+    cfg.nonblocking_io_thread_num = config.nonblocking_io_thread_num;
+
+    m_node.reset(new elliptics::node(
+                elliptics::logger(m_app.get_elliptics_logger(), blackhole::log::attributes_t()), cfg));
 
     BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Initializing discovery");
 

@@ -26,8 +26,12 @@ enum ConfigKey
     ForbiddenUnmatchedGroupTotalSpace = 8,
     ReservedSpace                     = 0x10,
     DnetLogMask                       = 0x20,
-    Nodes                             = 0x40,
-    MonitorPort                       = 0x80
+    NetThreadNum                      = 0x40,
+    IoThreadNum                       = 0x80,
+    NonblockingIoThreadNum            = 0x100,
+    Nodes                             = 0x200,
+    MonitorPort                       = 0x400,
+    WaitTimeout                       = 0x800
 };
 
 static const Parser::Folder config_1[] = {
@@ -36,12 +40,16 @@ static const Parser::Folder config_1[] = {
     { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
     { "reserved_space",                        0, ReservedSpace                     },
     { "dnet_log_mask",                         0, DnetLogMask                       },
+    { "net_thread_num",                        0, NetThreadNum                      },
+    { "io_thread_num",                         0, IoThreadNum                       },
+    { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
     { NULL, 0, 0 }
 };
 
 static const Parser::Folder config_2[] = {
     { "nodes",        Elliptics, Nodes       },
     { "monitor_port", Elliptics, MonitorPort },
+    { "wait_timeout", Elliptics, WaitTimeout },
     { NULL, 0, 0 }
 };
 
@@ -52,10 +60,14 @@ static const Parser::Folder * const config_folders[] = {
 
 static const Parser::UIntInfo config_uint_info[] = {
     { Elliptics|MonitorPort,             SET, offsetof(Config, monitor_port)                          },
+    { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
     { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },
+    { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
+    { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
+    { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
     { 0, 0, 0 }
 };
 
