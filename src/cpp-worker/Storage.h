@@ -97,7 +97,8 @@ public:
     void get_snapshot(const Filter & filter, std::shared_ptr<on_get_snapshot> handler);
     void refresh(const Filter & filter, std::shared_ptr<on_refresh> handler);
 
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries);
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            Entries & entries, uint32_t item_types);
 
 public:
     class UpdateJobToggle;

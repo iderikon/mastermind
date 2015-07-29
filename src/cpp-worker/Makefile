@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -O0 -Wall -g
+CFLAGS = -O2 -Wall -g
 CXXFLAGS = $(CFLAGS) -std=c++0x
 CPPFLAGS = -I/usr/include/RapidJSON-1
 

@@ -28,3 +28,13 @@ void Filter::sort()
     std::sort(nodes.begin(), nodes.end());
     std::sort(filesystems.begin(), filesystems.end());
 }
+
+bool Filter::empty() const
+{
+    return namespaces.empty() &&
+        couples.empty() &&
+        groups.empty() &&
+        backends.empty() &&
+        nodes.empty() &&
+        filesystems.empty();
+}

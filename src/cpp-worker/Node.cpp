@@ -356,8 +356,10 @@ void Node::print_info(std::ostream & ostr) const
 }
 
 void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-        const std::vector<Backend*> *backends,
-        const std::vector<FS*> *filesystems) const
+        const std::vector<Backend*> & backends,
+        const std::vector<FS*> & filesystems,
+        bool print_backends,
+        bool print_fs) const
 {
     writer.StartObject();
 
@@ -368,6 +370,13 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("tv_usec");
     writer.Uint64(m_stat.ts_usec);
     writer.EndObject();
+
+    writer.Key("host");
+    writer.String(m_host.c_str());
+    writer.Key("port");
+    writer.Uint64(m_port);
+    writer.Key("family");
+    writer.Uint64(m_family);
 
     writer.Key("tx_bytes");
     writer.Uint64(m_stat.tx_bytes);
@@ -380,28 +389,28 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("rx_rate");
     writer.Double(m_stat.rx_rate);
 
-    if (filesystems || backends == NULL) {
-        writer.Key("filesystems");
+    if (print_backends) {
+        writer.Key("backends");
         writer.StartArray();
         {
-            ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-            for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
-                if (filesystems == NULL || std::binary_search(filesystems->begin(),
-                            filesystems->end(), &it->second))
+            ReadGuard<RWSpinLock> guard(m_backends_lock);
+            for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+                if (backends.empty() || std::binary_search(backends.begin(),
+                            backends.end(), &it->second))
                     it->second.print_json(writer);
             }
         }
         writer.EndArray();
     }
 
-    if (backends || filesystems == NULL) {
-        writer.Key("backends");
+    if (print_fs) {
+        writer.Key("filesystems");
         writer.StartArray();
         {
-            ReadGuard<RWSpinLock> guard(m_backends_lock);
-            for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-                if (backends == NULL || std::binary_search(backends->begin(),
-                            backends->end(), &it->second))
+            ReadGuard<RWSpinLock> guard(m_filesystems_lock);
+            for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+                if (filesystems.empty() || std::binary_search(filesystems.begin(),
+                            filesystems.end(), &it->second))
                     it->second.print_json(writer);
             }
         }

@@ -112,7 +112,6 @@ public:
             std::ostringstream ostr;
             ostr << "Metadata download failed: " << error.message();
             m_group->set_status_text(ostr.str());
-            m_group->set_status(Group::BAD);
         }
         m_toggle->handle_completion();
     }
@@ -139,12 +138,28 @@ public:
 
     virtual void execute()
     {
+        struct timeval start, end;
+        gettimeofday(&start, NULL);
+
         Storage::Entries entries;
         m_storage.select(m_filter, entries);
 
         rapidjson::StringBuffer buf;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-        m_storage.print_json(writer, entries);
+
+        writer.StartObject();
+
+        m_storage.print_json(writer, entries, m_filter.item_types);
+
+        gettimeofday(&end, NULL);
+        double ts1 = double(start.tv_sec) + double(start.tv_usec) / 1000000.0;
+        double ts2 = double(end.tv_sec) + double(end.tv_usec) / 1000000.0;
+        double duration = ts2 - ts1;
+
+        writer.Key("collecting_time");
+        writer.Double(duration);
+
+        writer.EndObject();
 
         std::string reply = buf.GetString();
         m_handler->response()->write(reply);
@@ -562,6 +577,18 @@ void Storage::arm_timer()
 
 void Storage::select(Filter & filter, Entries & entries)
 {
+    if (filter.empty()) {
+        if (filter.item_types & Filter::Group)
+            get_groups(entries.groups);
+        if (filter.item_types & Filter::Couple)
+            get_couples(entries.couples);
+        if ((filter.item_types & Filter::Node) ||
+                (filter.item_types & Filter::FS) ||
+                (filter.item_types & Filter::Backend))
+            get_nodes(entries.nodes);
+        return;
+    }
+
     filter.sort();
 
     bool have_groups = false;
@@ -926,6 +953,26 @@ void Storage::select(Filter & filter, Entries & entries)
         }
     }
 
+    if (!have_groups && (filter.item_types & Filter::Group)) {
+        if (have_backends) {
+            for (Backend *backend : entries.backends) {
+                Group *group = backend->get_group();
+                if (group != NULL && group->match(filter, ~Filter::Backend))
+                    entries.groups.push_back(group);
+            }
+            remove_duplicates(entries.groups);
+            have_groups = true;
+        } else {
+            std::vector<Group*> groups;
+            get_groups(groups);
+            for (Group *group : groups) {
+                if (group->match(filter))
+                    entries.groups.push_back(group);
+            }
+            have_groups = true;
+        }
+    }
+
     if (have_backends || have_fs) {
         for (Backend *backend : entries.backends)
             entries.nodes.push_back(&backend->get_node());
@@ -945,28 +992,16 @@ void Storage::refresh(const Filter & filter, std::shared_ptr<on_refresh> handler
     m_app.get_thread_pool().dispatch_after(new RefreshStart(m_app, filter, handler));
 }
 
-void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, Entries & entries)
+void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        Entries & entries, uint32_t item_types)
 {
-    std::vector<Node*> nodes;
-    get_nodes(nodes);
-
-    std::vector<Group*> groups;
-    get_groups(groups);
-
-    std::vector<Couple*> couples;
-    get_couples(couples);
-
     entries.sort();
-
-    writer.StartObject();
-
-    std::vector<Backend*> *backends = (entries.backends.empty() ? NULL : &entries.backends);
-    std::vector<FS*> *filesystems = (entries.filesystems.empty() ? NULL : &entries.filesystems);
 
     writer.Key("nodes");
     writer.StartArray();
     for (Node *node : entries.nodes)
-        node->print_json(writer, backends, filesystems);
+        node->print_json(writer, entries.backends, entries.filesystems,
+                !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
     writer.EndArray();
 
     writer.Key("groups");
@@ -980,6 +1015,4 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, En
     for (Couple *couple : entries.couples)
         couple->print_json(writer);
     writer.EndArray();
-
-    writer.EndObject();
 }

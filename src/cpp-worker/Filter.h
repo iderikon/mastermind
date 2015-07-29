@@ -47,6 +47,7 @@ struct Filter
     uint32_t item_types;
 
     void sort();
+    bool empty() const;
 };
 
 #endif

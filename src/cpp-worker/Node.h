@@ -111,8 +111,10 @@ public:
 
     void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            const std::vector<Backend*> *backends,
-            const std::vector<FS*> *filesystems) const;
+            const std::vector<Backend*> & backends,
+            const std::vector<FS*> & filesystems,
+            bool print_backends,
+            bool print_fs) const;
 
     static const char *download_state_str(DownloadState state);
 
