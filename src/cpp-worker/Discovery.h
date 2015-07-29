@@ -89,7 +89,7 @@ private:
     CURLM *m_curl_handle;
     long m_timeout_ms;
 
-    timeval m_start_tv;
+    uint64_t m_duration_clock;
     double m_last_duration;
 
     bool m_in_progress;

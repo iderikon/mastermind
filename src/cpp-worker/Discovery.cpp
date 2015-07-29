@@ -18,6 +18,7 @@
 #include "Config.h"
 #include "Discovery.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
 #include "WorkerApplication.h"
@@ -118,7 +119,7 @@ Discovery::Discovery(WorkerApplication & app)
     m_epollfd(-1),
     m_curl_handle(NULL),
     m_timeout_ms(0),
-    m_start_tv{0, 0},
+    m_duration_clock(0),
     m_last_duration(0.0),
     m_in_progress(false)
 {
@@ -199,7 +200,7 @@ int Discovery::start()
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Starting discovery");
 
     m_in_progress = true;
-    gettimeofday(&m_start_tv, NULL);
+    clock_start(m_duration_clock);
 
     resolve_nodes();
 
@@ -347,13 +348,8 @@ void Discovery::end()
     if (!m_in_progress)
         return;
 
-    struct timeval end_tv;
-    gettimeofday(&end_tv, NULL);
-
-    double ts1 = double(m_start_tv.tv_sec) + double(m_start_tv.tv_usec) / 1000000.0;
-    double ts2 = double(end_tv.tv_sec) + double(end_tv.tv_usec) / 1000000.0;
-
-    m_last_duration = ts2 - ts1;
+    clock_stop(m_duration_clock);
+    m_last_duration = double(m_duration_clock) / 1000000000.0;
 
     LockGuard<SpinLock> guard(m_progress_lock);
 
