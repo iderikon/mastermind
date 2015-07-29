@@ -67,6 +67,9 @@ public:
     const char *get_status_text() const
     { return m_status_text; }
 
+    uint64_t get_update_status_time() const
+    { return m_update_status_time; }
+
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
@@ -81,6 +84,8 @@ private:
 
     Status m_status;
     const char *m_status_text;
+
+    uint64_t m_update_status_time;
 };
 
 #endif

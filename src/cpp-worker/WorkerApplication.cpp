@@ -54,7 +54,7 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     m_discovery = new Discovery(*this);
     m_discovery_timer = new DiscoveryTimer(*this, 60);
 
-    m_logger = new ioremap::elliptics::file_logger(LOG_FILE, DNET_LOG_DEBUG);
+    m_logger = new ioremap::elliptics::file_logger(LOG_FILE, DNET_LOG_INFO);
     if (!m_logger)
         throw worker_error("failed to open log file " LOG_FILE);
 

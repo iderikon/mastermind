@@ -22,6 +22,7 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "ProcfsParser.h"
 #include "TimestampParser.h"
@@ -29,93 +30,87 @@
 
 #include <cmath>
 
-namespace {
-
-class ProcfsJob : public ThreadPool::Job
+class Node::BackendJob : public ThreadPool::Job
 {
 public:
-    ProcfsJob(Node *node)
-        :
-        m_node(node)
+    BackendJob(Node & node)
+        : m_node(node)
     {}
 
     void pick_data(std::vector<char> & data)
     { m_data.swap(data); }
 
-    virtual void execute();
+    virtual void execute()
+    {
+        Stopwatch watch(m_node.m_clock.backend);
+
+        TimestampParser ts_parser;
+
+        {
+            rapidjson::Reader reader;
+            rapidjson::StringStream ss(&m_data[0]);
+            reader.Parse(ss, ts_parser);
+        }
+
+        if (!ts_parser.good()) {
+            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
+                    "Error parsing timestamp in backend statistics");
+            return;
+        }
+
+        BackendParser parser(ts_parser.get_ts_sec(), ts_parser.get_ts_usec(), m_node);
+
+        {
+            rapidjson::Reader reader;
+            rapidjson::StringStream ss(&m_data[0]);
+            reader.Parse(ss, parser);
+        }
+
+        if (!parser.good()) {
+            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
+                    "Error parsing backend statistics");
+            return;
+        }
+    }
 
 private:
-    Node *m_node;
+    Node & m_node;
     std::vector<char> m_data;
 };
 
-class BackendJob : public ThreadPool::Job
+class Node::ProcfsJob : public ThreadPool::Job
 {
 public:
-    BackendJob(Node *node)
-        :
-        m_node(node)
+    ProcfsJob(Node & node)
+        : m_node(node)
     {}
 
     void pick_data(std::vector<char> & data)
     { m_data.swap(data); }
 
-    virtual void execute();
-
-private:
-    Node *m_node;
-    std::vector<char> m_data;
-};
-
-void ProcfsJob::execute()
-{
-    ProcfsParser parser;
-
-    rapidjson::Reader reader;
-    rapidjson::StringStream ss(&m_data[0]);
-    reader.Parse(ss, parser);
-
-    if (!parser.good()) {
-        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing procfs statistics");
-        return;
-    }
-
-    m_node->update(parser.get_stat());
-}
-
-void BackendJob::execute()
-{
-    TimestampParser ts_parser;
-
+    virtual void execute()
     {
-        rapidjson::Reader reader;
-        rapidjson::StringStream ss(&m_data[0]);
-        reader.Parse(ss, ts_parser);
-    }
+        Stopwatch watch(m_node.m_clock.procfs);
 
-    if (!ts_parser.good()) {
-        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing timestamp in backend statistics");
-        return;
-    }
+        ProcfsParser parser;
 
-    BackendParser parser(ts_parser.get_ts_sec(), ts_parser.get_ts_usec(), m_node);
-
-    {
         rapidjson::Reader reader;
         rapidjson::StringStream ss(&m_data[0]);
         reader.Parse(ss, parser);
+
+        if (!parser.good()) {
+            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
+                    "Error parsing procfs statistics");
+            return;
+        }
+
+        m_node.update(parser.get_stat());
     }
 
-    if (!parser.good()) {
-        BH_LOG(m_node->get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing backend statistics");
-        return;
-    }
-}
-
-} // unnamed namespace
+private:
+    Node & m_node;
+    std::vector<char> m_data;
+};
 
 NodeStat::NodeStat()
 {
@@ -185,14 +180,14 @@ void Node::handle_backend(const BackendStat & new_stat)
 
 ThreadPool::Job *Node::create_backend_parse_job()
 {
-    BackendJob *job = new BackendJob(this);
+    BackendJob *job = new BackendJob(*this);
     job->pick_data(m_download_data);
     return job;
 }
 
 ThreadPool::Job *Node::create_procfs_parse_job()
 {
-    ProcfsJob *job = new ProcfsJob(this);
+    ProcfsJob *job = new ProcfsJob(*this);
     job->pick_data(m_download_data);
     return job;
 }
@@ -225,6 +220,8 @@ bool Node::get_backend(int id, Backend *& backend)
 
 void Node::update_filesystems()
 {
+    Stopwatch watch(m_clock.update_fs);
+
     std::vector<FS*> filesystems;
     get_filesystems(filesystems);
 

@@ -35,25 +35,6 @@ using namespace ioremap;
 
 namespace {
 
-class UpdateStorage : public ThreadPool::Job
-{
-public:
-    UpdateStorage(Storage & storage, elliptics::session & session)
-        :
-        m_storage(storage),
-        m_session(session.clone())
-    {}
-
-    virtual void execute()
-    {
-        m_storage.schedule_update(m_session);
-    }
-
-private:
-    Storage & m_storage;
-    elliptics::session m_session;
-};
-
 struct dnet_addr_compare
 {
     bool operator () (const dnet_addr & a, const dnet_addr & b) const
@@ -112,6 +93,30 @@ private:
     Discovery & m_discovery;
 };
 
+class Discovery::UpdateStorage : public ThreadPool::Job
+{
+public:
+    UpdateStorage(WorkerApplication & app, elliptics::session & session)
+        :
+        m_app(app),
+        m_session(session.clone())
+    {}
+
+    virtual void execute()
+    {
+        Discovery & discovery = m_app.get_discovery();
+
+        clock_stop(discovery.m_clock.finish_monitor_stats_clk);
+        discovery.m_clock.finish_monitor_stats = discovery.m_clock.finish_monitor_stats_clk;
+
+        m_app.get_storage().schedule_update(m_session);
+    }
+
+private:
+    WorkerApplication & m_app;
+    elliptics::session m_session;
+};
+
 Discovery::Discovery(WorkerApplication & app)
     :
     m_app(app),
@@ -119,8 +124,6 @@ Discovery::Discovery(WorkerApplication & app)
     m_epollfd(-1),
     m_curl_handle(NULL),
     m_timeout_ms(0),
-    m_duration_clock(0),
-    m_last_duration(0.0),
     m_in_progress(false)
 {
     m_discovery_start = new DiscoveryStart(*this);
@@ -169,6 +172,8 @@ int Discovery::init()
 
 void Discovery::resolve_nodes()
 {
+    Stopwatch watch(m_clock.resolve_nodes);
+
     if (m_session == NULL) {
         BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "resolve_nodes: session is empty");
         return;
@@ -200,7 +205,7 @@ int Discovery::start()
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Starting discovery");
 
     m_in_progress = true;
-    clock_start(m_duration_clock);
+    clock_start(m_clock.full_clk);
 
     resolve_nodes();
 
@@ -213,16 +218,20 @@ int Discovery::start()
     if (discover_nodes(nodes) != 0)
         return -1;
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Discovery completed successfully");
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Node discovery completed");
 
     assert(m_session != NULL);
-    m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app.get_storage(), *m_session));
+
+    clock_start(m_clock.finish_monitor_stats_clk);
+    m_app.get_thread_pool().dispatch_after(new UpdateStorage(m_app, *m_session));
 
     return 0;
 }
 
 int Discovery::discover_nodes(const std::vector<Node*> & nodes)
 {
+    Stopwatch watch(m_clock.discover_nodes);
+
     CurlGuard guard(m_curl_handle, m_epollfd);
 
     m_curl_handle = curl_multi_init();
@@ -252,8 +261,11 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
 
         node.set_download_state(Node::DownloadStateBackend);
         CURL *easy = create_easy_handle(&node, "backend");
-        if (easy == NULL)
+        if (easy == NULL) {
+            BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                    "Cannot create easy handle to download backend stat");
             return -1;
+        }
         curl_multi_add_handle(m_curl_handle, easy);
     }
 
@@ -348,8 +360,8 @@ void Discovery::end()
     if (!m_in_progress)
         return;
 
-    clock_stop(m_duration_clock);
-    m_last_duration = double(m_duration_clock) / 1000000000.0;
+    clock_stop(m_clock.full_clk);
+    m_clock.full = m_clock.full_clk;
 
     LockGuard<SpinLock> guard(m_progress_lock);
 

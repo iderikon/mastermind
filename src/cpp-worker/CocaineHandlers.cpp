@@ -23,6 +23,7 @@
 #include "FilterParser.h"
 #include "FS.h"
 #include "Group.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
 
@@ -112,8 +113,54 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     std::vector<Namespace*> namespaces;
     storage.get_namespaces(namespaces);
 
-    ostr << namespaces.size() << " namespaces\n"
-            "Last discovery/update duration: " << m_app.get_discovery().get_last_duration() << " seconds";
+    ostr << namespaces.size() << " namespaces\n";
+
+    {
+        const Discovery::ClockStat & stat = m_app.get_discovery().get_clock_stat();
+        ostr << "Discovery metrics:\n"
+                "  Total update time: " << SECONDS(stat.full) << " s\n"
+                "  Resolve node list: " << SECONDS(stat.resolve_nodes) << " s\n"
+                "  Download nodes description: " << SECONDS(stat.discover_nodes) << " s\n"
+                "  Finish processing monitor stats: " << SECONDS(stat.finish_monitor_stats) << " s\n";
+    }
+
+    {
+        const Storage::ClockStat & stat = m_app.get_storage().get_clock_stat();
+        ostr << "  Schedule metadata download time: " << SECONDS(stat.schedule_update_time) << " s\n"
+                "  Metadata download total time: " << SECONDS(stat.metadata_download_total_time) << " s\n"
+                "  Status update time: " << SECONDS(stat.status_update_time) << " s\n";
+    }
+
+    {
+        SerialDistribution distrib_procfs;
+        SerialDistribution distrib_backend;
+        SerialDistribution distrib_update_fs;
+
+        for (Node *node : nodes) {
+            const Node::ClockStat & stat = node->get_clock_stat();
+            distrib_procfs.add_sample(stat.procfs);
+            distrib_backend.add_sample(stat.backend);
+            distrib_update_fs.add_sample(stat.update_fs);
+        }
+
+        ostr << "Distribution for node procfs processing:\n" << distrib_procfs.str() << "\n"
+                "Distribution for node backend processing:\n" << distrib_backend.str() << "\n"
+                "Distribution for node fs update:\n" << distrib_update_fs.str() << '\n';
+    }
+
+    {
+        SerialDistribution distrib;
+        for (Group *group : groups)
+            distrib.add_sample(group->get_metadata_process_time());
+        ostr << "Distribution for group metadata processing:\n" << distrib.str() << '\n';
+    }
+
+    {
+        SerialDistribution distrib;
+        for (Couple *couple : couples)
+            distrib.add_sample(couple->get_update_status_time());
+        ostr << "Distribution for couple update_status:\n" << distrib.str() << '\n';
+    }
 
     response()->write(ostr.str());
     response()->close();

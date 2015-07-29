@@ -88,6 +88,9 @@ public:
     bool get_frozen() const
     { return m_frozen; }
 
+    uint64_t get_metadata_process_time() const
+    { return m_metadata_process_time; }
+
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
@@ -107,6 +110,8 @@ private:
     std::string m_status_text;
     Status m_status;
     mutable RWSpinLock m_metadata_lock;
+
+    uint64_t m_metadata_process_time;
 
     bool m_frozen;
     int m_version;

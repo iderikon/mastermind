@@ -58,8 +58,22 @@ public:
 
     void take_over_snapshot(ThreadPool::Job *job);
 
-    double get_last_duration() const
-    { return m_last_duration; }
+public:
+    struct ClockStat
+    {
+        ClockStat()
+        { memset(this, 0, sizeof(*this)); }
+
+        uint64_t full_clk;
+        uint64_t full;
+        uint64_t resolve_nodes;
+        uint64_t discover_nodes;
+        uint64_t finish_monitor_stats_clk;
+        uint64_t finish_monitor_stats;
+    };
+
+    const ClockStat & get_clock_stat() const
+    { return m_clock; }
 
 private:
     CURL *create_easy_handle(Node *node, const char *stat);
@@ -75,6 +89,7 @@ private:
 
 private:
     class DiscoveryStart;
+    class UpdateStorage;
 
 private:
     WorkerApplication & m_app;
@@ -89,8 +104,7 @@ private:
     CURLM *m_curl_handle;
     long m_timeout_ms;
 
-    uint64_t m_duration_clock;
-    double m_last_duration;
+    ClockStat m_clock;
 
     bool m_in_progress;
     std::vector<ThreadPool::Job*> m_snapshot_jobs;

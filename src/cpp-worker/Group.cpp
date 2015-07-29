@@ -22,6 +22,7 @@
 #include "FS.h"
 #include "Group.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
 #include "WorkerApplication.h"
@@ -60,6 +61,7 @@ Group::Group(Backend & backend, Storage & storage)
     m_couple(NULL),
     m_clean(true),
     m_status(INIT),
+    m_metadata_process_time(0),
     m_frozen(false),
     m_version(0),
     m_namespace(NULL)
@@ -75,6 +77,7 @@ Group::Group(int id, Storage & storage)
     m_couple(NULL),
     m_clean(true),
     m_status(INIT),
+    m_metadata_process_time(0),
     m_frozen(false),
     m_version(0),
     m_namespace(NULL)
@@ -140,12 +143,10 @@ void Group::process_metadata()
     if (m_clean)
         return;
 
-    std::vector<Backend*> backends;
+    Stopwatch watch(m_metadata_process_time);
 
-    {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-        backends.assign(m_backends.begin(), m_backends.end());
-    }
+    std::vector<Backend*> backends;
+    get_backends(backends);
 
     WriteGuard<RWSpinLock> guard(m_metadata_lock);
 

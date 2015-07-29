@@ -26,7 +26,7 @@ class BackendParser : public Parser
     typedef Parser super;
 
 public:
-    BackendParser(uint64_t ts_sec, uint64_t ts_usec, Node *node);
+    BackendParser(uint64_t ts_sec, uint64_t ts_usec, Node & node);
 
     const BackendStat & get_stat() const
     { return m_stat; }
@@ -38,7 +38,7 @@ private:
     BackendStat m_stat;
     uint64_t m_ts_sec;
     uint64_t m_ts_usec;
-    Node *m_node;
+    Node & m_node;
 };
 
 #endif

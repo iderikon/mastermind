@@ -150,7 +150,7 @@ static const Parser::UIntInfo backend_uint_info[] = {
     { 0, 0, 0 }
 };
 
-BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, Node *node)
+BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, Node & node)
     :
     super(backend_folders, sizeof(backend_folders)/sizeof(backend_folders[0]),
             backend_uint_info, (uint8_t *) &m_stat),
@@ -164,7 +164,7 @@ bool BackendParser::EndObject(rapidjson::SizeType nr_members)
     if (m_keys == (Backends|BackendFolder|1) && m_depth == 3) {
         m_stat.ts_sec = m_ts_sec;
         m_stat.ts_usec = m_ts_usec;
-        m_node->handle_backend(m_stat);
+        m_node.handle_backend(m_stat);
         std::memset(&m_stat, 0, sizeof(m_stat));
     }
 

@@ -22,6 +22,7 @@
 #include "FS.h"
 #include "Group.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
 #include "ThreadPool.h"
@@ -31,41 +32,7 @@
 
 using namespace ioremap;
 
-class Storage::UpdateJobToggle
-{
-public:
-    UpdateJobToggle(ThreadPool & thread_pool, ThreadPool::Job *job, int nr_groups)
-        :
-        m_thread_pool(thread_pool),
-        m_update_job(job),
-        m_nr_groups(nr_groups)
-    {}
-
-    void handle_completion()
-    {
-        if (! --m_nr_groups) {
-            m_thread_pool.execute_pending(m_update_job);
-            delete this;
-        }
-    }
-
-private:
-    ThreadPool & m_thread_pool;
-    ThreadPool::Job *m_update_job;
-    std::atomic<int> m_nr_groups;
-};
-
-namespace {
-
-template<typename T>
-void remove_duplicates(std::vector<T> & v)
-{
-    std::sort(v.begin(), v.end());
-    auto it = std::unique(v.begin(), v.end());
-    v.erase(it, v.end());
-}
-
-class UpdateJob : public ThreadPool::Job
+class Storage::UpdateJob : public ThreadPool::Job
 {
 public:
     UpdateJob(Storage & storage)
@@ -77,9 +44,16 @@ public:
         BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE,
                 "Updating filesystems, groups and couples");
 
-        m_storage.update_filesystems();
-        m_storage.update_groups();
-        m_storage.update_couples();
+        {
+            Stopwatch watch(m_storage.m_clock.status_update_time);
+
+            m_storage.update_filesystems();
+            m_storage.update_groups();
+            m_storage.update_couples();
+        }
+
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE,
+                "Update completed");
 
         m_storage.get_app().get_discovery().end();
         m_storage.arm_timer();
@@ -88,6 +62,50 @@ public:
 private:
     Storage & m_storage;
 };
+
+class Storage::UpdateJobToggle
+{
+public:
+    UpdateJobToggle(WorkerApplication & app, ThreadPool::Job *job, int nr_groups)
+        :
+        m_app(app),
+        m_update_job(job),
+        m_nr_groups(nr_groups)
+    {
+        clock_start(m_clock);
+    }
+
+    ~UpdateJobToggle()
+    {
+        clock_stop(m_clock);
+        m_app.get_storage().m_clock.metadata_download_total_time = m_clock;
+    }
+
+    void handle_completion()
+    {
+        if (! --m_nr_groups) {
+            BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Group metadata download completed");
+            m_app.get_thread_pool().execute_pending(m_update_job);
+            delete this;
+        }
+    }
+
+private:
+    WorkerApplication & m_app;
+    ThreadPool::Job *m_update_job;
+    std::atomic<int> m_nr_groups;
+    uint64_t m_clock;
+};
+
+namespace {
+
+template<typename T>
+void remove_duplicates(std::vector<T> & v)
+{
+    std::sort(v.begin(), v.end());
+    auto it = std::unique(v.begin(), v.end());
+    v.erase(it, v.end());
+}
 
 class GroupMetadataHandler
 {
@@ -283,7 +301,9 @@ void Storage::Entries::sort()
 }
 
 Storage::Storage(WorkerApplication & app)
-    : m_app(app)
+    :
+    m_app(app),
+    m_clock{0, 0, 0}
 {}
 
 Storage::~Storage()
@@ -440,6 +460,10 @@ void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
 
 void Storage::schedule_update(elliptics::session & session)
 {
+    Stopwatch watch(m_clock.schedule_update_time);
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Scheduling group metadata download");
+
     ReadGuard<RWMutex> guard(m_groups_lock);
 
     if (m_groups.empty()) {
@@ -448,7 +472,7 @@ void Storage::schedule_update(elliptics::session & session)
     }
 
     UpdateJob *update = new UpdateJob(*this);
-    UpdateJobToggle *toggle = new UpdateJobToggle(m_app.get_thread_pool(), update, m_groups.size());
+    UpdateJobToggle *toggle = new UpdateJobToggle(m_app, update, m_groups.size());
     m_app.get_thread_pool().dispatch_pending(update);
 
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
@@ -459,7 +483,7 @@ void Storage::schedule_refresh(const Entries & entries, elliptics::session & ses
         std::shared_ptr<on_refresh> handler)
 {
     RefreshEntries *refresh = new RefreshEntries(entries, handler);
-    UpdateJobToggle *toggle = new UpdateJobToggle(m_app.get_thread_pool(), refresh, entries.groups.size());
+    UpdateJobToggle *toggle = new UpdateJobToggle(m_app, refresh, entries.groups.size());
     m_app.get_thread_pool().dispatch_pending(refresh);
 
     for (Group *group : entries.groups)

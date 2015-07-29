@@ -118,6 +118,21 @@ public:
 
     static const char *download_state_str(DownloadState state);
 
+public:
+    struct ClockStat
+    {
+        uint64_t procfs;
+        uint64_t backend;
+        uint64_t update_fs;
+    };
+
+    const ClockStat & get_clock_stat() const
+    { return m_clock; }
+
+private:
+    class BackendJob;
+    class ProcfsJob;
+
 private:
     Storage & m_storage;
 
@@ -137,6 +152,10 @@ private:
 
     std::map<uint64_t, FS> m_filesystems;
     mutable RWSpinLock m_filesystems_lock;
+
+    friend class BackendJob;
+    friend class Procfsjob;
+    ClockStat m_clock;
 };
 
 #endif

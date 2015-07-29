@@ -21,6 +21,7 @@
 #include "FS.h"
 #include "Group.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Namespace.h"
 #include "Node.h"
 
@@ -30,7 +31,8 @@ Couple::Couple(const std::vector<Group*> & groups, bool forbidden_unmatched_spac
     :
     m_forbidden_unmatched_space(forbidden_unmatched_space),
     m_status(INIT),
-    m_status_text("")
+    m_status_text(""),
+    m_update_status_time(0)
 {
     m_groups = groups;
 }
@@ -76,6 +78,8 @@ void Couple::get_groups(std::vector<Group*> & groups) const
 
 void Couple::update_status()
 {
+    Stopwatch watch(m_update_status_time);
+
     ReadGuard<RWSpinLock> guard(m_groups_lock);
 
     if (m_groups.empty()) {
