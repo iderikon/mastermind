@@ -76,7 +76,7 @@ public:
 
     void process_metadata();
 
-    bool metadata_equals(const Group & other) const;
+    bool check_metadata_equals(const Group & other) const;
 
     void set_status(Status status)
     { m_status = status; }

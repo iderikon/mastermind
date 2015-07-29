@@ -96,7 +96,7 @@ void Couple::update_status()
     bool have_frozen = g->get_frozen();
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
-        if (!g->metadata_equals(*m_groups[i])) {
+        if (!g->check_metadata_equals(*m_groups[i])) {
             m_status = BAD;
             m_status_text = "Groups have different metadata";
             return;

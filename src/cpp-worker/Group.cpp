@@ -364,8 +364,11 @@ void Group::process_metadata()
     }
 }
 
-bool Group::metadata_equals(const Group & other) const
+bool Group::check_metadata_equals(const Group & other) const
 {
+    if (m_status == INIT || other.m_status == INIT)
+        return true;
+
     return (m_frozen == other.m_frozen &&
             m_couple == other.m_couple &&
             m_namespace == other.m_namespace);
