@@ -1,0 +1,4 @@
+.*.swp
+*.o
+cpp-worker
+cpp-worker.tar.gz
