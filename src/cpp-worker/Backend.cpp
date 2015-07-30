@@ -21,6 +21,7 @@
 #include "Node.h"
 #include "Storage.h"
 #include "TimestampParser.h"
+#include "WorkerApplication.h"
 
 Backend::Backend(Node & node)
     :
