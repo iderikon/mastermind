@@ -19,6 +19,7 @@
 #include "ThreadPool.h"
 
 #include <assert.h>
+#include <sys/prctl.h>
 
 namespace {
 
@@ -275,6 +276,8 @@ void ThreadPool::flush()
 
 void ThreadPool::thread_func(int thr_id)
 {
+    prctl(PR_SET_NAME, (unsigned long) "thread_pool", 0, 0, 0);
+
     while (1) {
         m_sem.wait();
 
