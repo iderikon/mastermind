@@ -18,7 +18,6 @@
 #ifndef __f8057e8e_b6f5_475b_bb31_771928953bf8
 #define __f8057e8e_b6f5_475b_bb31_771928953bf8
 
-#include "CocaineHandlers.h"
 #include "Couple.h"
 #include "Group.h"
 #include "Namespace.h"
@@ -41,6 +40,8 @@ namespace ioremap {
 
 class BackendStat;
 class WorkerApplication;
+class on_get_snapshot;
+class on_refresh;
 
 class Storage
 {

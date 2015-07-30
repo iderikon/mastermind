@@ -18,8 +18,6 @@
 #include "Storage.h"
 #include "CocaineHandlers.h"
 #include "ConfigParser.h"
-#include "Discovery.h"
-#include "DiscoveryTimer.h"
 #include "WorkerApplication.h"
 
 #include <elliptics/logger.hpp>
@@ -47,30 +45,22 @@ private:
 
 } // unnamed namespace
 
+WorkerApplication::WorkerApplication()
+    :
+    m_logger(NULL),
+    m_elliptics_logger(NULL),
+    m_storage(*this),
+    m_discovery(*this),
+    m_discovery_timer(*this, 60)
+{}
+
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
+    :
+    m_storage(*this),
+    m_discovery(*this),
+    m_discovery_timer(*this, 60)
 {
-    m_thread_pool = new ThreadPool;
-    m_storage = new Storage(*this);
-    m_discovery = new Discovery(*this);
-    m_discovery_timer = new DiscoveryTimer(*this, 60);
-
-    load_config();
-
-    m_logger = new ioremap::elliptics::file_logger(
-            LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
-    if (!m_logger)
-        throw worker_error("failed to open log file " LOG_FILE);
-
-    m_elliptics_logger = new ioremap::elliptics::file_logger(
-            ELLIPTICS_LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
-    if (!m_elliptics_logger)
-        throw worker_error("failed to open log file " ELLIPTICS_LOG_FILE);
-
-    if (m_discovery->init())
-        throw worker_error("failed to initialize discovery");
-
-    if (m_discovery_timer->init())
-        throw worker_error("failed to start discovery timer");
+    init();
 
     d.on<on_summary>("summary", *this);
     d.on<on_group_info>("group_info", *this);
@@ -87,17 +77,41 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     d.on<on_get_snapshot>("get_snapshot", *this);
     d.on<on_refresh>("refresh", *this);
 
-    m_thread_pool->start();
-    m_discovery_timer->start();
+    start();
 }
 
 WorkerApplication::~WorkerApplication()
 {
-    delete m_discovery_timer;
-    delete m_discovery;
-    delete m_storage;
-    delete m_thread_pool;
+    delete m_elliptics_logger;
     delete m_logger;
+}
+
+void WorkerApplication::init()
+{
+    load_config();
+
+    m_logger = new ioremap::elliptics::file_logger(
+            LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
+    if (!m_logger)
+        throw worker_error("failed to open log file " LOG_FILE);
+
+    m_elliptics_logger = new ioremap::elliptics::file_logger(
+            ELLIPTICS_LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
+    if (!m_elliptics_logger)
+        throw worker_error("failed to open log file " ELLIPTICS_LOG_FILE);
+
+    if (m_discovery.init())
+        throw worker_error("failed to initialize discovery");
+
+    if (m_discovery_timer.init())
+        throw worker_error("failed to start discovery timer");
+
+}
+
+void WorkerApplication::start()
+{
+    m_thread_pool.start();
+    m_discovery_timer.start();
 }
 
 int WorkerApplication::load_config()

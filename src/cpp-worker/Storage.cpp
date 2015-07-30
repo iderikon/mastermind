@@ -15,6 +15,7 @@
  * License along with this library.
  */
 
+#include "CocaineHandlers.h"
 #include "Couple.h"
 #include "Discovery.h"
 #include "DiscoveryTimer.h"
