@@ -279,7 +279,12 @@ void ThreadPool::thread_func(int thr_id)
     prctl(PR_SET_NAME, (unsigned long) "thread_pool", 0, 0, 0);
 
     while (1) {
-        m_sem.wait();
+        if (m_sem.wait() != 0) {
+            if (m_sem.interrupted())
+                continue;
+            else
+                break;
+        }
 
         Job *job = NULL;
 

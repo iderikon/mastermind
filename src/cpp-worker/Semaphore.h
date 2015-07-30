@@ -18,12 +18,14 @@
 #ifndef __85f47038_5a9f_43b5_97fd_8c7f69012993
 #define __85f47038_5a9f_43b5_97fd_8c7f69012993
 
+#include <errno.h>
 #include <semaphore.h>
 
 class Semaphore
 {
 public:
     Semaphore()
+        : m_errno(0)
     {
         sem_init(&m_sem, 0, 0);
     }
@@ -40,7 +42,10 @@ public:
 
     int wait()
     {
-        return sem_wait(&m_sem);
+        int rc = sem_wait(&m_sem);
+        if (rc)
+            m_errno = errno;
+        return rc;
     }
 
     int get_value()
@@ -50,12 +55,16 @@ public:
         return ret;
     }
 
+    bool interrupted() const
+    { return m_errno == EINTR; }
+
 private:
     Semaphore(const Semaphore & other);
     Semaphore & operator = (const Semaphore & other);
 
 private:
     sem_t m_sem;
+    int m_errno;
 };
 
 #endif
