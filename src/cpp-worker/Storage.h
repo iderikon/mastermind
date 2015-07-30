@@ -102,6 +102,7 @@ public:
             Entries & entries, uint32_t item_types);
 
 public:
+    class ScheduleMetadataDownload;
     class UpdateJob;
     class UpdateJobToggle;
 
@@ -147,6 +148,7 @@ public:
     struct ClockStat
     {
         uint64_t schedule_update_time;
+        uint64_t schedule_update_clk;
         uint64_t metadata_download_total_time;
         uint64_t status_update_time;
     };
@@ -169,6 +171,7 @@ private:
     std::map<std::string, Namespace> m_namespaces;
     mutable RWSpinLock m_namespaces_lock;
 
+    friend class ScheduleMetadataDownload;
     friend class UpdateJob;
     friend class UpdateJobToggle;
     ClockStat m_clock;

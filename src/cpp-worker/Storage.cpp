@@ -33,6 +33,36 @@
 
 using namespace ioremap;
 
+class Storage::ScheduleMetadataDownload : public ThreadPool::Job
+{
+public:
+    ScheduleMetadataDownload(Storage & storage, ioremap::elliptics::session & session,
+            UpdateJobToggle *toggle, std::vector<Group*> & groups)
+        :
+        m_storage(storage),
+        m_session(session.clone()),
+        m_toggle(toggle),
+        m_groups(groups)
+    {}
+
+    virtual void execute()
+    {
+        uint64_t clk = m_storage.m_clock.schedule_update_clk;
+
+        for (Group *group : m_groups)
+            m_storage.schedule_metadata_download(m_session, m_toggle, group);
+
+        clock_stop(clk);
+        m_storage.m_clock.schedule_update_time = clk;
+    }
+
+private:
+    Storage & m_storage;
+    ioremap::elliptics::session m_session;
+    UpdateJobToggle *m_toggle;
+    std::vector<Group*> m_groups;
+};
+
 class Storage::UpdateJob : public ThreadPool::Job
 {
 public:
@@ -304,7 +334,7 @@ void Storage::Entries::sort()
 Storage::Storage(WorkerApplication & app)
     :
     m_app(app),
-    m_clock{0, 0, 0}
+    m_clock{0, 0, 0, 0}
 {}
 
 Storage::~Storage()
@@ -461,7 +491,7 @@ void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
 
 void Storage::schedule_update(elliptics::session & session)
 {
-    Stopwatch watch(m_clock.schedule_update_time);
+    clock_start(m_clock.schedule_update_clk);
 
     ReadGuard<RWMutex> guard(m_groups_lock);
 
@@ -477,8 +507,33 @@ void Storage::schedule_update(elliptics::session & session)
     UpdateJobToggle *toggle = new UpdateJobToggle(m_app, update, m_groups.size());
     m_app.get_thread_pool().dispatch_pending(update);
 
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        schedule_metadata_download(session, toggle, &it->second);
+    int nr_threads = m_app.get_thread_pool().get_nr_threads();
+    if (m_groups.size() < (nr_threads * 2)) {
+        for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+            schedule_metadata_download(session, toggle, &it->second);
+    } else {
+        auto it = m_groups.begin();
+        int rem = m_groups.size() % nr_threads;
+        size_t n = m_groups.size()/nr_threads;
+        if (rem-- > 0)
+            ++n;
+
+        std::vector<Group*> groups;
+        groups.reserve(n);
+
+        while (1) {
+            groups.push_back(&it->second);
+            if (groups.size() == n) {
+                m_app.get_thread_pool().dispatch_aggregate(
+                        new ScheduleMetadataDownload(*this, session, toggle, groups));
+                groups.clear();
+                if (rem-- == 0)
+                    --n;
+            }
+            if (++it == m_groups.end())
+                break;
+        }
+    }
 }
 
 void Storage::schedule_refresh(const Entries & entries, elliptics::session & session,
