@@ -41,7 +41,7 @@ public:
 
     virtual void execute()
     {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE,
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
                 "Updating filesystems, groups and couples");
 
         {
@@ -52,7 +52,7 @@ public:
             m_storage.update_couples();
         }
 
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_NOTICE,
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
                 "Update completed");
 
         m_storage.get_app().get_discovery().end();
@@ -462,9 +462,10 @@ void Storage::schedule_update(elliptics::session & session)
 {
     Stopwatch watch(m_clock.schedule_update_time);
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Scheduling group metadata download");
-
     ReadGuard<RWMutex> guard(m_groups_lock);
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO,
+            "Scheduling metadata download for %lu groups", m_groups.size());
 
     if (m_groups.empty()) {
         arm_timer();

@@ -220,6 +220,8 @@ int Discovery::start()
     std::vector<Node*> nodes;
     m_app.get_storage().get_nodes(nodes);
 
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Have %lu nodes", nodes.size());
+
     if (nodes.empty())
         return 0;
 
