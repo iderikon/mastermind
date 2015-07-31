@@ -201,10 +201,7 @@ void Discovery::resolve_nodes()
         const char *host = dnet_addr_host_string(&addr);
         int port = dnet_addr_port(&addr);
 
-        if (m_app.get_storage().add_node(host, port, addr.family)) {
-            elliptics::address el_addr(addr);
-            m_node->add_remote(el_addr);
-        }
+        m_app.get_storage().add_node(host, port, addr.family);
     }
 }
 
