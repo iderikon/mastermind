@@ -15,38 +15,18 @@
  * License along with this library.
  */
 
-#ifndef __221b4370_2518_4a22_8352_9091ad9aa553
-#define __221b4370_2518_4a22_8352_9091ad9aa553
+#include "Metrics.h"
 
-#include "Parser.h"
-
-#include <ctime>
-#include <string>
-
-class TimestampParser : public Parser
+std::string timeval_user_friendly(time_t sec, int usec)
 {
-    typedef Parser super;
+    struct tm tm_buf;
+    struct tm *res = localtime_r(&sec, &tm_buf);
+    if (res == NULL)
+        return std::string();
 
-public:
-    TimestampParser();
-
-    size_t get_ts_sec() const
-    { return m_ts.sec; }
-
-    size_t get_ts_usec() const
-    { return m_ts.usec; }
-
-    static std::string ts_user_friendly(time_t sec, int usec);
-
-public:
-    struct TS {
-        uint64_t sec;
-        uint64_t usec;
-    };
-
-private:
-    TS m_ts;
-};
-
-#endif
-
+    char buf[64];
+    sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%06d",
+            res->tm_year + 1900, res->tm_mon, res->tm_mday,
+            res->tm_hour, res->tm_min, res->tm_sec, usec);
+    return std::string(buf);
+}

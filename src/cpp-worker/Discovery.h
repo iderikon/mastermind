@@ -76,7 +76,7 @@ public:
     { return m_clock; }
 
 private:
-    CURL *create_easy_handle(Node *node, const char *stat);
+    CURL *create_easy_handle(Node *node);
 
 private:
     static int handle_socket(CURL *easy, curl_socket_t fd,

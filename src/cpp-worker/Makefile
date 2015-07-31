@@ -11,7 +11,7 @@ LDFLAGS = -pthread -lrt -lcurl -lelliptics_client -lelliptics \
 
 DEPS = $(wildcard *.h)
 SOURCES = Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp \
-		  BackendParser.cpp TimestampParser.cpp ThreadPool.cpp \
+		  BackendParser.cpp Metrics.cpp ThreadPool.cpp \
 		  Storage.cpp Group.cpp Couple.cpp DiscoveryTimer.cpp \
 		  ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp \
 		  Namespace.cpp FS.cpp FilterParser.cpp Backend.cpp \

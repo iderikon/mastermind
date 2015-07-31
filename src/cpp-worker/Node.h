@@ -81,21 +81,13 @@ public:
 
     void handle_backend(const BackendStat & new_stat);
 
-    void set_download_state(DownloadState state)
-    { m_download_state = state; }
-
-    DownloadState get_download_state() const
-    { return m_download_state; }
-
     void add_download_data(const char *data, size_t size)
     { m_download_data.insert(m_download_data.end(), data, data + size); }
 
     void drop_download_data()
     { m_download_data.clear(); }
 
-    ThreadPool::Job *create_backend_parse_job();
-
-    ThreadPool::Job *create_procfs_parse_job();
+    ThreadPool::Job *create_stats_parse_job();
 
     size_t get_backend_count() const;
     void get_backends(std::vector<Backend*> & backends);
@@ -116,13 +108,10 @@ public:
             bool print_backends,
             bool print_fs) const;
 
-    static const char *download_state_str(DownloadState state);
-
 public:
     struct ClockStat
     {
-        uint64_t procfs;
-        uint64_t backend;
+        uint64_t stats_parse;
         uint64_t update_fs;
     };
 
@@ -130,8 +119,7 @@ public:
     { return m_clock; }
 
 private:
-    class BackendJob;
-    class ProcfsJob;
+    class StatsParse;
 
 private:
     Storage & m_storage;
@@ -142,7 +130,6 @@ private:
 
     std::string m_key;
 
-    DownloadState m_download_state;
     std::vector<char> m_download_data;
 
     NodeStat m_stat;
@@ -153,8 +140,7 @@ private:
     std::map<uint64_t, FS> m_filesystems;
     mutable RWSpinLock m_filesystems_lock;
 
-    friend class BackendJob;
-    friend class Procfsjob;
+    friend class StatsParse;
     ClockStat m_clock;
 };
 

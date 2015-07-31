@@ -25,15 +25,14 @@
 #include "Metrics.h"
 #include "Node.h"
 #include "ProcfsParser.h"
-#include "TimestampParser.h"
 #include "WorkerApplication.h"
 
 #include <cmath>
 
-class Node::BackendJob : public ThreadPool::Job
+class Node::StatsParse : public ThreadPool::Job
 {
 public:
-    BackendJob(Node & node)
+    StatsParse(Node & node)
         : m_node(node)
     {}
 
@@ -42,69 +41,38 @@ public:
 
     virtual void execute()
     {
-        Stopwatch watch(m_node.m_clock.backend);
+        Stopwatch watch(m_node.m_clock.stats_parse);
 
-        TimestampParser ts_parser;
-
-        {
-            rapidjson::Reader reader;
-            rapidjson::StringStream ss(&m_data[0]);
-            reader.Parse(ss, ts_parser);
-        }
-
-        if (!ts_parser.good()) {
-            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                    "Error parsing timestamp in backend statistics");
-            return;
-        }
-
-        BackendParser parser(ts_parser.get_ts_sec(), ts_parser.get_ts_usec(), m_node);
+        ProcfsParser procfs_parser;
 
         {
             rapidjson::Reader reader;
             rapidjson::StringStream ss(&m_data[0]);
-            reader.Parse(ss, parser);
+            reader.Parse(ss, procfs_parser);
         }
 
-        if (!parser.good()) {
-            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                    "Error parsing backend statistics");
-            return;
-        }
-    }
-
-private:
-    Node & m_node;
-    std::vector<char> m_data;
-};
-
-class Node::ProcfsJob : public ThreadPool::Job
-{
-public:
-    ProcfsJob(Node & node)
-        : m_node(node)
-    {}
-
-    void pick_data(std::vector<char> & data)
-    { m_data.swap(data); }
-
-    virtual void execute()
-    {
-        Stopwatch watch(m_node.m_clock.procfs);
-
-        ProcfsParser parser;
-
-        rapidjson::Reader reader;
-        rapidjson::StringStream ss(&m_data[0]);
-        reader.Parse(ss, parser);
-
-        if (!parser.good()) {
+        if (!procfs_parser.good()) {
             BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
                     "Error parsing procfs statistics");
             return;
         }
 
-        m_node.update(parser.get_stat());
+        const NodeStat & node_stat = procfs_parser.get_stat();
+        m_node.update(node_stat);
+
+        BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec, m_node);
+
+        {
+            rapidjson::Reader reader;
+            rapidjson::StringStream ss(&m_data[0]);
+            reader.Parse(ss, backend_parser);
+        }
+
+        if (!backend_parser.good()) {
+            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
+                    "Error parsing backend statistics");
+            return;
+        }
     }
 
 private:
@@ -123,7 +91,7 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_host(host),
     m_port(port),
     m_family(family),
-    m_download_state(DownloadStateEmpty)
+    m_clock{0, 0}
 {
     m_key = m_host;
     m_key += ':';
@@ -178,16 +146,9 @@ void Node::handle_backend(const BackendStat & new_stat)
     m_storage.handle_backend(it->second, found);
 }
 
-ThreadPool::Job *Node::create_backend_parse_job()
+ThreadPool::Job *Node::create_stats_parse_job()
 {
-    BackendJob *job = new BackendJob(*this);
-    job->pick_data(m_download_data);
-    return job;
-}
-
-ThreadPool::Job *Node::create_procfs_parse_job()
-{
-    ProcfsJob *job = new ProcfsJob(*this);
+    StatsParse *job = new StatsParse(*this);
     job->pick_data(m_download_data);
     return job;
 }
@@ -338,9 +299,8 @@ void Node::print_info(std::ostream & ostr) const
             "  host: " << m_host << "\n"
             "  port: " << m_port << "\n"
             "  family: " << m_family << "\n"
-            "  download_state: " << download_state_str(m_download_state) << "\n"
             "  Stat {\n"
-            "    ts: " << TimestampParser::ts_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
+            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
             "    la: " << m_stat.la1 << "\n"
             "    tx_bytes: " << m_stat.tx_bytes << "\n"
             "    rx_bytes: " << m_stat.rx_bytes << "\n"
@@ -415,18 +375,4 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
 
     writer.EndObject();
-}
-
-const char *Node::download_state_str(DownloadState state)
-{
-    switch (state)
-    {
-    case DownloadStateEmpty:
-        return "DownloadStateEmpty";
-    case DownloadStateBackend:
-        return "DownloadStateBackend";
-    case DownloadStateProcfs:
-        return "DownloadStateProcfs";
-    }
-    return "UNKNOWN";
 }

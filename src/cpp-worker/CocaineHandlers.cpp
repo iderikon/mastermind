@@ -132,19 +132,16 @@ void on_summary::on_chunk(const char *chunk, size_t size)
     }
 
     {
-        SerialDistribution distrib_procfs;
-        SerialDistribution distrib_backend;
+        SerialDistribution distrib_stats_parse;
         SerialDistribution distrib_update_fs;
 
         for (Node *node : nodes) {
             const Node::ClockStat & stat = node->get_clock_stat();
-            distrib_procfs.add_sample(stat.procfs);
-            distrib_backend.add_sample(stat.backend);
+            distrib_stats_parse.add_sample(stat.stats_parse);
             distrib_update_fs.add_sample(stat.update_fs);
         }
 
-        ostr << "Distribution for node procfs processing:\n" << distrib_procfs.str() << "\n"
-                "Distribution for node backend processing:\n" << distrib_backend.str() << "\n"
+        ostr << "\nDistribution for node stats parsing:\n" << distrib_stats_parse.str() << "\n"
                 "Distribution for node fs update:\n" << distrib_update_fs.str() << '\n';
     }
 

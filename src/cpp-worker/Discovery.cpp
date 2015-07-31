@@ -258,20 +258,13 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
     for (size_t i = 0; i < nodes.size(); ++i) {
         Node & node = *nodes[i];
 
-        if (node.get_download_state() != Node::DownloadStateEmpty) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s is in download state %d",
-                    node.get_host().c_str(), node.get_download_state());
-            continue;
-        }
-
-        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling backend download for node %s",
+        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling stat download for node %s",
                 node.get_key().c_str());
 
-        node.set_download_state(Node::DownloadStateBackend);
-        CURL *easy = create_easy_handle(&node, "backend");
+        CURL *easy = create_easy_handle(&node);
         if (easy == NULL) {
             BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
-                    "Cannot create easy handle to download backend stat");
+                    "Cannot create easy handle to download node stat");
             return -1;
         }
         curl_multi_add_handle(m_curl_handle, easy);
@@ -314,48 +307,22 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
                     return -1;
                 }
 
+                if (msg->data.result == CURLE_OK) {
+                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
+                            "Node %s stat download completed", node->get_key().c_str());
+
+                    ThreadPool::Job *job = node->create_stats_parse_job();
+                    m_app.get_thread_pool().dispatch(job);
+                } else {
+                    BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s stats download failed, "
+                            "result: %d", node->get_key().c_str(), msg->data.result);
+
+                    node->drop_download_data();
+                }
+
                 curl_multi_remove_handle(m_curl_handle, easy);
                 curl_easy_cleanup(easy);
 
-                if (node->get_download_state() == Node::DownloadStateBackend) {
-                    if (msg->data.result == CURLE_OK) {
-                        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-                                "Node %s statistics: backend done", node->get_key().c_str());
-
-                        ThreadPool::Job *job = node->create_backend_parse_job();
-                        m_app.get_thread_pool().dispatch(job);
-                    } else {
-                        BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s statistics: "
-                                "backend failed, result: %d", node->get_key().c_str(), msg->data.result);
-                        node->drop_download_data();
-                    }
-
-                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling procfs download for node %s",
-                            node->get_key().c_str());
-
-                    node->set_download_state(Node::DownloadStateProcfs);
-                    easy = create_easy_handle(node, "procfs");
-                    curl_multi_add_handle(m_curl_handle, easy);
-
-                    if (running_handles == 0)
-                        curl_multi_socket_action(m_curl_handle, CURL_SOCKET_TIMEOUT, 0, &running_handles);
-
-                } else if (node->get_download_state() == Node::DownloadStateProcfs) {
-                    if (msg->data.result == CURLE_OK) {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-                            "Node %s statistics: procfs done", node->get_key().c_str());
-
-                        ThreadPool::Job *job = node->create_procfs_parse_job();
-                        m_app.get_thread_pool().dispatch(job);
-                    } else {
-                        BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s statistics: "
-                                "procfs failed, result: %d", node->get_key().c_str(), msg->data.result);
-
-                        node->drop_download_data();
-                    }
-
-                    node->set_download_state(Node::DownloadStateEmpty);
-                }
             }
         } while (msg);
     }
@@ -399,7 +366,7 @@ void Discovery::take_over_snapshot(ThreadPool::Job *job)
         m_snapshot_jobs.push_back(job);
 }
 
-CURL *Discovery::create_easy_handle(Node *node, const char *stat)
+CURL *Discovery::create_easy_handle(Node *node)
 {
     CURL *easy;
     easy = curl_easy_init();
@@ -408,7 +375,7 @@ CURL *Discovery::create_easy_handle(Node *node, const char *stat)
         return NULL;
 
     char buf[128];
-    sprintf(buf, "http://%s:%u/%s", node->get_host().c_str(), m_http_port, stat);
+    sprintf(buf, "http://%s:%u/?categories=80", node->get_host().c_str(), m_http_port);
 
     curl_easy_setopt(easy, CURLOPT_URL, buf);
     curl_easy_setopt(easy, CURLOPT_PRIVATE, node);

@@ -154,5 +154,8 @@ private:
     bool m_stopped;
 };
 
+
+std::string timeval_user_friendly(time_t sec, int usec);
+
 #endif
 

@@ -19,9 +19,9 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Guard.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
-#include "TimestampParser.h"
 #include "WorkerApplication.h"
 
 FS::FS(Node & node, uint64_t fsid)
@@ -154,7 +154,7 @@ void FS::print_info(std::ostream & ostr) const
             "  node: " << m_node.get_key() << "\n"
             "  fsid: " << m_fsid << "\n"
             "  Stat {\n"
-            "    ts: " << TimestampParser::ts_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
+            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
             "    total_space: " << m_stat.total_space << "\n"
             "  }\n"
             "  number of backends: " << get_backend_count() << "\n"

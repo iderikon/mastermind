@@ -18,9 +18,9 @@
 #include "Backend.h"
 #include "Filter.h"
 #include "FS.h"
+#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
-#include "TimestampParser.h"
 #include "WorkerApplication.h"
 
 Backend::Backend(Node & node)
@@ -175,7 +175,7 @@ void Backend::print_info(std::ostream & ostr) const
             "  node: " << m_node.get_key() << "\n"
             "  fs: " << (m_fs != NULL ? m_fs->get_key().c_str() : "NULL") << "\n"
             "  BackendStat {\n"
-            "    ts: " << TimestampParser::ts_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
+            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
             "    backend_id: " << m_stat.backend_id << "\n"
             "    state: " << m_stat.state << "\n"
             "    vfs_blocks: " << m_stat.vfs_blocks << "\n"
