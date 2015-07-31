@@ -174,6 +174,7 @@ int Discovery::init()
     }
 
     m_session.reset(new elliptics::session(*m_node));
+    m_session->set_cflags(DNET_FLAGS_NOLOCK);
 
     return 0;
 }
