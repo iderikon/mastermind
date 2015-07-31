@@ -63,19 +63,36 @@ public:
             ++m_count[9];
     }
 
-    std::string str()
+    bool empty() const
     {
+        for (size_t i = 0; i < sizeof(m_count)/sizeof(m_count[0]); ++i) {
+            if (m_count[i])
+                return false;
+        }
+        return true;
+    }
+
+    std::string str() const
+    {
+        static const char * const order[] = {
+            "  1 us: ",
+            " 10 us: ",
+            "100 us: ",
+            "  1 ms: ",
+            " 10 ms: ",
+            "100 ms: ",
+            "  1  s: ",
+            " 10  s: ",
+            "100  s: ",
+            "   inf: "
+        };
+
         std::ostringstream ostr;
-        ostr << "  1 us: " << m_count[0] << "\n"
-                " 10 us: " << m_count[1] << "\n"
-                "100 us: " << m_count[2] << "\n"
-                "  1 ms: " << m_count[3] << "\n"
-                " 10 ms: " << m_count[4] << "\n"
-                "100 ms: " << m_count[5] << "\n"
-                "  1  s: " << m_count[6] << "\n"
-                " 10  s: " << m_count[7] << "\n"
-                "100  s: " << m_count[8] << "\n"
-                "   inf: " << m_count[9];
+        for (size_t i = 0; i < sizeof(m_count)/sizeof(m_count[0]); ++i) {
+            if (m_count[i])
+                ostr << order[i] << m_count[i] << '\n';
+        }
+
         return ostr.str();
     }
 
