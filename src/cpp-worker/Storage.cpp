@@ -163,6 +163,7 @@ public:
             m_group->set_status_text(ostr.str());
         }
         m_toggle->handle_completion();
+        delete this;
     }
 
     elliptics::session *get_session()
