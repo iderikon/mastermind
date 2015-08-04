@@ -5,3 +5,12 @@ mastermind.egg-info
 
 # in case someone uses fuse for development
 .fuse*
+
+.*.swp
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+mastermind-collector
+mastermind-collector.tar.gz
+Testing/
