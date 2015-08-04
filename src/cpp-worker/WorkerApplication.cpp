@@ -127,6 +127,8 @@ int WorkerApplication::load_config()
     rapidjson::Reader reader;
     reader.Parse(is, parser);
 
+    fclose(f);
+
     if (!parser.good())
         throw worker_error("Error parsing " CONFIG_FILE);
 
