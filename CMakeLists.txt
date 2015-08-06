@@ -21,6 +21,6 @@ include_directories(${elliptics_INCLUDE_DIRS} ${CocaineNative_INCLUDE_DIRS}
 
 add_subdirectory(src/collector)
 
-# enable_testing()
-# add_subdirectory(tests/collector)
+enable_testing()
+add_subdirectory(tests/collector)
 
