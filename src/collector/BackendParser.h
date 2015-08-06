@@ -18,15 +18,18 @@
 #ifndef __b0f837f3_4008_452e_a47a_e7fc060a7974
 #define __b0f837f3_4008_452e_a47a_e7fc060a7974
 
-#include "Node.h"
+#include "Backend.h"
 #include "Parser.h"
+
+#include <functional>
 
 class BackendParser : public Parser
 {
     typedef Parser super;
 
 public:
-    BackendParser(uint64_t ts_sec, uint64_t ts_usec, Node & node);
+    BackendParser(uint64_t ts_sec, uint64_t ts_usec,
+            std::function<void(BackendStat&)> callback);
 
     const BackendStat & get_stat() const
     { return m_stat; }
@@ -38,7 +41,7 @@ private:
     BackendStat m_stat;
     uint64_t m_ts_sec;
     uint64_t m_ts_usec;
-    Node & m_node;
+    std::function<void(BackendStat&)> m_callback;
 };
 
 #endif

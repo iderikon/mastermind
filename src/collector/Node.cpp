@@ -60,7 +60,8 @@ public:
         const NodeStat & node_stat = procfs_parser.get_stat();
         m_node.update(node_stat);
 
-        BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec, m_node);
+        BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec,
+                std::bind(&Node::handle_backend, &m_node, std::placeholders::_1));
 
         {
             rapidjson::Reader reader;
