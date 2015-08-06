@@ -51,12 +51,6 @@ struct NodeStat
 class Node
 {
 public:
-    enum DownloadState {
-        DownloadStateEmpty = 0,
-        DownloadStateBackend,
-        DownloadStateProcfs
-    };
-
     Node(Storage & storage, const char *host, int port, int family);
 
     Storage & get_storage() const

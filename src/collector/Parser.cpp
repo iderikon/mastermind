@@ -68,7 +68,7 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
         if (fold->keys == (m_keys - 1)) {
             switch (fold->str[0]) {
             case NOT_MATCH[0]:
-                if (std::strcmp(fold->str, str)) {
+                if (std::strcmp(fold->str + 1, str)) {
                     m_keys |= fold->token;
                     return true;
                 }
