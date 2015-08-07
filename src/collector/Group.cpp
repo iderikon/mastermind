@@ -386,6 +386,12 @@ void Group::get_status_text(std::string & status_text) const
     status_text = m_status_text;
 }
 
+void Group::get_job_id(std::string & job_id) const
+{
+    ReadGuard<RWSpinLock> guard(m_metadata_lock);
+    job_id = m_service.job_id;
+}
+
 bool Group::match(const Filter & filter, uint32_t item_types) const
 {
     if ((item_types & Filter::Group) && !filter.groups.empty()) {

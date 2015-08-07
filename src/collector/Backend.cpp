@@ -23,6 +23,11 @@
 #include "Storage.h"
 #include "WorkerApplication.h"
 
+BackendStat::BackendStat()
+{
+    std::memset(this, 0, sizeof(*this));
+}
+
 Backend::Backend(Node & node)
     :
     m_node(node),

@@ -24,14 +24,57 @@
 
 namespace {
 
-BackendStat b1_stat = {
-    0, 0, 1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61
-};
+struct TestBackendStat1 : public BackendStat
+{
+    TestBackendStat1()
+    {
+        backend_id = 1;
+        state = 2;
+        vfs_blocks = 3;
+        vfs_bavail = 5;
+        vfs_bsize = 7;
+        records_total = 11;
+        records_removed = 13;
+        records_removed_size = 17;
+        base_size = 19;
+        fsid = 23;
+        defrag_state = 29;
+        want_defrag = 31;
+        read_ios = 37;
+        write_ios = 41;
+        error = 43;
+        blob_size_limit = 47;
+        max_blob_base_size = 53;
+        blob_size = 59;
+        group = 61;
+    }
+} b1_stat;
 
-BackendStat b2_stat = {
-    0, 0, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109,
-    113, 127, 131, 137, 139, 149, 151, 157, 163
-};
+struct TestBackendStat2 : public BackendStat
+{
+    TestBackendStat2()
+    {
+        backend_id = 71;
+        state = 73;
+        vfs_blocks = 79;
+        vfs_bavail = 83;
+        vfs_bsize = 89;
+        records_total = 97;
+        records_removed = 101;
+        records_removed_size = 103;
+        base_size = 107;
+        fsid = 109;
+        defrag_state = 113;
+        want_defrag = 127;
+        read_ios = 131;
+        write_ios = 137;
+        error = 139;
+        blob_size_limit = 149;
+        max_blob_base_size = 151;
+        blob_size = 157;
+        group = 163;
+    }
+} b2_stat;
 
 const int s_ts_sec = 173;
 const int s_ts_usec = 179;

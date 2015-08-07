@@ -29,6 +29,8 @@ class Node;
 
 struct BackendStat
 {
+    BackendStat();
+
     uint64_t ts_sec;
     uint64_t ts_usec;
     uint64_t backend_id;

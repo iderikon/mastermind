@@ -27,6 +27,7 @@
 #include "RWSpinLock.h"
 
 class Backend;
+class Node;
 class Storage;
 
 struct FSStat
