@@ -55,6 +55,7 @@ void Backend::init(const BackendStat & stat)
 {
     memcpy(&m_stat, &stat, sizeof(m_stat));
     m_fs = m_node.get_fs(stat.fsid);
+    m_fs->add_backend(this);
     m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
     recalculate();
 }
@@ -99,8 +100,7 @@ void Backend::recalculate()
         // vfs_total_space can be less than blob_size_limit in case of misconfiguration
         m_total_space = std::min(m_stat.blob_size_limit, m_vfs_total_space);
         m_used_space = m_stat.base_size;
-        m_free_space = std::min(m_vfs_free_space,
-                uint64_t(std::max(0L, int64_t(m_total_space) - int64_t(m_used_space))));
+        m_free_space = std::min(int64_t(m_vfs_free_space), std::max(0L, m_total_space - m_used_space));
     } else {
         m_total_space = m_vfs_total_space;
         m_free_space = m_vfs_free_space;
@@ -110,7 +110,9 @@ void Backend::recalculate()
     double share = double(m_total_space) / double(m_vfs_total_space);
     int64_t free_space_req_share =
         std::ceil(double(m_node.get_storage().get_app().get_config().reserved_space) * share);
-    m_effective_space = std::max(0L, int64_t(m_total_space) - free_space_req_share);
+    m_effective_space = std::max(0L, m_total_space - free_space_req_share);
+
+    m_effective_free_space = std::max(m_free_space - (m_total_space - m_effective_space), 0L);
 
     m_fs->update(*this);
 
@@ -122,6 +124,15 @@ void Backend::recalculate()
         m_status = RO;
     else
         m_status = OK;
+}
+
+bool Backend::full() const
+{
+    if (m_used_space >= m_effective_space)
+        return true;
+    if (m_effective_free_space <= 0)
+        return true;
+    return false;
 }
 
 bool Backend::match(const Filter & filter, uint32_t item_types) const
@@ -209,6 +220,7 @@ void Backend::print_info(std::ostream & ostr) const
             "  total_space: " << m_total_space << "\n"
             "  used_space: " << m_used_space << "\n"
             "  effective_space: " << m_effective_space << "\n"
+            "  effective_free_space: " << m_effective_free_space << "\n"
             "  fragmentation: " << m_fragmentation << "\n"
             "  read_rps: " << m_read_rps << "\n"
             "  write_rps: " << m_write_rps << "\n"

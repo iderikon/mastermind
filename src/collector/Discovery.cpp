@@ -348,12 +348,10 @@ void Discovery::end()
 
 void Discovery::schedule_start()
 {
-    DiscoveryStart *start_job = new DiscoveryStart(*this);
-
     LockGuard<SpinLock> guard(m_progress_lock);
 
     m_in_progress = true;
-    m_app.get_thread_pool().dispatch_after(start_job);
+    m_app.get_thread_pool().dispatch_after(m_discovery_start);
 }
 
 void Discovery::take_over_snapshot(ThreadPool::Job *job)

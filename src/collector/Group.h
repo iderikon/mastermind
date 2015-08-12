@@ -65,6 +65,9 @@ public:
     Namespace *get_namespace()
     { return m_namespace; }
 
+    void set_namespace(Namespace *ns)
+    { m_namespace = ns; }
+
     bool has_backend(Backend & backend) const;
     void add_backend(Backend & backend);
     void get_backends(std::vector<Backend*> & backends) const;

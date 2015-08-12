@@ -115,8 +115,16 @@ public:
     uint64_t get_effective_space() const
     { return m_effective_space; }
 
-    bool full() const
-    { return m_used_space >= m_effective_space; }
+    double get_fragmentation() const
+    { return m_fragmentation; }
+
+    int get_read_rps() const
+    { return m_read_rps; }
+
+    int get_write_rps() const
+    { return m_write_rps; }
+
+    bool full() const;
 
     Status get_status() const
     { return m_status; }
@@ -143,10 +151,11 @@ private:
 
     uint64_t m_records;
 
-    uint64_t m_free_space;
-    uint64_t m_total_space;
-    uint64_t m_used_space;
-    uint64_t m_effective_space;
+    int64_t m_free_space;
+    int64_t m_total_space;
+    int64_t m_used_space;
+    int64_t m_effective_space;
+    int64_t m_effective_free_space;
 
     double m_fragmentation;
 
