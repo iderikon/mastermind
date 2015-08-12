@@ -76,7 +76,7 @@ public:
     void handle_backend(const BackendStat & new_stat);
 
     void add_download_data(const char *data, size_t size)
-    { m_download_data.insert(m_download_data.end(), data, data + size); }
+    { m_download_data.append(data, size); }
 
     void drop_download_data()
     { m_download_data.clear(); }
@@ -124,7 +124,7 @@ private:
 
     std::string m_key;
 
-    std::vector<char> m_download_data;
+    std::string m_download_data;
 
     NodeStat m_stat;
 

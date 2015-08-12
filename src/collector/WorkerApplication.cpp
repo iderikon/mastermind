@@ -100,7 +100,7 @@ void WorkerApplication::init()
     if (!m_elliptics_logger)
         throw worker_error("failed to open log file " ELLIPTICS_LOG_FILE);
 
-    if (m_discovery.init())
+    if (m_discovery.init_curl() || m_discovery.init_elliptics())
         throw worker_error("failed to initialize discovery");
 
     if (m_discovery_timer.init())

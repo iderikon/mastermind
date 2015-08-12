@@ -36,7 +36,7 @@ public:
         : m_node(node)
     {}
 
-    void pick_data(std::vector<char> & data)
+    void pick_data(std::string & data)
     { m_data.swap(data); }
 
     virtual void execute()
@@ -47,7 +47,7 @@ public:
 
         {
             rapidjson::Reader reader;
-            rapidjson::StringStream ss(&m_data[0]);
+            rapidjson::StringStream ss(m_data.c_str());
             reader.Parse(ss, procfs_parser);
         }
 
@@ -65,7 +65,7 @@ public:
 
         {
             rapidjson::Reader reader;
-            rapidjson::StringStream ss(&m_data[0]);
+            rapidjson::StringStream ss(m_data.c_str());
             reader.Parse(ss, backend_parser);
         }
 
@@ -78,7 +78,7 @@ public:
 
 private:
     Node & m_node;
-    std::vector<char> m_data;
+    std::string m_data;
 };
 
 NodeStat::NodeStat()

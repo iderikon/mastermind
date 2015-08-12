@@ -22,6 +22,8 @@
 #include <Storage.h>
 #include <WorkerApplication.h>
 
+#include "Samples.h"
+
 #include <algorithm>
 #include <cstring>
 
@@ -41,12 +43,6 @@ void test_initialized(Group & group, int id)
     EXPECT_EQ(0, group.get_version());
     EXPECT_EQ(0, group.get_service_migrating());
     EXPECT_EQ(0, group.get_metadata_process_time());
-}
-
-void init_logger(WorkerApplication & app)
-{
-    app.set_logger(new ioremap::elliptics::file_logger(
-                "/dev/null", ioremap::elliptics::log_level(4)));
 }
 
 } // unnamed namespace
