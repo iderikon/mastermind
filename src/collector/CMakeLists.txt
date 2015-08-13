@@ -11,7 +11,6 @@ target_link_libraries(mastermind-collector
     ${CocaineNative_LIBRARIES} ${Cocaine_LIBRARY}
     ${CURL_LIBRARIES} boost_system boost_thread msgpack rt)
 
-add_custom_target(tarball
+add_custom_target(tarball ALL
     COMMAND tar czf mastermind-collector.tar.gz mastermind-collector
     DEPENDS mastermind-collector)
-

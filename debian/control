@@ -25,3 +25,14 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends},
  python-tornado, cocaine-framework-python (<< 0.12)
 XB-Python-Version: >= 2.6
 Description: Common components and a client library for Mastermind
+
+Package: mastermind-collector
+Architecture: amd64
+Build-Depends: librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev
+Depends: ${shlibs:Depends}, ${misc:Depends}, cocaine-tools (<< 0.12), cocaine-runtime (<< 0.12), libcurl3
+Description: Elliptics storage statistics collector
+
+Package: mastermind-cocaine
+Architecture: any
+Depends: mastermind-collector
+Description: Scripts for deploying mastermind into cocaine
