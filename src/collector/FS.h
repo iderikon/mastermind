@@ -27,6 +27,7 @@
 #include "RWSpinLock.h"
 
 class Backend;
+class Node;
 class Storage;
 
 struct FSStat
@@ -61,6 +62,9 @@ public:
     const std::string & get_key() const
     { return m_key; }
 
+    const FSStat & get_stat() const
+    { return m_stat; }
+
     void add_backend(Backend *backend);
     void remove_backend(Backend *backend);
     void get_backends(std::vector<Backend*> & backends) const;
@@ -71,6 +75,9 @@ public:
 
     Status get_status() const
     { return m_status; }
+
+    void set_status(Status status)
+    { m_status = status; }
 
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 

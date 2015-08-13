@@ -136,16 +136,19 @@ Discovery::~Discovery()
     delete m_discovery_start;
 }
 
-int Discovery::init()
+int Discovery::init_curl()
 {
     if (curl_global_init(CURL_GLOBAL_ALL)) {
         BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to initialize libcurl");
         return -1;
     }
+    m_http_port = m_app.get_config().monitor_port;
+    return 0;
+}
 
+int Discovery::init_elliptics()
+{
     const Config & config = m_app.get_config();
-
-    m_http_port = config.monitor_port;
 
     dnet_config cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -223,7 +226,7 @@ int Discovery::start()
     if (nodes.empty())
         return 0;
 
-    if (discover_nodes(nodes) != 0)
+    if (discover_nodes(nodes) < 0)
         return -1;
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Node discovery completed");
@@ -242,6 +245,8 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
 
     CurlGuard guard(m_curl_handle, m_epollfd);
 
+    int res = 0;
+
     m_curl_handle = curl_multi_init();
     curl_multi_setopt(m_curl_handle, CURLMOPT_SOCKETFUNCTION, handle_socket);
     curl_multi_setopt(m_curl_handle, CURLMOPT_SOCKETDATA, (void *) this);
@@ -258,7 +263,7 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
     for (size_t i = 0; i < nodes.size(); ++i) {
         Node & node = *nodes[i];
 
-        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Scheduling stat download for node %s",
+        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Scheduling stat download for node %s",
                 node.get_key().c_str());
 
         CURL *easy = create_easy_handle(&node);
@@ -297,6 +302,7 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
         do {
             int msgq = 0;
             msg = curl_multi_info_read(m_curl_handle, &msgq);
+
             if (msg && (msg->msg == CURLMSG_DONE)) {
                 CURL *easy = msg->easy_handle;
 
@@ -308,13 +314,14 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
                 }
 
                 if (msg->data.result == CURLE_OK) {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
+                    BH_LOG(m_app.get_logger(), DNET_LOG_INFO,
                             "Node %s stat download completed", node->get_key().c_str());
 
+                    ++res;
                     ThreadPool::Job *job = node->create_stats_parse_job();
                     m_app.get_thread_pool().dispatch(job);
                 } else {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Node %s stats download failed, "
+                    BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Node %s stats download failed, "
                             "result: %d", node->get_key().c_str(), msg->data.result);
 
                     node->drop_download_data();
@@ -327,7 +334,7 @@ int Discovery::discover_nodes(const std::vector<Node*> & nodes)
         } while (msg);
     }
 
-    return 0;
+    return res;
 }
 
 void Discovery::end()
@@ -348,12 +355,10 @@ void Discovery::end()
 
 void Discovery::schedule_start()
 {
-    DiscoveryStart *start_job = new DiscoveryStart(*this);
-
     LockGuard<SpinLock> guard(m_progress_lock);
 
     m_in_progress = true;
-    m_app.get_thread_pool().dispatch_after(start_job);
+    m_app.get_thread_pool().dispatch_after(m_discovery_start);
 }
 
 void Discovery::take_over_snapshot(ThreadPool::Job *job)
@@ -382,6 +387,7 @@ CURL *Discovery::create_easy_handle(Node *node)
     curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "deflate");
     curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, &write_func);
     curl_easy_setopt(easy, CURLOPT_WRITEDATA, node);
+    curl_easy_setopt(easy, CURLOPT_TIMEOUT, m_app.get_config().wait_timeout);
 
     return easy;
 }

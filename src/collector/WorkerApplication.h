@@ -40,10 +40,13 @@ public:
     ioremap::elliptics::logger_base & get_logger()
     { return *m_logger; }
 
+    void set_logger(ioremap::elliptics::logger_base *logger)
+    { m_logger = logger; }
+
     ioremap::elliptics::logger_base & get_elliptics_logger()
     { return *m_elliptics_logger; }
 
-    const Config & get_config() const
+    Config & get_config()
     { return m_config; }
 
     ThreadPool & get_thread_pool()

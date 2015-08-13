@@ -70,7 +70,7 @@ public:
 
     void handle_backend(Backend & backend, bool existed);
 
-    void get_group_ids(std::vector<int> & groups) const;
+    void get_group_ids(std::vector<int> & group_ids) const;
     void get_groups(std::vector<Group*> & groups);
     bool get_group(int id, Group *& group);
 

@@ -39,7 +39,8 @@ public:
     Discovery(WorkerApplication & app);
     ~Discovery();
 
-    int init();
+    int init_curl();
+    int init_elliptics();
 
     ioremap::elliptics::session & get_session()
     { return *m_session; }

@@ -85,6 +85,26 @@ TEST(ProcfsParserTest, ParseFull)
     EXPECT_EQ(157, stat.ts_usec);
 }
 
+TEST(ProcfsParserTest, ParseTimestamp)
+{
+    const char *str = "{\"timestamp\":{\"tv_sec\":163,\"tv_usec\":167}}";
+
+    ProcfsParser parser;
+
+    rapidjson::Reader reader;
+    rapidjson::StringStream stream(str);
+    reader.Parse(stream, parser);
+
+    ASSERT_TRUE(parser.good());
+
+    const NodeStat & stat = parser.get_stat();
+    EXPECT_EQ(163, stat.ts_sec);
+    EXPECT_EQ(167, stat.ts_usec);
+    EXPECT_EQ(0, stat.la1);
+    EXPECT_EQ(0, stat.tx_bytes);
+    EXPECT_EQ(0, stat.rx_bytes);
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

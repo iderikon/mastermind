@@ -157,9 +157,7 @@ BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, std::function<vo
     m_ts_sec(ts_sec),
     m_ts_usec(ts_usec),
     m_callback(callback)
-{
-    std::memset(&m_stat, 0, sizeof(m_stat));
-}
+{}
 
 bool BackendParser::EndObject(rapidjson::SizeType nr_members)
 {

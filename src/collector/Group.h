@@ -65,6 +65,9 @@ public:
     Namespace *get_namespace()
     { return m_namespace; }
 
+    void set_namespace(Namespace *ns)
+    { m_namespace = ns; }
+
     bool has_backend(Backend & backend) const;
     void add_backend(Backend & backend);
     void get_backends(std::vector<Backend*> & backends) const;
@@ -87,6 +90,14 @@ public:
 
     bool get_frozen() const
     { return m_frozen; }
+
+    int get_version() const
+    { return m_version; }
+
+    bool get_service_migrating() const
+    { return m_service.migrating; }
+
+    void get_job_id(std::string & job_id) const;
 
     uint64_t get_metadata_process_time() const
     { return m_metadata_process_time; }
