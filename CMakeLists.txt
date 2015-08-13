@@ -24,3 +24,7 @@ add_subdirectory(src/collector)
 enable_testing()
 add_subdirectory(tests/collector)
 
+install(FILES ${CMAKE_BINARY_DIR}/src/collector/mastermind-collector.tar.gz
+    src/collector/mastermind-collector.manifest
+    src/collector/mastermind-collector.profile
+    DESTINATION lib/mastermind/cocaine-app/)

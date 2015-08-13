@@ -1,0 +1,43 @@
+#!/bin/sh
+
+set -e
+
+#DEBHELPER#
+
+case "$1" in
+    configure)
+
+    DEPLOY_DIR="/usr/lib/mastermind"
+
+    mkdir -p /var/log/mastermind
+    chown cocaine -R $DEPLOY_DIR
+    chown cocaine -R /var/log/mastermind
+
+    BASE_APP_NAME=`/usr/bin/mastermind_app_name.sh`
+
+    rm -rf /var/lib/cocaine/apps/$BASE_APP_NAME-collector
+    rm -rf /var/spool/cocaine/$BASE_APP_NAME-collector
+    rm -rf /var/cache/cocaine/apps/$BASE_APP_NAME-collector
+    rm -f /var/cache/cocaine/manifests/$BASE_APP_NAME-collector
+
+    cocaine-tool app upload --name $BASE_APP_NAME-collector \
+        --package $DEPLOY_DIR/cocaine-app/mastermind-collector.tar.gz \
+        --manifest $DEPLOY_DIR/cocaine-app/mastermind-collector.manifest
+
+    cocaine-tool profile upload -n $BASE_APP_NAME-collector \
+        --profile $DEPLOY_DIR/cocaine-app/mastermind-collector.profile
+
+    cocaine-tool runlist add-app -n default --app $BASE_APP_NAME-collector \
+        --profile $BASE_APP_NAME-collector --force
+
+    ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
