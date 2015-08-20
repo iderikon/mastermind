@@ -29,14 +29,6 @@
 
 namespace {
 
-struct NSVolumeSort
-{
-    bool operator () (Namespace *ns1, Namespace *ns2) const
-    {
-        return (ns1->get_couples().size() > ns2->get_couples().size());
-    }
-};
-
 int parse_filter(const std::string & request, Filter & filter)
 {
     FilterParser parser(filter);
@@ -61,7 +53,7 @@ void on_summary::on_chunk(const char *chunk, size_t size)
 void on_group_info::on_chunk(const char *chunk, size_t size)
 {
     try {
-        m_group_id = std::stol(chunk);
+        m_group_id = std::stoi(chunk);
     } catch (...) {
         response()->error(-1, "invalid integer");
         response()->close();
@@ -89,174 +81,88 @@ void on_node_list_backends::on_chunk(const char *chunk, size_t size)
 
 void on_backend_info::on_chunk(const char *chunk, size_t size)
 {
-#if 0
+    std::string backend_name(chunk, size);
     std::ostringstream ostr;
 
     do {
-        const char *slash = std::strchr(chunk, '/');
-        if (slash == NULL) {
-            ostr << "Invalid backend id '" << chunk << "'\n"
+        size_t slash_pos = backend_name.rfind('/');
+        if (slash_pos == std::string::npos) {
+            ostr << "Invalid backend name '" << backend_name << "'\n"
                     "Syntax: <host>:<port>:<family>/<backend id>";
+            response()->error(-1, ostr.str());
             break;
         }
 
-        std::string node_name(chunk, slash - chunk);
-        int backend_id = atoi(slash + 1);
-
-        Node *node;
-        if (!m_app.get_storage().get_node(node_name, node)) {
-            ostr << "Node " << node_name << " does not exist";
+        std::string node_name = backend_name.substr(0, slash_pos);
+        std::string backend_id_str = backend_name.substr(slash_pos + 1);
+        try {
+            m_backend_id = std::stoi(backend_id_str);
+        } catch (...) {
+            ostr << "Invalid backend id " << backend_id_str;
+            response()->error(-1, ostr.str());
             break;
         }
-
-        Backend *backend;
-        if (!node->get_backend(backend_id, backend)) {
-            ostr << "Backend " << backend_id << " does not exist";
-            break;
-        }
-
-        backend->print_info(ostr);
     } while (0);
 
-    response()->write(ostr.str());
-#endif
-    response()->close();
+    if (!ostr.str().empty()) {
+        response()->close();
+        return;
+    }
+
+    m_app.get_collector().backend_info(shared_from_this());
 }
 
 void on_fs_info::on_chunk(const char *chunk, size_t size)
 {
-#if 0
+    std::string key(chunk, size);
     std::ostringstream ostr;
-    std::string key(chunk);
 
     do {
-        size_t pos = key.rfind('/');
-        if (pos == std::string::npos) {
-            ostr << "Invalid FS key '" << key << '\'';
+        size_t slash_pos = key.rfind('/');
+        if (slash_pos == std::string::npos) {
+            ostr << "Invalid FS key '" << key << "'\n"
+                    "Syntax: <host>:<port>:<family>/<fs id>";
+            response()->error(-1, ostr.str());
             break;
         }
 
-        unsigned long long fsid = std::stoull(key.substr(pos + 1));
-        std::string node_key = key.substr(0, pos);
-
-        Node *node;
-        if (!m_app.get_storage().get_node(node_key, node)) {
-            ostr << "Node '" << node_key << "' does not exist";
+        std::string node_name = key.substr(0, slash_pos);
+        std::string fs_id_str = key.substr(slash_pos + 1);
+        try {
+            m_fsid = std::stol(fs_id_str);
+        } catch (...) {
+            ostr << "Invalid fs id " << fs_id_str;
+            response()->error(-1, ostr.str());
             break;
-        }
-
-        FS *fs;
-        if (!node->get_fs(uint64_t(fsid), fs)) {
-            ostr << "Found no FS '" << key << '\'';
-            break;
-        }
-
-        fs->print_info(ostr);
-    } while (0);
-
-    response()->write(ostr.str());
-#endif
-    response()->close();
-}
-
-void on_fs_list_backends::on_chunk(const char *chunk, size_t size)
-{
-#if 0
-    std::ostringstream ostr;
-    std::string key(chunk);
-
-    do {
-        size_t pos = key.rfind('/');
-        if (pos == std::string::npos) {
-            ostr << "Invalid FS key '" << key << '\'';
-            break;
-        }
-
-        unsigned long long fsid = std::stoull(key.substr(pos + 1));
-        std::string node_key = key.substr(0, pos);
-
-        Node *node;
-        if (!m_app.get_storage().get_node(node_key, node)) {
-            ostr << "Node '" << node_key << "' does not exist";
-            break;
-        }
-
-        FS *fs;
-        if (!node->get_fs(uint64_t(fsid), fs)) {
-            ostr << "Found no FS '" << key << '\'';
-            break;
-        }
-
-        std::vector<Backend*> backends;
-        fs->get_backends(backends);
-
-        ostr << "There are " << backends.size() << " backends\n";
-        if (backends.empty())
-            break;
-
-        for (size_t i = 0; i < backends.size(); ++i) {
-            const Backend & backend = *backends[i];
-            ostr << "  " << backend.get_node().get_key() << '/' << backend.get_stat().backend_id << '\n';
         }
     } while (0);
 
-    response()->write(ostr.str());
-#endif
-    response()->close();
+    if (!ostr.str().empty()) {
+        response()->close();
+        return;
+    }
+
+    m_app.get_collector().fs_info(shared_from_this());
 }
 
 void on_list_namespaces::on_chunk(const char *chunk, size_t size)
 {
-#if 0
-    std::vector<Namespace*> namespaces;
-    m_app.get_storage().get_namespaces(namespaces);
-
-    std::ostringstream ostr;
-    ostr << "There are " << namespaces.size() << " namespaces\n";
-
-    std::sort(namespaces.begin(), namespaces.end(), NSVolumeSort());
-
-    for (size_t i = 0; i < namespaces.size(); ++i) {
-        Namespace *ns = namespaces[i];
-        ostr << "  '" << ns->get_name() << "' (" << ns->get_couple_count() << " couples)\n";
-    }
-
-    response()->write(ostr.str());
-#endif
-    response()->close();
+    m_app.get_collector().list_namespaces(shared_from_this());
 }
 
 void on_group_couple_info::on_chunk(const char *chunk, size_t size)
 {
-#if 0
-    std::ostringstream ostr;
+    std::string group_str(chunk, size);
+    try {
+        m_group_id = std::stoi(group_str);
+    } catch (...) {
+        std::ostringstream ostr;
+        ostr << "Invalid group id '" << group_str << '\'';
+        response()->error(-1, ostr.str());
+        response()->close();
+    }
 
-    do {
-        char c;
-        int group_id;
-        if (sscanf(chunk, "%d%c", &group_id, &c) != 1) {
-            ostr << "Invalid group id " << group_id;
-            break;
-        }
-
-        Group *group;
-        if (!m_app.get_storage().get_group(group_id, group)) {
-            ostr << "Group " << group_id << " does not exist";
-            break;
-        }
-
-        Couple *couple = group->get_couple();
-        if (couple == NULL) {
-            ostr << "Couple is NULL";
-            break;
-        }
-
-        couple->print_info(ostr);
-    } while (0);
-
-    response()->write(ostr.str());
-#endif
-    response()->close();
+    m_app.get_collector().group_couple_info(shared_from_this());
 }
 
 void on_force_update::on_chunk(const char *chunk, size_t size)

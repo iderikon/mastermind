@@ -70,7 +70,7 @@ public:
 
     Namespace & get_namespace(const std::string & name);
     bool get_namespace(const std::string & name, Namespace *& ns);
-    const std::map<std::string, Namespace> & get_namespaces() const
+    std::map<std::string, Namespace> & get_namespaces()
     { return m_namespaces; }
 
     // process newly received backends, i.e. create Group objects

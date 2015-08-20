@@ -147,11 +147,6 @@ void Collector::fs_info(std::shared_ptr<on_fs_info> handler)
     dispatch_async_f(m_queue, new std::shared_ptr<on_fs_info>(handler), &Collector::execute_fs_info);
 }
 
-void Collector::fs_list_backends(std::shared_ptr<on_fs_list_backends> handler)
-{
-    dispatch_async_f(m_queue, new std::shared_ptr<on_fs_list_backends>(handler), &Collector::execute_fs_list_backends);
-}
-
 void Collector::group_couple_info(std::shared_ptr<on_group_couple_info> handler)
 {
     dispatch_async_f(m_queue, new std::shared_ptr<on_group_couple_info>(handler), &Collector::execute_group_couple_info);
@@ -350,35 +345,127 @@ void Collector::execute_backend_info(void *arg)
 {
     std::unique_ptr<std::shared_ptr<on_backend_info>> handler_ptr(
             static_cast<std::shared_ptr<on_backend_info>*>(arg));
-    // Collector & self = (*handler_ptr)->get_app().get_collector();
+    Collector & self = (*handler_ptr)->get_app().get_collector();
+
+    const std::string & node_name = (*handler_ptr)->get_node_name();
+
+    std::ostringstream ostr;
+    do {
+        Node *node = nullptr;
+        if (!self.m_storage.get_node(node_name, node) || node == nullptr) {
+            ostr << "Node " << node_name << " does not exist";
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        int backend_id = (*handler_ptr)->get_backend_id();
+        Backend *backend = nullptr;
+        if (!node->get_backend(backend_id, backend) || backend == nullptr) {
+            ostr << "Backend " << backend_id << " does not exist";
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        backend->print_info(ostr);
+        (*handler_ptr)->response()->write(ostr.str());
+    } while (0);
+
+    (*handler_ptr)->response()->close();
 }
 
 void Collector::execute_fs_info(void *arg)
 {
     std::unique_ptr<std::shared_ptr<on_fs_info>> handler_ptr(
             static_cast<std::shared_ptr<on_fs_info>*>(arg));
-    // Collector & self = (*handler_ptr)->get_app().get_collector();
-}
+    Collector & self = (*handler_ptr)->get_app().get_collector();
 
-void Collector::execute_fs_list_backends(void *arg)
-{
-    std::unique_ptr<std::shared_ptr<on_fs_list_backends>> handler_ptr(
-            static_cast<std::shared_ptr<on_fs_list_backends>*>(arg));
-    // Collector & self = (*handler_ptr)->get_app().get_collector();
+    std::ostringstream ostr;
+    do {
+        const std::string & node_name = (*handler_ptr)->get_node_name();
+        uint64_t fsid = (*handler_ptr)->get_fsid();
+
+        Node *node = nullptr;
+        if (!self.m_storage.get_node(node_name, node) || node == nullptr) {
+            ostr << "Node '" << node_name << "' does not exist";
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        FS *fs = nullptr;
+        if (!node->get_fs(fsid, fs) || fs == nullptr) {
+            ostr << "Found no FS " << fsid;
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        fs->print_info(ostr);
+        (*handler_ptr)->response()->write(ostr.str());
+    } while (0);
+
+    (*handler_ptr)->response()->close();
 }
 
 void Collector::execute_group_couple_info(void *arg)
 {
     std::unique_ptr<std::shared_ptr<on_group_couple_info>> handler_ptr(
             static_cast<std::shared_ptr<on_group_couple_info>*>(arg));
-    // Collector & self = (*handler_ptr)->get_app().get_collector();
+    Collector & self = (*handler_ptr)->get_app().get_collector();
+
+    std::ostringstream ostr;
+    do {
+        int group_id = (*handler_ptr)->get_group_id();
+        Group *group = nullptr;
+        if (!self.m_storage.get_group(group_id, group) || group == nullptr) {
+            ostr << "Group " << group_id << " does not exist";
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        Couple *couple = group->get_couple();
+        if (couple == nullptr) {
+            ostr << "Group " << group_id << " is not bound to any couple";
+            (*handler_ptr)->response()->error(-1, ostr.str());
+            break;
+        }
+
+        couple->print_info(ostr);
+        (*handler_ptr)->response()->write(ostr.str());
+    } while (0);
+
+    (*handler_ptr)->response()->close();
 }
 
 void Collector::execute_list_namespaces(void *arg)
 {
     std::unique_ptr<std::shared_ptr<on_list_namespaces>> handler_ptr(
             static_cast<std::shared_ptr<on_list_namespaces>*>(arg));
-    // Collector & self = (*handler_ptr)->get_app().get_collector();
+    Collector & self = (*handler_ptr)->get_app().get_collector();
+
+    std::map<std::string, Namespace> & namespaces = self.m_storage.get_namespaces();
+    std::vector<Namespace*> ns_sorted;
+
+    ns_sorted.reserve(namespaces.size());
+    for (auto it = namespaces.begin(); it != namespaces.end(); ++it)
+        ns_sorted.push_back(&it->second);
+
+    std::ostringstream ostr;
+    ostr << "There are " << namespaces.size() << " namespaces\n";
+
+    struct
+    {
+        bool operator () (Namespace *ns1, Namespace *ns2) const
+        {
+            return (ns1->get_couples().size() > ns2->get_couples().size());
+        }
+    } ns_volume_sort;
+
+    std::sort(ns_sorted.begin(), ns_sorted.end(), ns_volume_sort);
+
+    for (Namespace *ns : ns_sorted)
+        ostr << "  '" << ns->get_name() << "' (" << ns->get_couples().size() << " couples)\n";
+
+    (*handler_ptr)->response()->write(ostr.str());
+    (*handler_ptr)->response()->close();
 }
 
 void Collector::execute_node_list_backends(void *arg)

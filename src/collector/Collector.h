@@ -32,7 +32,6 @@ class WorkerApplication;
 class on_backend_info;
 class on_force_update;
 class on_fs_info;
-class on_fs_list_backends;
 class on_get_snapshot;
 class on_group_couple_info;
 class on_group_info;
@@ -71,7 +70,6 @@ public:
     void summary(std::shared_ptr<on_summary> handler);
     void backend_info(std::shared_ptr<on_backend_info> handler);
     void fs_info(std::shared_ptr<on_fs_info> handler);
-    void fs_list_backends(std::shared_ptr<on_fs_list_backends> handler);
     void group_couple_info(std::shared_ptr<on_group_couple_info> handler);
     void list_namespaces(std::shared_ptr<on_list_namespaces> handler);
     void node_list_backends(std::shared_ptr<on_node_list_backends> handler);
@@ -89,7 +87,6 @@ private:
     static void execute_summary(void *arg);
     static void execute_backend_info(void *arg);
     static void execute_fs_info(void *arg);
-    static void execute_fs_list_backends(void *arg);
     static void execute_group_couple_info(void *arg);
     static void execute_list_namespaces(void *arg);
     static void execute_node_list_backends(void *arg);

@@ -66,7 +66,6 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     d.on<on_node_list_backends>("node_list_backends", *this);
     d.on<on_backend_info>("backend_info", *this);
     d.on<on_fs_info>("fs_info", *this);
-    d.on<on_fs_list_backends>("fs_list_backends", *this);
     d.on<on_list_namespaces>("list_namespaces", *this);
     d.on<on_group_couple_info>("group_couple_info", *this);
 

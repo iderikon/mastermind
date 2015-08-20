@@ -157,7 +157,8 @@ public:
     on_backend_info(WorkerApplication & app)
         :
         super(app),
-        m_app(app)
+        m_app(app),
+        m_backend_id(0)
     {}
 
     WorkerApplication & get_app()
@@ -165,8 +166,16 @@ public:
 
     void on_chunk(const char *chunk, size_t size);
 
+    const std::string & get_node_name() const
+    { return m_node_name; }
+
+    int get_backend_id() const
+    { return m_backend_id; }
+
 private:
     WorkerApplication & m_app;
+    std::string m_node_name;
+    int m_backend_id;
 };
 
 class on_fs_info :
@@ -179,7 +188,8 @@ public:
     on_fs_info(WorkerApplication & app)
         :
         super(app),
-        m_app(app)
+        m_app(app),
+        m_fsid(0)
     {}
 
     WorkerApplication & get_app()
@@ -187,30 +197,16 @@ public:
 
     void on_chunk(const char *chunk, size_t size);
 
-private:
-    WorkerApplication & m_app;
-};
+    const std::string & get_node_name() const
+    { return m_node_name; }
 
-class on_fs_list_backends :
-    public cocaine::framework::handler<WorkerApplication>,
-    public std::enable_shared_from_this<on_fs_list_backends>
-{
-public:
-    typedef cocaine::framework::handler<WorkerApplication> super;
-
-    on_fs_list_backends(WorkerApplication & app)
-        :
-        super(app),
-        m_app(app)
-    {}
-
-    WorkerApplication & get_app()
-    { return m_app; }
-
-    void on_chunk(const char *chunk, size_t size);
+    uint64_t get_fsid() const
+    { return m_fsid; }
 
 private:
     WorkerApplication & m_app;
+    std::string m_node_name;
+    uint64_t m_fsid;
 };
 
 class on_list_namespaces :
@@ -245,7 +241,8 @@ public:
     on_group_couple_info(WorkerApplication & app)
         :
         super(app),
-        m_app(app)
+        m_app(app),
+        m_group_id(0)
     {}
 
     WorkerApplication & get_app()
@@ -253,8 +250,12 @@ public:
 
     void on_chunk(const char *chunk, size_t size);
 
+    int get_group_id() const
+    { return m_group_id; }
+
 private:
     WorkerApplication & m_app;
+    int m_group_id;
 };
 
 class on_force_update :
