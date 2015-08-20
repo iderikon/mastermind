@@ -81,30 +81,13 @@ void on_node_list_backends::on_chunk(const char *chunk, size_t size)
 
 void on_backend_info::on_chunk(const char *chunk, size_t size)
 {
-    std::string backend_name(chunk, size);
-    std::ostringstream ostr;
+    const std::string key(chunk, size);
 
-    do {
-        size_t slash_pos = backend_name.rfind('/');
-        if (slash_pos == std::string::npos) {
-            ostr << "Invalid backend name '" << backend_name << "'\n"
-                    "Syntax: <host>:<port>:<family>/<backend id>";
-            response()->error(-1, ostr.str());
-            break;
-        }
-
-        std::string node_name = backend_name.substr(0, slash_pos);
-        std::string backend_id_str = backend_name.substr(slash_pos + 1);
-        try {
-            m_backend_id = std::stoi(backend_id_str);
-        } catch (...) {
-            ostr << "Invalid backend id " << backend_id_str;
-            response()->error(-1, ostr.str());
-            break;
-        }
-    } while (0);
-
-    if (!ostr.str().empty()) {
+    if (!Storage::split_node_num(key, m_node_name, m_backend_id)) {
+        std::ostringstream ostr;
+        ostr << "Invalid backend key '" << key << "'\n"
+                "Syntax: <host>:<port>:<family>/<backend id>";
+        response()->error(-1, ostr.str());
         response()->close();
         return;
     }
@@ -114,30 +97,13 @@ void on_backend_info::on_chunk(const char *chunk, size_t size)
 
 void on_fs_info::on_chunk(const char *chunk, size_t size)
 {
-    std::string key(chunk, size);
-    std::ostringstream ostr;
+    const std::string key(chunk, size);
 
-    do {
-        size_t slash_pos = key.rfind('/');
-        if (slash_pos == std::string::npos) {
-            ostr << "Invalid FS key '" << key << "'\n"
-                    "Syntax: <host>:<port>:<family>/<fs id>";
-            response()->error(-1, ostr.str());
-            break;
-        }
-
-        std::string node_name = key.substr(0, slash_pos);
-        std::string fs_id_str = key.substr(slash_pos + 1);
-        try {
-            m_fsid = std::stol(fs_id_str);
-        } catch (...) {
-            ostr << "Invalid fs id " << fs_id_str;
-            response()->error(-1, ostr.str());
-            break;
-        }
-    } while (0);
-
-    if (!ostr.str().empty()) {
+    if (!Storage::split_node_num(key, m_node_name, m_fsid)) {
+        std::ostringstream ostr;
+        ostr << "Invalid FS key '" << key << "'\n"
+                "Syntax: <host>:<port>:<family>/<fs id>";
+        response()->error(-1, ostr.str());
         response()->close();
         return;
     }

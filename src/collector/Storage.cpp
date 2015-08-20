@@ -221,359 +221,106 @@ void Storage::select(Filter & filter, Entries & entries)
 {
     filter.sort();
 
-    bool have_groups = false;
-    bool have_couples = false;
-    bool have_nodes = false;
-    bool have_backends = false;
-    bool have_fs = false;
+    // map node -> pair(backend ids, fs ids)
+    std::map<std::string, std::pair<std::vector<uint64_t>, std::vector<uint64_t>>> node_item_ids;
+    for (const std::string & key : filter.backends) {
+        std::string node;
+        uint64_t backend_id;
+        if (split_node_num(key, node, backend_id))
+            node_item_ids[node].first.push_back(backend_id);
+    }
+    for (const std::string & key : filter.filesystems) {
+        std::string node;
+        uint64_t fsid;
+        if (split_node_num(key, node, fsid))
+            node_item_ids[node].second.push_back(fsid);
+    }
+
+    std::vector<Backend*> backends;
+    std::vector<FS*> filesystems;
+    for (auto nit = node_item_ids.begin(); nit != node_item_ids.end(); ++nit) {
+        Node *node = nullptr;
+        if (!get_node(nit->first, node) || node == nullptr)
+            continue;
+
+        const std::vector<uint64_t> & backend_ids = nit->second.first;
+        const std::vector<uint64_t> & fs_ids = nit->second.second;
+        for (uint64_t backend_id : backend_ids) {
+            Backend *backend = nullptr;
+            if (node->get_backend(backend_id, backend) && backend != nullptr)
+                backends.push_back(backend);
+        }
+        for (uint64_t fsid : fs_ids) {
+            FS *fs = nullptr;
+            if (node->get_fs(fsid, fs) && fs != nullptr)
+                filesystems.push_back(fs);
+        }
+    }
+
+    std::vector<Namespace*> namespaces;
+    std::vector<Couple*> couples;
+    std::vector<Group*> groups;
+    std::vector<Node*> nodes;
+
+    for (const std::string & name : filter.namespaces) {
+        Namespace *ns = nullptr;
+        if (get_namespace(name, ns) && ns != nullptr)
+            namespaces.push_back(ns);
+    }
+    for (const std::string & key : filter.couples) {
+        Couple *couple = nullptr;
+        if (get_couple(key, couple) && couple != nullptr)
+            couples.push_back(couple);
+    }
+    for (int id : filter.groups) {
+        Group *group = nullptr;
+        if (get_group(id, group) && group != nullptr)
+            groups.push_back(group);
+    }
+    for (const std::string & key : filter.nodes) {
+        Node *node = nullptr;
+        if (get_node(key, node) && node != nullptr)
+            nodes.push_back(node);
+    }
 
     if (filter.item_types & Filter::Group) {
         if (!filter.groups.empty()) {
-            std::vector<Group*> candidate_groups;
-            for (int id : filter.groups) {
-                auto it = m_groups.find(id);
-                if (it != m_groups.end()) {
-                    Group & group = it->second;
-                    if (group.match(filter, ~Filter::Group))
-                        entries.groups.push_back(&group);
-                }
-            }
-            have_groups = true;
+            entries.groups = groups;
+        } else {
+            // TODO
         }
     }
 
     if (filter.item_types & Filter::Couple) {
         if (!filter.couples.empty()) {
-            std::vector<int> group_ids;
-            group_ids.reserve(4);
-
-            for (const std::string & couple_key_str : filter.couples) {
-                if (couple_key_str.empty())
-                    continue;
-
-                size_t start = 0;
-                size_t pos;
-                do {
-                    pos = couple_key_str.find(':', start);
-                    group_ids.push_back(std::stoi(couple_key_str.substr(start, pos - start)));
-                    start = pos + 1;
-                } while (pos != std::string::npos);
-
-                auto it = m_couples.find(CoupleKey(group_ids));
-                if (it != m_couples.end()) {
-                    Couple & couple = it->second;
-                    if (couple.match(filter, ~Filter::Couple))
-                        entries.couples.push_back(&couple);
-                }
-
-                group_ids.clear();
-            }
-            have_couples = true;
-        } else if (have_groups) {
-            std::vector<Couple*> candidate_couples;
-            for (Group *group : entries.groups) {
-                if (group->get_couple() != nullptr)
-                    candidate_couples.push_back(group->get_couple());
-            }
-            remove_duplicates(candidate_couples);
-            for (Couple *couple : candidate_couples) {
-                if (couple->match(filter, ~Filter::Group))
-                    entries.couples.push_back(couple);
-            }
-            have_couples = true;
-        } else if (!filter.namespaces.empty()) {
-            for (const std::string & name : filter.namespaces) {
-                Namespace *ns;
-                if (get_namespace(name, ns)) {
-                    const std::set<Couple*> & couples = ns->get_couples();
-                    for (Couple *couple : couples) {
-                        if (couple->match(filter, ~Filter::Namespace))
-                            entries.couples.push_back(couple);
-                    }
-                }
-            }
-            have_couples = true;
+            entries.couples = couples;
         } else {
-            for (auto it = m_couples.begin(); it != m_couples.end(); ++it) {
-                Couple & couple = it->second;
-                if (couple.match(filter))
-                    entries.couples.push_back(&couple);
-            }
+            // TODO
         }
-    }
-
-    if (have_couples && !have_groups && (filter.item_types & Filter::Group)) {
-        // XXX
-        std::vector<Group*> candidate_groups;
-        for (Couple *couple : entries.couples) {
-            couple->get_groups(candidate_groups);
-            for (Group *group : candidate_groups) {
-                if (group->match(filter, ~Filter::Couple & ~Filter::Group))
-                    entries.groups.push_back(group);
-            }
-            candidate_groups.clear();
-        }
-        have_groups = true;
     }
 
     if (filter.item_types & Filter::Node) {
         if (!filter.nodes.empty()) {
-            for (const std::string & key : filter.nodes) {
-                auto it = m_nodes.find(key);
-                if (it != m_nodes.end()) {
-                    Node & node = it->second;
-                    if (node.match(filter, ~Filter::Node))
-                        entries.nodes.push_back(&node);
-                }
-            }
-            have_nodes = true;
-        } else if (have_groups) {
-            std::vector<Node*> candidate_nodes;
-            for (Group *group : entries.groups) {
-                std::set<Backend*> & backends = group->get_backends();
-                for (Backend *backend : backends)
-                    candidate_nodes.push_back(&backend->get_node());
-            }
-            remove_duplicates(candidate_nodes);
-            for (Node *node : candidate_nodes) {
-                if (node->match(filter, ~Filter::Group))
-                    entries.nodes.push_back(node);
-            }
-            have_nodes = true;
-        } else if (have_couples) {
-            std::vector<Node*> candidate_nodes;
-            std::vector<Group*> groups;
-            for (Couple *couple : entries.couples) {
-                couple->get_groups(groups);
-                for (Group *group : groups) {
-                    std::set<Backend*> & backends = group->get_backends();
-                    for (Backend *backend : backends)
-                        candidate_nodes.push_back(&backend->get_node());
-                }
-                groups.clear();
-            }
-            remove_duplicates(candidate_nodes);
-            for (Node *node : candidate_nodes) {
-                if (node->match(filter, ~Filter::Couple))
-                    entries.nodes.push_back(node);
-            }
-            have_nodes = true;
+            entries.nodes = nodes;
         } else {
-            for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
-                Node & node = it->second;
-                if (node.match(filter))
-                    entries.nodes.push_back(&node);
-            }
-            have_nodes = true;
+            // TODO
         }
     }
 
     if (filter.item_types & Filter::Backend) {
         if (!filter.backends.empty()) {
-            Node *node = nullptr;
-            for (const std::string & backend_key : filter.backends) {
-                size_t pos = backend_key.rfind('/');
-                if (pos == std::string::npos)
-                    continue;
-                std::string node_key = backend_key.substr(0, pos);
-                if (node == nullptr || node->get_key() != node_key) {
-                    if (!get_node(node_key, node))
-                        continue;
-                }
-                Backend *backend;
-                if (node->get_backend(std::stoi(backend_key.substr(pos + 1)), backend)) {
-                    if (backend->match(filter, ~Filter::Backend))
-                        entries.backends.push_back(backend);
-                }
-            }
-            have_backends = true;
-        } else if (have_groups) {
-            for (Group *group : entries.groups) {
-                std::set<Backend*> & backends = group->get_backends();
-                for (Backend *backend : backends) {
-                    if (backend->match(filter, ~Filter::Group))
-                        entries.backends.push_back(backend);
-                }
-            }
-            have_backends = true;
-        } else if (have_couples) {
-            std::vector<Group*> groups;
-            for (Couple *couple : entries.couples) {
-                couple->get_groups(groups);
-                for (Group *group : groups) {
-                    std::set<Backend*> & backends = group->get_backends();
-                    for (Backend *backend : backends) {
-                        if (backend->match(filter, ~Filter::Couple))
-                            entries.backends.push_back(backend);
-                    }
-                }
-                groups.clear();
-            }
-            have_backends = true;
-        } else if (have_nodes) {
-            for (Node *node : entries.nodes) {
-                std::map<int, Backend> & backends = node->get_backends();
-                for (auto it = backends.begin(); it != backends.end(); ++it) {
-                    Backend & backend = it->second;
-                    if (backend.match(filter, ~Filter::Node))
-                        entries.backends.push_back(&backend);
-                }
-            }
-            have_backends = true;
+            entries.backends = backends;
+        } else {
+            // TODO
         }
     }
 
     if (filter.item_types & Filter::FS) {
         if (!filter.filesystems.empty()) {
-            Node *node = nullptr;
-            for (const std::string & fs_key : filter.filesystems) {
-                size_t pos = fs_key.rfind('/');
-                if (pos == std::string::npos)
-                    continue;
-                std::string node_key = fs_key.substr(0, pos);
-                if (node == nullptr || node->get_key() != node_key) {
-                    if (!get_node(node_key, node))
-                        continue;
-                }
-                FS *fs;
-                if (node->get_fs(std::stoull(fs_key.substr(pos + 1)), fs)) {
-                    if (fs->match(filter, ~Filter::FS))
-                        entries.filesystems.push_back(fs);
-                }
-            }
-            have_fs = true;
-        } else if (have_backends) {
-            std::vector<FS*> candidate_fs;
-            for (Backend *backend : entries.backends) {
-                FS *fs = backend->get_fs();
-                if (fs == nullptr)
-                    continue;
-                candidate_fs.push_back(fs);
-            }
-            remove_duplicates(candidate_fs);
-            for (FS *fs : candidate_fs) {
-                if (fs->match(filter, ~Filter::Backend))
-                    entries.filesystems.push_back(fs);
-            }
-            have_fs = true;
-        } else if (have_nodes) {
-            for (Node *node : entries.nodes) {
-                std::map<uint64_t, FS> & candidate_fs = node->get_filesystems();
-                for (auto it = candidate_fs.begin(); it != candidate_fs.end(); ++it) {
-                    FS & fs = it->second;
-                    if (fs.match(filter, ~Filter::Node))
-                        entries.filesystems.push_back(&fs);
-                }
-                candidate_fs.clear();
-            }
-            have_fs = true;
-        } else if (have_groups) {
-            std::vector<FS*> candidate_fs;
-            for (Group *group : entries.groups) {
-                std::set<Backend*> & backends = group->get_backends();
-                for (Backend *backend : backends) {
-                    FS *fs = backend->get_fs();
-                    if (fs == nullptr)
-                        continue;
-                    candidate_fs.push_back(fs);
-                }
-            }
-            remove_duplicates(candidate_fs);
-            for (FS *fs : candidate_fs) {
-                if (fs->match(filter, ~Filter::Group))
-                    entries.filesystems.push_back(fs);
-            }
-            have_fs = true;
-        } else if (have_couples) {
-            std::vector<Group*> groups;
-            std::vector<FS*> candidate_fs;
-            for (Couple *couple : entries.couples) {
-                couple->get_groups(groups);
-                for (Group *group : groups) {
-                    std::set<Backend*> & backends = group->get_backends();
-                    for (Backend *backend : backends) {
-                        FS *fs = backend->get_fs();
-                        if (fs == nullptr)
-                            continue;
-                        candidate_fs.push_back(fs);
-                    }
-                }
-                groups.clear();
-            }
-            remove_duplicates(candidate_fs);
-            for (FS *fs : candidate_fs) {
-                if (fs->match(filter, ~Filter::Couple))
-                    entries.filesystems.push_back(fs);
-            }
-            have_fs = true;
+            entries.filesystems = filesystems;
         } else {
-            for (auto nit = m_nodes.begin(); nit != m_nodes.end(); ++nit) {
-                Node & node = nit->second;
-                std::map<int, Backend> & backends = node.get_backends();
-                for (auto it = backends.begin(); it != backends.end(); ++it) {
-                    Backend & backend = it->second;
-                    FS *fs = backend.get_fs();
-                    if (fs == nullptr)
-                        continue;
-                    if (fs->match(filter))
-                        entries.filesystems.push_back(fs);
-                }
-            }
-            have_fs = true;
+            // TODO
         }
-    }
-
-    if (!have_backends && (filter.item_types & Filter::Backend)) {
-        if (have_fs) {
-            for (FS *fs : entries.filesystems) {
-                const std::set<Backend*> & backends = fs->get_backends();
-                for (Backend *backend : backends) {
-                    if (backend->match(filter, ~Filter::FS))
-                        entries.backends.push_back(backend);
-                }
-            }
-            have_backends = true;
-        } else {
-            std::map<std::string, Node> & nodes = m_nodes;
-            for (auto nit = nodes.begin(); nit != nodes.end(); ++nit) {
-                Node & node = nit->second;
-                std::map<int, Backend> & backends = node.get_backends();
-                for (auto bit = backends.begin(); bit != backends.end(); ++bit) {
-                    Backend & backend = bit->second;
-                    if (backend.match(filter))
-                        entries.backends.push_back(&backend);
-                }
-                backends.clear();
-            }
-            have_backends = true;
-        }
-    }
-
-    if (!have_groups && (filter.item_types & Filter::Group)) {
-        if (have_backends) {
-            for (Backend *backend : entries.backends) {
-                Group *group = backend->get_group();
-                if (group != nullptr && group->match(filter, ~Filter::Backend))
-                    entries.groups.push_back(group);
-            }
-            remove_duplicates(entries.groups);
-            have_groups = true;
-        } else {
-            for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
-                Group & group = it->second;
-                if (group.match(filter))
-                    entries.groups.push_back(&group);
-            }
-            have_groups = true;
-        }
-    }
-
-    if (have_backends || have_fs) {
-        for (Backend *backend : entries.backends)
-            entries.nodes.push_back(&backend->get_node());
-        for (FS *fs : entries.filesystems)
-            entries.nodes.push_back(&fs->get_node());
-        remove_duplicates(entries.nodes);
     }
 }
 
@@ -611,24 +358,30 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
 {
     entries.sort();
 
-    writer.Key("nodes");
-    writer.StartArray();
-    for (Node *node : entries.nodes)
-        node->print_json(writer, entries.backends, entries.filesystems,
-                !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
-    writer.EndArray();
+    if (!entries.nodes.empty()) {
+        writer.Key("nodes");
+        writer.StartArray();
+        for (Node *node : entries.nodes)
+            node->print_json(writer, entries.backends, entries.filesystems,
+                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
+        writer.EndArray();
+    }
 
-    writer.Key("groups");
-    writer.StartArray();
-    for (Group *group : entries.groups)
-        group->print_json(writer);
-    writer.EndArray();
+    if (!entries.groups.empty()) {
+        writer.Key("groups");
+        writer.StartArray();
+        for (Group *group : entries.groups)
+            group->print_json(writer);
+        writer.EndArray();
+    }
 
-    writer.Key("couples");
-    writer.StartArray();
-    for (Couple *couple : entries.couples)
-        couple->print_json(writer);
-    writer.EndArray();
+    if (!entries.couples.empty()) {
+        writer.Key("couples");
+        writer.StartArray();
+        for (Couple *couple : entries.couples)
+            couple->print_json(writer);
+        writer.EndArray();
+    }
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -656,8 +409,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("couples");
         writer.StartArray();
         for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-            it->second.print_json(writer);
-        writer.EndArray();
+            it->second.print_json(writer); writer.EndArray();
     }
 }
 
@@ -679,4 +431,22 @@ void Storage::merge(const Storage & other)
     merge_map(*this, m_nodes, other.m_nodes);
     merge_map(*this, m_groups, other.m_groups);
     merge_map(*this, m_couples, other.m_couples);
+}
+
+bool Storage::split_node_num(const std::string & key, std::string & node, uint64_t & id)
+{
+    size_t slash_pos = key.rfind('/');
+    if (slash_pos == std::string::npos)
+        return false;
+
+    node = key.substr(0, slash_pos);
+
+    std::string id_str = key.substr(slash_pos + 1);
+    try {
+        id = std::stol(id_str);
+    } catch (...) {
+        return false;
+    }
+
+    return true;
 }

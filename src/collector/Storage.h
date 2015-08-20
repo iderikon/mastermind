@@ -119,6 +119,8 @@ public:
         }
     }
 
+    static bool split_node_num(const std::string & key, std::string & node, uint64_t & id);
+
 private:
     WorkerApplication & m_app;
 

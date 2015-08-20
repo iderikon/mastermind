@@ -169,13 +169,13 @@ public:
     const std::string & get_node_name() const
     { return m_node_name; }
 
-    int get_backend_id() const
+    uint64_t get_backend_id() const
     { return m_backend_id; }
 
 private:
     WorkerApplication & m_app;
     std::string m_node_name;
-    int m_backend_id;
+    uint64_t m_backend_id;
 };
 
 class on_fs_info :

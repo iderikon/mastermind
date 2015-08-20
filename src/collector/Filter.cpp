@@ -22,12 +22,17 @@
 
 void Filter::sort()
 {
-    std::sort(namespaces.begin(), namespaces.end());
-    std::sort(couples.begin(), couples.end());
-    std::sort(groups.begin(), groups.end());
-    std::sort(backends.begin(), backends.end());
-    std::sort(nodes.begin(), nodes.end());
-    std::sort(filesystems.begin(), filesystems.end());
+#define SORT(v) \
+    std::sort(v.begin(), v.end()); \
+    auto v## _it = std::unique(v.begin(), v.end()); \
+    v.erase(v## _it, v.end())
+
+    SORT(namespaces);
+    SORT(couples);
+    SORT(groups);
+    SORT(backends);
+    SORT(nodes);
+    SORT(filesystems);
 }
 
 bool Filter::empty() const
