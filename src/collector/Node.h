@@ -1,26 +1,25 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __8424595a_92d5_49dd_ad9d_798dd37ce961
 #define __8424595a_92d5_49dd_ad9d_798dd37ce961
 
 #include "Backend.h"
-#include "RWSpinLock.h"
-#include "ThreadPool.h"
 
 #include <iostream>
 #include <map>
@@ -52,6 +51,9 @@ class Node
 {
 public:
     Node(Storage & storage, const char *host, int port, int family);
+    Node(Storage & storage);
+
+    void clone_from(const Node & other);
 
     Storage & get_storage() const
     { return m_storage; }
@@ -81,17 +83,22 @@ public:
     void drop_download_data()
     { m_download_data.clear(); }
 
-    ThreadPool::Job *create_stats_parse_job();
+    static void parse_stats(void *arg);
 
-    size_t get_backend_count() const;
-    void get_backends(std::vector<Backend*> & backends);
+    std::map<int, Backend> & get_backends()
+    { return m_backends; }
     bool get_backend(int id, Backend *& backend);
+
+    void pick_new_backends(std::vector<Backend*> & backends);
 
     void update_filesystems();
 
+    void merge(const Node & other);
+
     FS *get_fs(uint64_t fsid);
     bool get_fs(uint64_t fsid, FS *& fs);
-    void get_filesystems(std::vector<FS*> & filesystems);
+    std::map<uint64_t, FS> & get_filesystems()
+    { return m_filesystems; }
 
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
@@ -105,15 +112,13 @@ public:
 public:
     struct ClockStat
     {
-        uint64_t stats_parse;
+        uint64_t procfs_parse;
+        uint64_t backend_parse;
         uint64_t update_fs;
     };
 
     const ClockStat & get_clock_stat() const
     { return m_clock; }
-
-private:
-    class StatsParse;
 
 private:
     Storage & m_storage;
@@ -129,12 +134,10 @@ private:
     NodeStat m_stat;
 
     std::map<int, Backend> m_backends;
-    mutable RWSpinLock m_backends_lock;
-
     std::map<uint64_t, FS> m_filesystems;
-    mutable RWSpinLock m_filesystems_lock;
 
-    friend class StatsParse;
+    std::vector<Backend*> m_new_backends;
+
     ClockStat m_clock;
 };
 

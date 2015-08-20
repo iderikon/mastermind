@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __60719e6b_2f14_4a95_b411_d9baa339f032
 #define __60719e6b_2f14_4a95_b411_d9baa339f032

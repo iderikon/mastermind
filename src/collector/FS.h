@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __c065a812_f800_4562_8686_a77b1e60e201
 #define __c065a812_f800_4562_8686_a77b1e60e201
@@ -24,9 +25,8 @@
 #include <string>
 #include <vector>
 
-#include "RWSpinLock.h"
-
 class Backend;
+class Filter;
 class Node;
 class Storage;
 
@@ -49,6 +49,9 @@ public:
 
 public:
     FS(Node & node, uint64_t fsid);
+    FS(Node & node);
+
+    void clone_from(const FS & other);
 
     Node & get_node()
     { return m_node; }
@@ -65,10 +68,14 @@ public:
     const FSStat & get_stat() const
     { return m_stat; }
 
-    void add_backend(Backend *backend);
-    void remove_backend(Backend *backend);
-    void get_backends(std::vector<Backend*> & backends) const;
-    size_t get_backend_count() const;
+    void add_backend(Backend & backend)
+    { m_backends.insert(&backend); }
+
+    void remove_backend(Backend & backend)
+    { m_backends.erase(&backend); }
+
+    std::set<Backend*> & get_backends()
+    { return m_backends; }
 
     void update(const Backend & backend);
     void update_status();
@@ -79,6 +86,8 @@ public:
     void set_status(Status status)
     { m_status = status; }
 
+    void merge(const FS & other);
+
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
@@ -87,14 +96,11 @@ public:
 private:
     Node & m_node;
     uint64_t m_fsid;
-
     std::string m_key;
 
-    FSStat m_stat;
-
     std::set<Backend*> m_backends;
-    mutable RWSpinLock m_backends_lock;
 
+    FSStat m_stat;
     Status m_status;
 };
 

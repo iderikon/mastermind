@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #include "Backend.h"
 #include "Config.h"
@@ -21,7 +22,6 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
-#include "Guard.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
@@ -54,59 +54,57 @@ bool parse_couple(msgpack::object & obj, std::vector<int> & couple)
 
 } // unnamed namespace
 
-Group::Group(Backend & backend, Storage & storage)
+Group::Group(Storage & storage, int id)
     :
-    m_id(backend.get_stat().group),
     m_storage(storage),
-    m_couple(NULL),
+    m_id(id),
+    m_couple(nullptr),
     m_clean(true),
     m_status(INIT),
+    m_metadata_process_start(0),
     m_metadata_process_time(0),
     m_frozen(false),
     m_version(0),
-    m_namespace(NULL)
+    m_namespace(nullptr)
 {
-    m_backends.insert(&backend);
     m_service.migrating = false;
 }
 
-Group::Group(int id, Storage & storage)
+Group::Group(Storage & storage)
     :
-    m_id(id),
     m_storage(storage),
-    m_couple(NULL),
+    m_id(0),
+    m_couple(nullptr),
     m_clean(true),
     m_status(INIT),
+    m_metadata_process_start(0),
     m_metadata_process_time(0),
     m_frozen(false),
     m_version(0),
-    m_namespace(NULL)
+    m_namespace(nullptr)
 {
     m_service.migrating = false;
+}
+
+void Group::clone_from(const Group & other)
+{
+    m_id = other.m_id;
+    merge(other);
 }
 
 bool Group::has_backend(Backend & backend) const
 {
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
     auto it = m_backends.find(&backend);
     return (it != m_backends.end());
 }
 
 void Group::add_backend(Backend & backend)
 {
-    WriteGuard<RWSpinLock> guard(m_backends_lock);
     m_backends.insert(&backend);
-}
-
-void Group::get_backends(std::vector<Backend*> & backends) const
-{
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-    backends.assign(m_backends.begin(), m_backends.end());
 }
 
 bool Group::full() const
 {
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
     for (const Backend *backend : m_backends) {
         if (!backend->full())
             return false;
@@ -118,7 +116,6 @@ uint64_t Group::get_total_space() const
 {
     uint64_t res = 0;
 
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
     for (const Backend *backend : m_backends)
         res += backend->get_total_space();
     return res;
@@ -126,13 +123,9 @@ uint64_t Group::get_total_space() const
 
 void Group::save_metadata(const char *metadata, size_t size)
 {
-    WriteGuard<RWSpinLock> guard(m_metadata_lock);
-
-    if (!m_metadata.empty() && m_metadata.size() == size &&
-            !std::memcmp(&m_metadata[0], metadata, size)) {
-        m_clean = true;
+    if (m_clean && !m_metadata.empty() && m_metadata.size() == size &&
+            !std::memcmp(&m_metadata[0], metadata, size))
         return;
-    }
 
     m_metadata.assign(metadata, metadata + size);
     m_clean = false;
@@ -143,15 +136,8 @@ void Group::process_metadata()
     if (m_clean)
         return;
 
+    clock_start(m_metadata_process_start);
     Stopwatch watch(m_metadata_process_time);
-
-    std::vector<Backend*> backends;
-    get_backends(backends);
-
-    WriteGuard<RWSpinLock> guard(m_metadata_lock);
-
-    if (m_clean)
-        return;
 
     m_clean = true;
 
@@ -282,8 +268,8 @@ void Group::process_metadata()
     m_service.migrating = service_migrating;
     m_service.job_id = service_job_id;
 
-    if (m_namespace == NULL) {
-        m_namespace = m_storage.get_namespace(ns);
+    if (m_namespace == nullptr) {
+        m_namespace = &m_storage.get_namespace(ns);
     } else if (m_namespace->get_name() != ns) {
         m_status = BAD;
         ostr << "Group moved to another namespace: '"
@@ -293,7 +279,7 @@ void Group::process_metadata()
         return;
     }
 
-    if (m_couple != NULL) {
+    if (m_couple != nullptr) {
         if (!m_couple->check(couple)) {
             std::vector<int> couple_groups;
             m_couple->get_group_ids(couple_groups);
@@ -315,21 +301,21 @@ void Group::process_metadata()
         m_storage.create_couple(couple, this);
     }
 
-    if (backends.empty()) {
+    if (m_backends.empty()) {
         m_status = INIT;
         m_status_text = "No node backends";
-    } else if (backends.size() > 1 && m_storage.get_app().get_config().forbidden_dht_groups) {
+    } else if (m_backends.size() > 1 && m_storage.get_app().get_config().forbidden_dht_groups) {
         m_status = BROKEN;
 
-        ostr << "DHT groups are forbidden but the group has " << backends.size() << " backends";
+        ostr << "DHT groups are forbidden but the group has " << m_backends.size() << " backends";
         m_status_text = ostr.str();
     } else {
         bool have_bad = false;
         bool have_ro = false;
         bool have_other = false;
 
-        for (size_t i = 0; i < backends.size(); ++i) {
-            Backend::Status b_status = backends[i]->get_status();
+        for (Backend *backend : m_backends) {
+            Backend::Status b_status = backend->get_status();
             if (b_status == Backend::BAD) {
                 have_bad = true;
                 break;
@@ -376,20 +362,86 @@ bool Group::check_metadata_equals(const Group & other) const
 
 void Group::set_status_text(const std::string & status_text)
 {
-    WriteGuard<RWSpinLock> guard(m_metadata_lock);
     m_status_text = status_text;
 }
 
 void Group::get_status_text(std::string & status_text) const
 {
-    ReadGuard<RWSpinLock> guard(m_metadata_lock);
     status_text = m_status_text;
 }
 
 void Group::get_job_id(std::string & job_id) const
 {
-    ReadGuard<RWSpinLock> guard(m_metadata_lock);
     job_id = m_service.job_id;
+}
+
+void Group::merge(const Group & other)
+{
+    if (m_metadata_process_start >= other.m_metadata_process_start)
+        return;
+
+    m_clean = other.m_clean;
+    m_metadata = other.m_metadata;
+    m_status_text = other.m_status_text;
+    m_status = other.m_status;
+
+    m_metadata_process_start = other.m_metadata_process_start;
+    m_metadata_process_time = other.m_metadata_process_time;
+
+    m_frozen = other.m_frozen;
+    m_version = other.m_version;
+    m_service.migrating = other.m_service.migrating;
+    m_service.job_id = other.m_service.job_id;
+
+    if (other.m_couple != nullptr) {
+        if (m_couple == nullptr) {
+            Couple *couple = nullptr;
+            if (m_storage.get_couple(other.m_couple->get_key(), couple)) {
+                m_couple = couple;
+            } else {
+                std::vector<int> group_ids;
+                other.m_couple->get_group_ids(group_ids);
+                m_storage.create_couple(group_ids, this);
+                // Storage::create_couple invokes Couple::bind_groups, so no need to set m_couple here
+            }
+        } else {
+            // TODO: m_couple != nullptr && m_couple->m_key != other.m_couple->m_key
+            if (m_couple->get_key() != other.m_couple->get_key()) {
+                BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                        "Group merge: unhandled case: group has moved from couple %s to couple %s",
+                        m_couple->get_key().c_str(), other.m_couple->get_key().c_str());
+            }
+        }
+    } else if (m_couple != nullptr) {
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Group merge: unhandled case: group has gone from couple %s", m_couple->get_key().c_str());
+        // TODO
+    }
+
+    if (other.m_namespace != nullptr) {
+        if (m_namespace == nullptr) {
+            m_namespace = &m_storage.get_namespace(other.m_namespace->get_name());
+        } else {
+            // TODO: handle change of namespace
+            if (m_namespace->get_name() != other.m_namespace->get_name()) {
+                BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                        "Group merge: unhandled case: group has moved from namespace %s to namespace %s",
+                        m_namespace->get_name().c_str(), other.m_namespace->get_name().c_str());
+            }
+        }
+    }
+
+    // TODO!!!
+    if (m_couple != nullptr && m_namespace != nullptr)
+        m_namespace->add_couple(*m_couple);
+
+    // As of m_backends, it must have been initialized during
+    // Storage merge => Node merge => Backend clone ctor
+    if (m_backends.size() != other.m_backends.size()) {
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Internal inconsistency: Group merge: subject group has %lu backends, other has %lu",
+                m_backends.size(), other.m_backends.size());
+    }
 }
 
 bool Group::match(const Filter & filter, uint32_t item_types) const
@@ -402,7 +454,7 @@ bool Group::match(const Filter & filter, uint32_t item_types) const
     if ((item_types & Filter::Namespace) && !filter.namespaces.empty()) {
         Namespace *ns = m_namespace;
 
-        if (ns == NULL)
+        if (ns == nullptr)
             return false;
 
         if (!std::binary_search(filter.namespaces.begin(), filter.namespaces.end(), ns->get_name()))
@@ -410,7 +462,7 @@ bool Group::match(const Filter & filter, uint32_t item_types) const
     }
 
     if ((item_types & Filter::Couple) && !filter.couples.empty()) {
-        if (m_couple == NULL)
+        if (m_couple == nullptr)
             return false;
 
         if (!std::binary_search(filter.couples.begin(), filter.couples.end(), m_couple->get_key()))
@@ -426,8 +478,6 @@ bool Group::match(const Filter & filter, uint32_t item_types) const
     bool found_fs = false;
 
     if (check_nodes || check_backends || check_fs) {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-
         for (Backend *backend : m_backends) {
             if (check_nodes && !found_node) {
                 if (!std::binary_search(filter.nodes.begin(), filter.nodes.end(),
@@ -440,7 +490,7 @@ bool Group::match(const Filter & filter, uint32_t item_types) const
                     found_backend = true;
             }
             if (check_fs && !found_fs) {
-                if (backend->get_fs() != NULL && std::binary_search(filter.filesystems.begin(),
+                if (backend->get_fs() != nullptr && std::binary_search(filter.filesystems.begin(),
                             filter.filesystems.end(), backend->get_fs()->get_key()))
                     found_fs = true;
             }
@@ -460,7 +510,7 @@ void Group::print_info(std::ostream & ostr) const
     ostr << "Group " << m_id << " {\n"
             "  couple:   [ ";
 
-    if (m_couple != NULL) {
+    if (m_couple != nullptr) {
         std::vector<int> group_ids;
         m_couple->get_group_ids(group_ids);
         for (size_t i = 0; i < group_ids.size(); ++i)
@@ -469,29 +519,28 @@ void Group::print_info(std::ostream & ostr) const
 
     ostr << "]\n"
             "  backends: [ ";
-    {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-        size_t i = 1;
-        for (auto it = m_backends.begin(); it != m_backends.end(); ++it, ++i) {
-            if (i != 1)
-                ostr << "              ";
 
-            ostr << (*it)->get_node().get_key() << '/' << (*it)->get_stat().backend_id;
+    size_t i = 1;
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it, ++i) {
+        if (i != 1)
+            ostr << "              ";
 
-            if (i < m_backends.size())
-                ostr << '\n';
-        }
-        ostr << " ]\n";
+        ostr << (*it)->get_node().get_key() << '/' << (*it)->get_stat().backend_id;
+
+        if (i < m_backends.size())
+            ostr << '\n';
     }
-
-    ostr << "  clean: " << std::boolalpha << m_clean << "\n"
+    ostr << " ]\n"
+            "  clean: " << std::boolalpha << m_clean << "\n"
             "  status_text: " << m_status_text << "\n"
             "  status: " << status_str(m_status) << "\n"
+            "  metadata_process_start: " << m_metadata_process_start << "\n"
+            "  metadata_process_time: " << m_metadata_process_time << "\n"
             "  frozen: " << m_frozen << "\n"
             "  version: " << m_version << "\n"
             "  namespace: ";
 
-    if (m_namespace != NULL)
+    if (m_namespace != nullptr)
         ostr << m_namespace->get_name() << '\n';
     else
         ostr << "<null>\n";
@@ -510,43 +559,36 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) cons
     writer.Key("id");
     writer.Uint64(m_id);
 
-    if (m_couple != NULL) {
+    if (m_couple != nullptr) {
         writer.Key("couple");
         writer.String(m_couple->get_key().c_str());
     }
 
     writer.Key("backends");
     writer.StartArray();
-    {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (Backend *backend : m_backends)
-            writer.String(backend->get_key().c_str());
-    }
+    for (Backend *backend : m_backends)
+        writer.String(backend->get_key().c_str());
     writer.EndArray();
 
-    {
-        ReadGuard<RWSpinLock> guard(m_metadata_lock);
+    writer.Key("status_text");
+    writer.String(m_status_text.c_str());
+    writer.Key("status");
+    writer.String(status_str(m_status));
+    writer.Key("frozen");
+    writer.Bool(m_frozen);
+    writer.Key("version");
+    writer.Uint64(m_version);
+    writer.Key("namespace");
+    writer.String(m_namespace != nullptr ? m_namespace->get_name().c_str() : "");
 
-        writer.Key("status_text");
-        writer.String(m_status_text.c_str());
-        writer.Key("status");
-        writer.String(status_str(m_status));
-        writer.Key("frozen");
-        writer.Bool(m_frozen);
-        writer.Key("version");
-        writer.Uint64(m_version);
-        writer.Key("namespace");
-        writer.String(m_namespace != NULL ? m_namespace->get_name().c_str() : "");
-
-        if (m_service.migrating || !m_service.job_id.empty()) {
-            writer.Key("service");
-            writer.StartObject();
-            writer.Key("migrating");
-            writer.Bool(m_service.migrating);
-            writer.Key("job_id");
-            writer.String(m_service.job_id.c_str());
-            writer.EndObject();
-        }
+    if (m_service.migrating || !m_service.job_id.empty()) {
+        writer.Key("service");
+        writer.StartObject();
+        writer.Key("migrating");
+        writer.Bool(m_service.migrating);
+        writer.Key("job_id");
+        writer.String(m_service.job_id.c_str());
+        writer.EndObject();
     }
 
     writer.EndObject();

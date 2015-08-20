@@ -1,132 +1,28 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
 
-#include "CocaineHandlers.h"
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
+
 #include "Couple.h"
-#include "Discovery.h"
-#include "DiscoveryTimer.h"
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
-#include "Guard.h"
-#include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
-#include "ThreadPool.h"
 #include "WorkerApplication.h"
-
-#include <elliptics/session.hpp>
-
-using namespace ioremap;
-
-class Storage::ScheduleMetadataDownload : public ThreadPool::Job
-{
-public:
-    ScheduleMetadataDownload(Storage & storage, ioremap::elliptics::session & session,
-            UpdateJobToggle *toggle, std::vector<Group*> & groups)
-        :
-        m_storage(storage),
-        m_session(session.clone()),
-        m_toggle(toggle),
-        m_groups(groups)
-    {}
-
-    virtual void execute()
-    {
-        uint64_t clk = m_storage.m_clock.schedule_update_clk;
-
-        for (Group *group : m_groups)
-            m_storage.schedule_metadata_download(m_session, m_toggle, group);
-
-        clock_stop(clk);
-        m_storage.m_clock.schedule_update_time = clk;
-    }
-
-private:
-    Storage & m_storage;
-    ioremap::elliptics::session m_session;
-    UpdateJobToggle *m_toggle;
-    std::vector<Group*> m_groups;
-};
-
-class Storage::UpdateJob : public ThreadPool::Job
-{
-public:
-    UpdateJob(Storage & storage)
-        : m_storage(storage)
-    {}
-
-    virtual void execute()
-    {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
-                "Updating filesystems, groups and couples");
-
-        {
-            Stopwatch watch(m_storage.m_clock.status_update_time);
-
-            m_storage.update_filesystems();
-            m_storage.update_groups();
-            m_storage.update_couples();
-        }
-
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
-                "Update completed");
-
-        m_storage.get_app().get_discovery().end();
-        m_storage.arm_timer();
-    }
-
-private:
-    Storage & m_storage;
-};
-
-class Storage::UpdateJobToggle
-{
-public:
-    UpdateJobToggle(WorkerApplication & app, ThreadPool::Job *job, int nr_groups)
-        :
-        m_app(app),
-        m_update_job(job),
-        m_nr_groups(nr_groups)
-    {
-        clock_start(m_clock);
-    }
-
-    ~UpdateJobToggle()
-    {
-        clock_stop(m_clock);
-        m_app.get_storage().m_clock.metadata_download_total_time = m_clock;
-    }
-
-    void handle_completion()
-    {
-        if (! --m_nr_groups) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Group metadata download completed");
-            m_app.get_thread_pool().execute_pending(m_update_job);
-            delete this;
-        }
-    }
-
-private:
-    WorkerApplication & m_app;
-    ThreadPool::Job *m_update_job;
-    std::atomic<int> m_nr_groups;
-    uint64_t m_clock;
-};
 
 namespace {
 
@@ -138,187 +34,29 @@ void remove_duplicates(std::vector<T> & v)
     v.erase(it, v.end());
 }
 
-class GroupMetadataHandler
+class CoupleKey
 {
 public:
-    GroupMetadataHandler(elliptics::session & session,
-            Group *group, Storage::UpdateJobToggle *toggle)
-        :
-        m_session(session.clone()),
-        m_group(group),
-        m_toggle(toggle)
+    CoupleKey(const std::vector<int> & group_ids)
+        : m_group_ids(group_ids)
     {}
 
-    void result(const elliptics::read_result_entry & entry)
+    operator const std::string()
     {
-        elliptics::data_pointer file = entry.file();
-        m_group->save_metadata((const char *) file.data(), file.size());
-    }
+        if (m_group_ids.empty())
+            return std::string();
 
-    void final(const elliptics::error_info & error)
-    {
-        if (error) {
-            std::ostringstream ostr;
-            ostr << "Metadata download failed: " << error.message();
-            m_group->set_status_text(ostr.str());
-        }
-        m_toggle->handle_completion();
-        delete this;
-    }
+        std::ostringstream ostr;
+        size_t i = 0;
+        for (; i < (m_group_ids.size() - 1); ++i)
+            ostr << m_group_ids[i] << ':';
+        ostr << m_group_ids[i];
 
-    elliptics::session *get_session()
-    { return &m_session; }
-
-private:
-    elliptics::session m_session;
-    Group *m_group;
-    Storage::UpdateJobToggle *m_toggle;
-};
-
-class SnapshotJob : public ThreadPool::Job
-{
-public:
-    SnapshotJob(Storage & storage, const Filter & filter,
-            std::shared_ptr<on_get_snapshot> handler)
-        :
-        m_storage(storage),
-        m_filter(filter),
-        m_handler(handler)
-    {}
-
-    virtual void execute()
-    {
-        struct timeval start, end;
-        gettimeofday(&start, NULL);
-
-        Storage::Entries entries;
-        m_storage.select(m_filter, entries);
-
-        rapidjson::StringBuffer buf;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-
-        writer.StartObject();
-
-        m_storage.print_json(writer, entries, m_filter.item_types);
-
-        gettimeofday(&end, NULL);
-        double ts1 = double(start.tv_sec) + double(start.tv_usec) / 1000000.0;
-        double ts2 = double(end.tv_sec) + double(end.tv_usec) / 1000000.0;
-        double duration = ts2 - ts1;
-
-        writer.Key("collecting_time");
-        writer.Double(duration);
-
-        writer.EndObject();
-
-        std::string reply = buf.GetString();
-        m_handler->response()->write(reply);
-        m_handler->response()->close();
+        return ostr.str();
     }
 
 private:
-    Storage & m_storage;
-    Filter m_filter;
-    std::shared_ptr<on_get_snapshot> m_handler;
-};
-
-class RefreshEntries : public ThreadPool::Job
-{
-public:
-    RefreshEntries(const Storage::Entries & entries,
-            std::shared_ptr<on_refresh> handler)
-        :
-        m_entries(entries),
-        m_handler(handler)
-    {}
-
-    static void perform(const Storage::Entries & entries,
-            std::shared_ptr<on_refresh> & handler)
-    {
-        for (Node *node : entries.nodes)
-            node->update_filesystems();
-
-        for (Group *group : entries.groups)
-            group->process_metadata();
-
-        for (Couple *couple : entries.couples)
-            couple->update_status();
-
-        handler->response()->write("Refresh done");
-        handler->response()->close();
-    }
-
-    virtual void execute()
-    {
-        perform(m_entries, m_handler);
-    }
-
-private:
-    Storage::Entries m_entries;
-    std::shared_ptr<on_refresh> m_handler;
-};
-
-class RefreshGroupDownload : public ThreadPool::Job
-{
-public:
-    RefreshGroupDownload(WorkerApplication & app,
-            const Storage::Entries & entries,
-            std::shared_ptr<on_refresh> handler)
-        :
-        m_app(app),
-        m_session(app.get_discovery().get_session().clone()),
-        m_entries(entries),
-        m_handler(handler)
-    {}
-
-    virtual void execute()
-    {
-        if (m_entries.groups.empty())
-            RefreshEntries::perform(m_entries, m_handler);
-        else
-            m_app.get_storage().schedule_refresh(m_entries, m_session, m_handler);
-    }
-
-private:
-    WorkerApplication & m_app;
-    elliptics::session m_session;
-    Storage::Entries m_entries;
-    std::shared_ptr<on_refresh> m_handler;
-};
-
-class RefreshStart : public ThreadPool::Job
-{
-public:
-    RefreshStart(WorkerApplication & app, const Filter & filter,
-            std::shared_ptr<on_refresh> handler)
-        :
-        m_app(app),
-        m_filter(filter),
-        m_handler(handler)
-    {}
-
-    virtual void execute()
-    {
-        Storage::Entries entries;
-        m_app.get_storage().select(m_filter, entries);
-
-        if (m_app.get_discovery().in_progress()) {
-            m_handler->response()->write("Discovery is in progress");
-            m_handler->response()->close();
-            return;
-        }
-
-        if (!entries.nodes.empty())
-            m_app.get_discovery().discover_nodes(entries.nodes);
-
-        m_app.get_thread_pool().dispatch_after(new RefreshGroupDownload(
-                    m_app, entries, m_handler));
-    }
-
-private:
-    WorkerApplication & m_app;
-    Filter m_filter;
-    std::shared_ptr<on_refresh> m_handler;
+    const std::vector<int> & m_group_ids;
 };
 
 } // unnamed namespace
@@ -333,55 +71,38 @@ void Storage::Entries::sort()
 }
 
 Storage::Storage(WorkerApplication & app)
-    :
-    m_app(app),
-    m_clock{0, 0, 0, 0}
+    : m_app(app)
 {}
+
+Storage::Storage(const Storage & other)
+    :
+    m_app(other.m_app)
+{
+    merge(other);
+}
 
 Storage::~Storage()
 {}
 
 bool Storage::add_node(const char *host, int port, int family)
 {
-    char node_id[128];
-    sprintf(node_id, "%s:%d:%d", host, port, family);
+    std::ostringstream node_id;
+    node_id << host << ':' << port << ':' << family;
+    const char *node_id_str = node_id.str().c_str();
 
-    std::string node_id_str(node_id);
-
-    {
-        ReadGuard<RWMutex> guard(m_nodes_lock);
-
-        auto it = m_nodes.find(node_id_str);
-        if (it != m_nodes.end()) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", node_id_str.c_str());
-            return false;
-        }
+    auto it = m_nodes.lower_bound(node_id.str());
+    if (it != m_nodes.end() && it->first == node_id.str()) {
+        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", node_id_str);
+        return false;
     }
 
-    {
-        Node node(*this, host, port, family);
-
-        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", node_id_str.c_str());
-
-        WriteGuard<RWMutex> guard(m_nodes_lock);
-
-        return m_nodes.insert(std::make_pair(std::string(node_id), node)).second;
-    }
-}
-
-void Storage::get_nodes(std::vector<Node *> & nodes)
-{
-    ReadGuard<RWMutex> guard(m_nodes_lock);
-
-    nodes.reserve(m_nodes.size());
-    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
-        nodes.push_back(&it->second);
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", node_id_str);
+    m_nodes.insert(it, std::make_pair(node_id.str(), Node(*this, host, port, family)));
+    return true;
 }
 
 bool Storage::get_node(const std::string & key, Node *& node)
 {
-    ReadGuard<RWMutex> guard(m_nodes_lock);
-
     auto it = m_nodes.find(key);
     if (it != m_nodes.end()) {
         node = &it->second;
@@ -390,55 +111,22 @@ bool Storage::get_node(const std::string & key, Node *& node)
     return false;
 }
 
-void Storage::handle_backend(Backend & backend, bool existed)
+void Storage::handle_backend(Backend & backend)
 {
-    if (existed) {
-        ReadGuard<RWMutex> guard(m_groups_lock);
-        auto it = m_groups.find(backend.get_stat().group);
-        if (it != m_groups.end()) {
-            guard.release();
-            Group & group = it->second;
-            if (!group.has_backend(backend))
-                group.add_backend(backend);
-            return;
-        }
+    auto it = m_groups.lower_bound(backend.get_stat().group);
+
+    if (it != m_groups.end() && it->first == int(backend.get_stat().group)) {
+        it->second.add_backend(backend);
+    } else {
+        it = m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(*this, backend.get_stat().group)));
+        it->second.add_backend(backend);
     }
 
-    {
-        WriteGuard<RWMutex> guard(m_groups_lock);
-        auto it = m_groups.lower_bound(backend.get_stat().group);
-        if (it != m_groups.end() && it->first == int(backend.get_stat().group)) {
-            guard.release();
-            it->second.add_backend(backend);
-        } else {
-            it = m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend, *this)));
-        }
-        backend.set_group(&it->second);
-    }
-}
-
-void Storage::get_group_ids(std::vector<int> & groups) const
-{
-    ReadGuard<RWMutex> guard(m_groups_lock);
-
-    groups.reserve(m_groups.size());
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        groups.push_back(it->first);
-}
-
-void Storage::get_groups(std::vector<Group*> & groups)
-{
-    ReadGuard<RWMutex> guard(m_groups_lock);
-
-    groups.reserve(m_groups.size());
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        groups.push_back(&it->second);
+    backend.set_group(&it->second);
 }
 
 bool Storage::get_group(int id, Group *& group)
 {
-    ReadGuard<RWMutex> guard(m_groups_lock);
-
     auto it = m_groups.find(id);
     if (it != m_groups.end()) {
         group = &it->second;
@@ -447,32 +135,34 @@ bool Storage::get_group(int id, Group *& group)
     return false;
 }
 
-void Storage::get_couples(std::vector<Couple*> & couples)
+Group & Storage::get_group(int id)
 {
-    ReadGuard<RWMutex> guard(m_couples_lock);
-
-    couples.reserve(m_couples.size());
-    for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        couples.push_back(&it->second);
+    auto it = m_groups.lower_bound(id);
+    if (it == m_groups.end() || it->first != id)
+        it = m_groups.insert(it, std::make_pair(id, Group(*this, id)));
+    return it->second;
 }
 
-Namespace *Storage::get_namespace(const std::string & name)
+bool Storage::get_couple(const std::string & key, Couple *& couple)
 {
-    Namespace *ns;
-    if (get_namespace(name, ns))
-        return ns;
+    auto it = m_couples.find(key);
+    if (it != m_couples.end()) {
+        couple = &it->second;
+        return true;
+    }
+    return false;
+}
 
-    WriteGuard<RWSpinLock> guard(m_namespaces_lock);
+Namespace & Storage::get_namespace(const std::string & name)
+{
     auto it = m_namespaces.lower_bound(name);
     if (it == m_namespaces.end() || it->first != name)
         it = m_namespaces.insert(it, std::make_pair(name, Namespace(name)));
-    return &it->second;
+    return it->second;
 }
 
 bool Storage::get_namespace(const std::string & name, Namespace *& ns)
 {
-    ReadGuard<RWSpinLock> guard(m_namespaces_lock);
-
     auto it = m_namespaces.find(name);
     if (it != m_namespaces.end()) {
         ns = &it->second;
@@ -481,134 +171,20 @@ bool Storage::get_namespace(const std::string & name, Namespace *& ns)
     return false;
 }
 
-void Storage::get_namespaces(std::vector<Namespace*> & namespaces)
+void Storage::update()
 {
-    ReadGuard<RWSpinLock> guard(m_namespaces_lock);
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups and couples");
 
-    namespaces.reserve(m_namespaces.size());
-    for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
-        namespaces.push_back(&it->second);
-}
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
+        it->second.update_filesystems();
 
-void Storage::schedule_update(elliptics::session & session)
-{
-    clock_start(m_clock.schedule_update_clk);
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+        it->second.process_metadata();
 
-    ReadGuard<RWMutex> guard(m_groups_lock);
+    for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
+        it->second.update_status();
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO,
-            "Scheduling metadata download for %lu groups", m_groups.size());
-
-    if (m_groups.empty()) {
-        arm_timer();
-        return;
-    }
-
-    UpdateJob *update = new UpdateJob(*this);
-    UpdateJobToggle *toggle = new UpdateJobToggle(m_app, update, m_groups.size());
-    m_app.get_thread_pool().dispatch_pending(update);
-
-    int nr_threads = m_app.get_thread_pool().get_nr_threads();
-    if (m_groups.size() < (nr_threads * 2)) {
-        for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-            schedule_metadata_download(session, toggle, &it->second);
-    } else {
-        auto it = m_groups.begin();
-        int rem = m_groups.size() % nr_threads;
-        size_t n = m_groups.size()/nr_threads;
-        if (rem-- > 0)
-            ++n;
-
-        std::vector<Group*> groups;
-        groups.reserve(n);
-
-        while (1) {
-            groups.push_back(&it->second);
-            if (groups.size() == n) {
-                m_app.get_thread_pool().dispatch_aggregate(
-                        new ScheduleMetadataDownload(*this, session, toggle, groups));
-                groups.clear();
-                if (rem-- == 0)
-                    --n;
-            }
-            if (++it == m_groups.end())
-                break;
-        }
-    }
-}
-
-void Storage::schedule_refresh(const Entries & entries, elliptics::session & session,
-        std::shared_ptr<on_refresh> handler)
-{
-    RefreshEntries *refresh = new RefreshEntries(entries, handler);
-    UpdateJobToggle *toggle = new UpdateJobToggle(m_app, refresh, entries.groups.size());
-    m_app.get_thread_pool().dispatch_pending(refresh);
-
-    for (Group *group : entries.groups)
-        schedule_metadata_download(session, toggle, group);
-}
-
-void Storage::schedule_metadata_download(elliptics::session & session,
-        UpdateJobToggle *toggle, Group *group)
-{
-    std::vector<int> group_id(1);
-    group_id[0] = group->get_id();
-
-    static const elliptics::key key("symmetric_groups");
-
-    GroupMetadataHandler *handler = new GroupMetadataHandler(session, group, toggle);
-
-    elliptics::session *new_session = handler->get_session();
-    new_session->set_namespace("metabalancer");
-    new_session->set_groups(group_id);
-
-    BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG,
-            "Scheduling metadata download for group %d", group_id[0]);
-
-    elliptics::async_read_result res = new_session->read_data(key, group_id, 0, 0);
-    res.connect(std::bind(&GroupMetadataHandler::result, handler, std::placeholders::_1),
-            std::bind(&GroupMetadataHandler::final, handler, std::placeholders::_1));
-}
-
-void Storage::update_filesystems()
-{
-    std::vector<Node*> nodes;
-    get_nodes(nodes);
-
-    for (Node *node : nodes)
-        node->update_filesystems();
-}
-
-void Storage::update_groups()
-{
-    std::vector<Group*> groups;
-
-    {
-        ReadGuard<RWMutex> guard(m_groups_lock);
-        groups.reserve(m_groups.size());
-        auto it = m_groups.begin();
-        for (; it != m_groups.end(); ++it)
-            groups.push_back(&it->second);
-    }
-
-    for (size_t i = 0; i < groups.size(); ++i)
-        groups[i]->process_metadata();
-}
-
-void Storage::update_couples()
-{
-    std::vector<Couple*> couples;
-
-    {
-        ReadGuard<RWMutex> guard(m_couples_lock);
-        couples.reserve(m_couples.size());
-        auto it = m_couples.begin();
-        for (; it != m_couples.end(); ++it)
-            couples.push_back(&it->second);
-    }
-
-    for (size_t i = 0; i < couples.size(); ++i)
-        couples[i]->update_status();
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }
 
 void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
@@ -616,61 +192,33 @@ void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
     std::vector<Group*> groups;
     groups.reserve(group_ids.size());
 
-    {
-        WriteGuard<RWMutex> guard(m_groups_lock);
-        for (size_t i = 0; i < group_ids.size(); ++i) {
-            int id = group_ids[i];
-
-            if (id == group->get_id()) {
-                groups.push_back(group);
-            } else {
-                auto it = m_groups.lower_bound(id);
-                if (it == m_groups.end() || it->first != id)
-                    it = m_groups.insert(it, std::make_pair(id, Group(id, *this)));
-                groups.push_back(&it->second);
-            }
+    for (int id : group_ids) {
+        if (id == group->get_id()) {
+            groups.push_back(group);
+        } else {
+            auto it = m_groups.lower_bound(id);
+            if (it == m_groups.end() || it->first != id)
+                it = m_groups.insert(it, std::make_pair(id, Group(*this, id)));
+            groups.push_back(&it->second);
         }
     }
 
-    {
-        CoupleKey key(group_ids);
+    std::string key = CoupleKey(group_ids);
 
-        WriteGuard<RWMutex> guard(m_couples_lock);
+    auto it = m_couples.lower_bound(key);
+    if (it == m_couples.end() || it->first != key) {
+        it = m_couples.insert(it, std::make_pair(key, Couple(*this, groups)));
 
-        auto it = m_couples.lower_bound(key);
-        if (it == m_couples.end() || it->first != key) {
-            it = m_couples.insert(it, std::make_pair(
-                        key, Couple(groups, m_app.get_config().forbidden_unmatched_group_total_space)));
-
-            Couple & couple = it->second;
-            couple.bind_groups();
-            group->get_namespace()->add_couple(&couple);
-        }
-    }
-}
-
-void Storage::arm_timer()
-{
-    if (m_app.get_discovery_timer().arm(DiscoveryTimer::Subsequent) < 0) {
-        int err = errno;
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to arm timer: %s", strerror(err));
+        Couple & couple = it->second;
+        couple.bind_groups();
+        Namespace *ns = group->get_namespace();
+        if (ns != nullptr)
+            ns->add_couple(couple);
     }
 }
 
 void Storage::select(Filter & filter, Entries & entries)
 {
-    if (filter.empty()) {
-        if (filter.item_types & Filter::Group)
-            get_groups(entries.groups);
-        if (filter.item_types & Filter::Couple)
-            get_couples(entries.couples);
-        if ((filter.item_types & Filter::Node) ||
-                (filter.item_types & Filter::FS) ||
-                (filter.item_types & Filter::Backend))
-            get_nodes(entries.nodes);
-        return;
-    }
-
     filter.sort();
 
     bool have_groups = false;
@@ -682,29 +230,22 @@ void Storage::select(Filter & filter, Entries & entries)
     if (filter.item_types & Filter::Group) {
         if (!filter.groups.empty()) {
             std::vector<Group*> candidate_groups;
-            {
-                ReadGuard<RWMutex> guard(m_groups_lock);
-                for (int id : filter.groups) {
-                    auto it = m_groups.find(id);
-                    if (it != m_groups.end())
-                        candidate_groups.push_back(&it->second);
+            for (int id : filter.groups) {
+                auto it = m_groups.find(id);
+                if (it != m_groups.end()) {
+                    Group & group = it->second;
+                    if (group.match(filter, ~Filter::Group))
+                        entries.groups.push_back(&group);
                 }
-            }
-            for (Group *group : candidate_groups) {
-                if (group->match(filter, ~Filter::Group))
-                    entries.groups.push_back(group);
             }
             have_groups = true;
         }
     }
 
     if (filter.item_types & Filter::Couple) {
-        std::vector<Couple*> candidate_couples;
         if (!filter.couples.empty()) {
             std::vector<int> group_ids;
             group_ids.reserve(4);
-
-            ReadGuard<RWMutex> guard(m_couples_lock);
 
             for (const std::string & couple_key_str : filter.couples) {
                 if (couple_key_str.empty())
@@ -719,22 +260,19 @@ void Storage::select(Filter & filter, Entries & entries)
                 } while (pos != std::string::npos);
 
                 auto it = m_couples.find(CoupleKey(group_ids));
-                if (it != m_couples.end())
-                    candidate_couples.push_back(&it->second);
+                if (it != m_couples.end()) {
+                    Couple & couple = it->second;
+                    if (couple.match(filter, ~Filter::Couple))
+                        entries.couples.push_back(&couple);
+                }
 
                 group_ids.clear();
             }
-
-            guard.release();
-
-            for (Couple *couple : candidate_couples) {
-                if (couple->match(filter, ~Filter::Couple))
-                    entries.couples.push_back(couple);
-            }
             have_couples = true;
         } else if (have_groups) {
+            std::vector<Couple*> candidate_couples;
             for (Group *group : entries.groups) {
-                if (group->get_couple() != NULL)
+                if (group->get_couple() != nullptr)
                     candidate_couples.push_back(group->get_couple());
             }
             remove_duplicates(candidate_couples);
@@ -747,8 +285,7 @@ void Storage::select(Filter & filter, Entries & entries)
             for (const std::string & name : filter.namespaces) {
                 Namespace *ns;
                 if (get_namespace(name, ns)) {
-                    std::vector<Couple*> couples;
-                    ns->get_couples(couples);
+                    const std::set<Couple*> & couples = ns->get_couples();
                     for (Couple *couple : couples) {
                         if (couple->match(filter, ~Filter::Namespace))
                             entries.couples.push_back(couple);
@@ -757,16 +294,16 @@ void Storage::select(Filter & filter, Entries & entries)
             }
             have_couples = true;
         } else {
-            std::vector<Couple*> couples;
-            get_couples(couples);
-            for (Couple *couple : couples) {
-                if (couple->match(filter))
-                    entries.couples.push_back(couple);
+            for (auto it = m_couples.begin(); it != m_couples.end(); ++it) {
+                Couple & couple = it->second;
+                if (couple.match(filter))
+                    entries.couples.push_back(&couple);
             }
         }
     }
 
     if (have_couples && !have_groups && (filter.item_types & Filter::Group)) {
+        // XXX
         std::vector<Group*> candidate_groups;
         for (Couple *couple : entries.couples) {
             couple->get_groups(candidate_groups);
@@ -781,28 +318,21 @@ void Storage::select(Filter & filter, Entries & entries)
 
     if (filter.item_types & Filter::Node) {
         if (!filter.nodes.empty()) {
-            std::vector<Node*> candidate_nodes;
-            {
-                ReadGuard<RWMutex> guard(m_nodes_lock);
-                for (const std::string & key : filter.nodes) {
-                    auto it = m_nodes.find(key);
-                    if (it != m_nodes.end())
-                        candidate_nodes.push_back(&it->second);
+            for (const std::string & key : filter.nodes) {
+                auto it = m_nodes.find(key);
+                if (it != m_nodes.end()) {
+                    Node & node = it->second;
+                    if (node.match(filter, ~Filter::Node))
+                        entries.nodes.push_back(&node);
                 }
-            }
-            for (Node *node : candidate_nodes) {
-                if (node->match(filter, ~Filter::Node))
-                    entries.nodes.push_back(node);
             }
             have_nodes = true;
         } else if (have_groups) {
             std::vector<Node*> candidate_nodes;
-            std::vector<Backend*> backends;
             for (Group *group : entries.groups) {
-                group->get_backends(backends);
+                std::set<Backend*> & backends = group->get_backends();
                 for (Backend *backend : backends)
                     candidate_nodes.push_back(&backend->get_node());
-                backends.clear();
             }
             remove_duplicates(candidate_nodes);
             for (Node *node : candidate_nodes) {
@@ -813,14 +343,12 @@ void Storage::select(Filter & filter, Entries & entries)
         } else if (have_couples) {
             std::vector<Node*> candidate_nodes;
             std::vector<Group*> groups;
-            std::vector<Backend*> backends;
             for (Couple *couple : entries.couples) {
                 couple->get_groups(groups);
                 for (Group *group : groups) {
-                    group->get_backends(backends);
+                    std::set<Backend*> & backends = group->get_backends();
                     for (Backend *backend : backends)
                         candidate_nodes.push_back(&backend->get_node());
-                    backends.clear();
                 }
                 groups.clear();
             }
@@ -831,11 +359,10 @@ void Storage::select(Filter & filter, Entries & entries)
             }
             have_nodes = true;
         } else {
-            std::vector<Node*> nodes;
-            get_nodes(nodes);
-            for (Node *node : nodes) {
-                if (node->match(filter))
-                    entries.nodes.push_back(node);
+            for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+                Node & node = it->second;
+                if (node.match(filter))
+                    entries.nodes.push_back(&node);
             }
             have_nodes = true;
         }
@@ -843,13 +370,13 @@ void Storage::select(Filter & filter, Entries & entries)
 
     if (filter.item_types & Filter::Backend) {
         if (!filter.backends.empty()) {
-            Node *node = NULL;
+            Node *node = nullptr;
             for (const std::string & backend_key : filter.backends) {
                 size_t pos = backend_key.rfind('/');
                 if (pos == std::string::npos)
                     continue;
                 std::string node_key = backend_key.substr(0, pos);
-                if (node == NULL || node->get_key() != node_key) {
+                if (node == nullptr || node->get_key() != node_key) {
                     if (!get_node(node_key, node))
                         continue;
                 }
@@ -861,41 +388,36 @@ void Storage::select(Filter & filter, Entries & entries)
             }
             have_backends = true;
         } else if (have_groups) {
-            std::vector<Backend*> backends;
             for (Group *group : entries.groups) {
-                group->get_backends(backends);
+                std::set<Backend*> & backends = group->get_backends();
                 for (Backend *backend : backends) {
                     if (backend->match(filter, ~Filter::Group))
                         entries.backends.push_back(backend);
                 }
-                backends.clear();
             }
             have_backends = true;
         } else if (have_couples) {
             std::vector<Group*> groups;
-            std::vector<Backend*> backends;
             for (Couple *couple : entries.couples) {
                 couple->get_groups(groups);
                 for (Group *group : groups) {
-                    group->get_backends(backends);
+                    std::set<Backend*> & backends = group->get_backends();
                     for (Backend *backend : backends) {
                         if (backend->match(filter, ~Filter::Couple))
                             entries.backends.push_back(backend);
                     }
-                    backends.clear();
                 }
                 groups.clear();
             }
             have_backends = true;
         } else if (have_nodes) {
-            std::vector<Backend*> backends;
             for (Node *node : entries.nodes) {
-                node->get_backends(backends);
-                for (Backend *backend : backends) {
-                    if (backend->match(filter, ~Filter::Node))
-                        entries.backends.push_back(backend);
+                std::map<int, Backend> & backends = node->get_backends();
+                for (auto it = backends.begin(); it != backends.end(); ++it) {
+                    Backend & backend = it->second;
+                    if (backend.match(filter, ~Filter::Node))
+                        entries.backends.push_back(&backend);
                 }
-                backends.clear();
             }
             have_backends = true;
         }
@@ -903,13 +425,13 @@ void Storage::select(Filter & filter, Entries & entries)
 
     if (filter.item_types & Filter::FS) {
         if (!filter.filesystems.empty()) {
-            Node *node = NULL;
+            Node *node = nullptr;
             for (const std::string & fs_key : filter.filesystems) {
                 size_t pos = fs_key.rfind('/');
                 if (pos == std::string::npos)
                     continue;
                 std::string node_key = fs_key.substr(0, pos);
-                if (node == NULL || node->get_key() != node_key) {
+                if (node == nullptr || node->get_key() != node_key) {
                     if (!get_node(node_key, node))
                         continue;
                 }
@@ -924,7 +446,7 @@ void Storage::select(Filter & filter, Entries & entries)
             std::vector<FS*> candidate_fs;
             for (Backend *backend : entries.backends) {
                 FS *fs = backend->get_fs();
-                if (fs == NULL)
+                if (fs == nullptr)
                     continue;
                 candidate_fs.push_back(fs);
             }
@@ -935,28 +457,26 @@ void Storage::select(Filter & filter, Entries & entries)
             }
             have_fs = true;
         } else if (have_nodes) {
-            std::vector<FS*> candidate_fs;
             for (Node *node : entries.nodes) {
-                node->get_filesystems(candidate_fs);
-                for (FS *fs : candidate_fs) {
-                    if (fs->match(filter, ~Filter::Node))
-                        entries.filesystems.push_back(fs);
+                std::map<uint64_t, FS> & candidate_fs = node->get_filesystems();
+                for (auto it = candidate_fs.begin(); it != candidate_fs.end(); ++it) {
+                    FS & fs = it->second;
+                    if (fs.match(filter, ~Filter::Node))
+                        entries.filesystems.push_back(&fs);
                 }
                 candidate_fs.clear();
             }
             have_fs = true;
         } else if (have_groups) {
-            std::vector<Backend*> backends;
             std::vector<FS*> candidate_fs;
             for (Group *group : entries.groups) {
-                group->get_backends(backends);
+                std::set<Backend*> & backends = group->get_backends();
                 for (Backend *backend : backends) {
                     FS *fs = backend->get_fs();
-                    if (fs == NULL)
+                    if (fs == nullptr)
                         continue;
                     candidate_fs.push_back(fs);
                 }
-                backends.clear();
             }
             remove_duplicates(candidate_fs);
             for (FS *fs : candidate_fs) {
@@ -966,19 +486,17 @@ void Storage::select(Filter & filter, Entries & entries)
             have_fs = true;
         } else if (have_couples) {
             std::vector<Group*> groups;
-            std::vector<Backend*> backends;
             std::vector<FS*> candidate_fs;
             for (Couple *couple : entries.couples) {
                 couple->get_groups(groups);
                 for (Group *group : groups) {
-                    group->get_backends(backends);
+                    std::set<Backend*> & backends = group->get_backends();
                     for (Backend *backend : backends) {
                         FS *fs = backend->get_fs();
-                        if (fs == NULL)
+                        if (fs == nullptr)
                             continue;
                         candidate_fs.push_back(fs);
                     }
-                    backends.clear();
                 }
                 groups.clear();
             }
@@ -989,19 +507,17 @@ void Storage::select(Filter & filter, Entries & entries)
             }
             have_fs = true;
         } else {
-            std::vector<Backend*> backends;
-            std::vector<Node*> nodes;
-            get_nodes(nodes);
-            for (Node *node : nodes) {
-                node->get_backends(backends);
-                for (Backend *backend : backends) {
-                    FS *fs = backend->get_fs();
-                    if (fs == NULL)
+            for (auto nit = m_nodes.begin(); nit != m_nodes.end(); ++nit) {
+                Node & node = nit->second;
+                std::map<int, Backend> & backends = node.get_backends();
+                for (auto it = backends.begin(); it != backends.end(); ++it) {
+                    Backend & backend = it->second;
+                    FS *fs = backend.get_fs();
+                    if (fs == nullptr)
                         continue;
                     if (fs->match(filter))
                         entries.filesystems.push_back(fs);
                 }
-                backends.clear();
             }
             have_fs = true;
         }
@@ -1009,25 +525,23 @@ void Storage::select(Filter & filter, Entries & entries)
 
     if (!have_backends && (filter.item_types & Filter::Backend)) {
         if (have_fs) {
-            std::vector<Backend*> backends;
             for (FS *fs : entries.filesystems) {
-                fs->get_backends(backends);
+                const std::set<Backend*> & backends = fs->get_backends();
                 for (Backend *backend : backends) {
                     if (backend->match(filter, ~Filter::FS))
                         entries.backends.push_back(backend);
                 }
-                backends.clear();
             }
             have_backends = true;
         } else {
-            std::vector<Backend*> backends;
-            std::vector<Node*> nodes;
-            get_nodes(nodes);
-            for (Node *node : nodes) {
-                node->get_backends(backends);
-                for (Backend *backend : backends) {
-                    if (backend->match(filter))
-                        entries.backends.push_back(backend);
+            std::map<std::string, Node> & nodes = m_nodes;
+            for (auto nit = nodes.begin(); nit != nodes.end(); ++nit) {
+                Node & node = nit->second;
+                std::map<int, Backend> & backends = node.get_backends();
+                for (auto bit = backends.begin(); bit != backends.end(); ++bit) {
+                    Backend & backend = bit->second;
+                    if (backend.match(filter))
+                        entries.backends.push_back(&backend);
                 }
                 backends.clear();
             }
@@ -1039,17 +553,16 @@ void Storage::select(Filter & filter, Entries & entries)
         if (have_backends) {
             for (Backend *backend : entries.backends) {
                 Group *group = backend->get_group();
-                if (group != NULL && group->match(filter, ~Filter::Backend))
+                if (group != nullptr && group->match(filter, ~Filter::Backend))
                     entries.groups.push_back(group);
             }
             remove_duplicates(entries.groups);
             have_groups = true;
         } else {
-            std::vector<Group*> groups;
-            get_groups(groups);
-            for (Group *group : groups) {
-                if (group->match(filter))
-                    entries.groups.push_back(group);
+            for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
+                Group & group = it->second;
+                if (group.match(filter))
+                    entries.groups.push_back(&group);
             }
             have_groups = true;
         }
@@ -1064,14 +577,33 @@ void Storage::select(Filter & filter, Entries & entries)
     }
 }
 
-void Storage::get_snapshot(const Filter & filter, std::shared_ptr<on_get_snapshot> handler)
+void Storage::print_json(uint32_t item_types, std::string & str)
 {
-    m_app.get_discovery().take_over_snapshot(new SnapshotJob(*this, filter, handler));
+    rapidjson::StringBuffer buf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+
+    writer.StartObject();
+    print_json(writer, item_types);
+    writer.EndObject();
+
+    str = buf.GetString();
 }
 
-void Storage::refresh(const Filter & filter, std::shared_ptr<on_refresh> handler)
+void Storage::print_json(Filter & filter, std::string & str)
 {
-    m_app.get_thread_pool().dispatch_after(new RefreshStart(m_app, filter, handler));
+    filter.sort();
+
+    Entries entries;
+    select(filter, entries);
+
+    rapidjson::StringBuffer buf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+
+    writer.StartObject();
+    print_json(writer, entries, filter.item_types);
+    writer.EndObject();
+
+    str = buf.GetString();
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -1097,4 +629,54 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     for (Couple *couple : entries.couples)
         couple->print_json(writer);
     writer.EndArray();
+}
+
+void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        uint32_t item_types)
+{
+    if (!!(item_types & (Filter::Node | Filter::Backend | Filter::FS))) {
+        writer.Key("nodes");
+        writer.StartArray();
+        for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+            it->second.print_json(writer, std::vector<Backend*>(), std::vector<FS*>(),
+                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
+        }
+        writer.EndArray();
+    }
+
+    if (!!(item_types & Filter::Group)) {
+        writer.Key("groups");
+        writer.StartArray();
+        for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+            it->second.print_json(writer);
+        writer.EndArray();
+    }
+
+    if (!!(item_types & Filter::Couple)) {
+        writer.Key("couples");
+        writer.StartArray();
+        for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
+            it->second.print_json(writer);
+        writer.EndArray();
+    }
+}
+
+void Storage::update_group_structure()
+{
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Updating group structure");
+
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+        Node & node = it->second;
+        std::vector<Backend*> backends;
+        node.pick_new_backends(backends);
+        for (Backend *backend : backends)
+            handle_backend(*backend);
+    }
+}
+
+void Storage::merge(const Storage & other)
+{
+    merge_map(*this, m_nodes, other.m_nodes);
+    merge_map(*this, m_groups, other.m_groups);
+    merge_map(*this, m_couples, other.m_couples);
 }

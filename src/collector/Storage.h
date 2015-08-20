@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __f8057e8e_b6f5_475b_bb31_771928953bf8
 #define __f8057e8e_b6f5_475b_bb31_771928953bf8
@@ -22,7 +23,6 @@
 #include "Group.h"
 #include "Namespace.h"
 #include "Node.h"
-#include "RWMutex.h"
 
 #include <cstring>
 #include <map>
@@ -30,18 +30,7 @@
 #include <utility>
 #include <vector>
 
-#include <elliptics/logger.hpp>
-
-namespace ioremap {
-    namespace elliptics {
-        class session;
-    }
-}
-
-class BackendStat;
 class WorkerApplication;
-class on_get_snapshot;
-class on_refresh;
 
 class Storage
 {
@@ -59,122 +48,84 @@ public:
 
 public:
     Storage(WorkerApplication & app);
+    Storage(const Storage & other);
     ~Storage();
 
     WorkerApplication & get_app()
     { return m_app; }
 
     bool add_node(const char *host, int port, int family);
-    void get_nodes(std::vector<Node*> & nodes);
     bool get_node(const std::string & key, Node *& node);
+    std::map<std::string, Node> & get_nodes()
+    { return m_nodes; }
 
-    void handle_backend(Backend & backend, bool existed);
-
-    void get_group_ids(std::vector<int> & group_ids) const;
-    void get_groups(std::vector<Group*> & groups);
     bool get_group(int id, Group *& group);
+    Group & get_group(int id);
+    std::map<int, Group> & get_groups()
+    { return m_groups; }
 
-    void get_couples(std::vector<Couple*> & couples);
+    bool get_couple(const std::string & key, Couple *& couple);
+    std::map<std::string, Couple> & get_couples()
+    { return m_couples; }
 
-    Namespace *get_namespace(const std::string & name);
+    Namespace & get_namespace(const std::string & name);
     bool get_namespace(const std::string & name, Namespace *& ns);
-    void get_namespaces(std::vector<Namespace*> & namespaces);
+    const std::map<std::string, Namespace> & get_namespaces() const
+    { return m_namespaces; }
 
-    void schedule_update(ioremap::elliptics::session & session);
-    void schedule_refresh(const Entries & entries, ioremap::elliptics::session & session,
-            std::shared_ptr<on_refresh> handler);
+    // process newly received backends, i.e. create Group objects
+    void update_group_structure();
 
-    void update_filesystems();
-    void update_groups();
-    void update_couples();
+    // process downloaded metadata, recalculate states, etc.
+    void update();
 
     // group_ids must be sorted
     void create_couple(const std::vector<int> & groups_ids, Group *group);
 
-    void arm_timer();
-
+    // select entries matching filter
     void select(Filter & filter, Entries & entries);
 
-    void get_snapshot(const Filter & filter, std::shared_ptr<on_get_snapshot> handler);
-    void refresh(const Filter & filter, std::shared_ptr<on_refresh> handler);
+    void merge(const Storage & other);
+
+    void print_json(uint32_t item_types, std::string & str);
+    void print_json(Filter & filter, std::string & str);
+
+private:
+    void handle_backend(Backend & backend);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             Entries & entries, uint32_t item_types);
 
-public:
-    class ScheduleMetadataDownload;
-    class UpdateJob;
-    class UpdateJobToggle;
-
-private:
-    void schedule_metadata_download(ioremap::elliptics::session & session,
-            UpdateJobToggle *toggle, Group *group);
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            uint32_t item_types);
 
 public:
-    struct CoupleKey
+    template<typename T, typename K, typename V>
+    static void merge_map(T & self, std::map<K, V> & map, const std::map<K, V> & other_map)
     {
-        CoupleKey(const std::vector<int> & ids)
-            : group_ids(ids)
-        {}
+        auto my = map.begin();
+        auto other = other_map.begin();
 
-        bool operator < (const CoupleKey & other) const
-        {
-            size_t my_size = group_ids.size();
-            size_t oth_size = other.group_ids.size();
-
-            if (my_size < oth_size)
-                return true;
-
-            if (my_size > oth_size)
-                return false;
-
-            return std::memcmp(group_ids.data(),
-                    other.group_ids.data(), my_size * sizeof(int)) < 0;
+        while (other != other_map.end()) {
+            while (my != map.end() && my->first < other->first)
+                ++my;
+            if (my != map.end() && my->first == other->first) {
+                my->second.merge(other->second);
+            } else {
+                my = map.insert(my, std::make_pair(other->first, V(self)));
+                my->second.clone_from(other->second);
+            }
+            ++other;
         }
-
-        bool operator == (const CoupleKey & other) const
-        {
-            return group_ids == other.group_ids;
-        }
-
-        bool operator != (const CoupleKey & other) const
-        {
-            return !operator == (other);
-        }
-
-        std::vector<int> group_ids;
-    };
-
-    struct ClockStat
-    {
-        uint64_t schedule_update_time;
-        uint64_t schedule_update_clk;
-        uint64_t metadata_download_total_time;
-        uint64_t status_update_time;
-    };
-
-    const ClockStat & get_clock_stat() const
-    { return m_clock; }
+    }
 
 private:
     WorkerApplication & m_app;
 
     std::map<std::string, Node> m_nodes;
-    mutable RWMutex m_nodes_lock;
-
     std::map<int, Group> m_groups;
-    mutable RWMutex m_groups_lock;
-
-    std::map<CoupleKey, Couple> m_couples;
-    mutable RWMutex m_couples_lock;
-
+    std::map<std::string, Couple> m_couples;
     std::map<std::string, Namespace> m_namespaces;
-    mutable RWSpinLock m_namespaces_lock;
-
-    friend class ScheduleMetadataDownload;
-    friend class UpdateJob;
-    friend class UpdateJobToggle;
-    ClockStat m_clock;
 };
 
 #endif

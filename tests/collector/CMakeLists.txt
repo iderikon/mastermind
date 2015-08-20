@@ -49,7 +49,6 @@ add_library(collector STATIC
     ../../src/collector/ConfigParser.cpp
     ../../src/collector/Couple.cpp
     ../../src/collector/Discovery.cpp
-    ../../src/collector/DiscoveryTimer.cpp
     ../../src/collector/Filter.cpp
     ../../src/collector/FilterParser.cpp
     ../../src/collector/FS.cpp
@@ -60,7 +59,6 @@ add_library(collector STATIC
     ../../src/collector/Parser.cpp
     ../../src/collector/ProcfsParser.cpp
     ../../src/collector/Storage.cpp
-    ../../src/collector/ThreadPool.cpp
     ../../src/collector/WorkerApplication.cpp)
 target_link_libraries(collector ${COLLECTOR_LIBS})
 

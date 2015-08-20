@@ -1,85 +1,34 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
 
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
+
+#include <elliptics/logger.hpp>
 #include <rapidjson/reader.h>
 
 #include "Storage.h"
 #include "BackendParser.h"
 #include "Filter.h"
 #include "FS.h"
-#include "Guard.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "ProcfsParser.h"
 #include "WorkerApplication.h"
 
 #include <cmath>
-
-class Node::StatsParse : public ThreadPool::Job
-{
-public:
-    StatsParse(Node & node)
-        : m_node(node)
-    {}
-
-    void pick_data(std::string & data)
-    { m_data.swap(data); }
-
-    virtual void execute()
-    {
-        Stopwatch watch(m_node.m_clock.stats_parse);
-
-        ProcfsParser procfs_parser;
-
-        {
-            rapidjson::Reader reader;
-            rapidjson::StringStream ss(m_data.c_str());
-            reader.Parse(ss, procfs_parser);
-        }
-
-        if (!procfs_parser.good()) {
-            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                    "Error parsing procfs statistics");
-            return;
-        }
-
-        const NodeStat & node_stat = procfs_parser.get_stat();
-        m_node.update(node_stat);
-
-        BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec,
-                std::bind(&Node::handle_backend, &m_node, std::placeholders::_1));
-
-        {
-            rapidjson::Reader reader;
-            rapidjson::StringStream ss(m_data.c_str());
-            reader.Parse(ss, backend_parser);
-        }
-
-        if (!backend_parser.good()) {
-            BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                    "Error parsing backend statistics");
-            return;
-        }
-    }
-
-private:
-    Node & m_node;
-    std::string m_data;
-};
 
 NodeStat::NodeStat()
 {
@@ -91,8 +40,7 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_storage(storage),
     m_host(host),
     m_port(port),
-    m_family(family),
-    m_clock{0, 0}
+    m_family(family)
 {
     m_key = m_host;
     m_key += ':';
@@ -101,6 +49,30 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_key += std::to_string(m_family);
 
     m_download_data.reserve(4096);
+
+    std::memset(&m_stat, 0, sizeof(m_stat));
+    std::memset(&m_clock, 0, sizeof(m_clock));
+}
+
+Node::Node(Storage & storage)
+    :
+    m_storage(storage),
+    m_port(0),
+    m_family(0)
+{
+    std::memset(&m_stat, 0, sizeof(m_stat));
+    std::memset(&m_clock, 0, sizeof(m_clock));
+}
+
+void Node::clone_from(const Node & other)
+{
+    m_host = other.m_host;
+    m_port = other.m_port;
+    m_family = other.m_family;
+    m_key = other.m_key;
+    m_download_data = other.m_download_data;
+
+    merge(other);
 }
 
 void Node::update(const NodeStat & stat)
@@ -127,8 +99,6 @@ void Node::update(const NodeStat & stat)
 
 void Node::handle_backend(const BackendStat & new_stat)
 {
-    WriteGuard<RWSpinLock> guard(m_backends_lock);
-
     auto it = m_backends.lower_bound(new_stat.backend_id);
 
     bool found = it != m_backends.end() && it->first == int(new_stat.backend_id);
@@ -136,42 +106,62 @@ void Node::handle_backend(const BackendStat & new_stat)
         return;
 
     if (found) {
-        guard.release();
         it->second.update(new_stat);
     } else {
         it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
-        guard.release();
         it->second.init(new_stat);
     }
 
-    m_storage.handle_backend(it->second, found);
+    m_new_backends.push_back(&it->second);
 }
 
-ThreadPool::Job *Node::create_stats_parse_job()
+void Node::parse_stats(void *arg)
 {
-    StatsParse *job = new StatsParse(*this);
-    job->pick_data(m_download_data);
-    return job;
-}
+    Node *self = (Node *) arg;
 
-size_t Node::get_backend_count() const
-{
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-    return m_backends.size();
-}
+    Stopwatch procfs_watch(self->m_clock.procfs_parse);
 
-void Node::get_backends(std::vector<Backend*> & backends)
-{
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-    backends.reserve(m_backends.size());
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        backends.push_back(&it->second);
+    ProcfsParser procfs_parser;
+    {
+        rapidjson::Reader reader;
+        rapidjson::StringStream ss(self->m_download_data.c_str());
+        reader.Parse(ss, procfs_parser);
+    }
+
+    if (!procfs_parser.good()) {
+        BH_LOG(self->m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Error parsing procfs statistics");
+        self->m_download_data.clear();
+        return;
+    }
+
+    const NodeStat & node_stat = procfs_parser.get_stat();
+    self->update(node_stat);
+
+    procfs_watch.stop();
+
+    Stopwatch backend_watch(self->m_clock.backend_parse);
+
+    BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec,
+            std::bind(&Node::handle_backend, self, std::placeholders::_1));
+
+    {
+        rapidjson::Reader reader;
+        rapidjson::StringStream ss(self->m_download_data.c_str());
+        reader.Parse(ss, backend_parser);
+    }
+
+    self->m_download_data.clear();
+
+    if (!backend_parser.good()) {
+        BH_LOG(self->m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Error parsing backend statistics");
+        return;
+    }
 }
 
 bool Node::get_backend(int id, Backend *& backend)
 {
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-
     auto it = m_backends.find(id);
     if (it != m_backends.end()) {
         backend = &it->second;
@@ -180,54 +170,51 @@ bool Node::get_backend(int id, Backend *& backend)
     return false;
 }
 
+void Node::pick_new_backends(std::vector<Backend*> & backends)
+{
+    backends.clear();
+    m_new_backends.swap(backends);
+}
+
 void Node::update_filesystems()
 {
     Stopwatch watch(m_clock.update_fs);
 
-    std::vector<FS*> filesystems;
-    get_filesystems(filesystems);
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+        it->second.update_status();
+}
 
-    for (FS *fs : filesystems)
-        fs->update_status();
+void Node::merge(const Node & other)
+{
+    uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
+    uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
+    if (my_ts < other_ts) {
+        std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
+        std::memcpy(&m_clock, &other.m_clock, sizeof(m_clock));
+    }
+
+    Storage::merge_map(*this, m_backends, other.m_backends);
+    Storage::merge_map(*this, m_filesystems, other.m_filesystems);
 }
 
 FS *Node::get_fs(uint64_t fsid)
 {
-    {
-        ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-        auto it = m_filesystems.find(fsid);
-        if (it != m_filesystems.end())
-            return &it->second;
-    }
+    auto it = m_filesystems.lower_bound(fsid);
 
-    {
-        WriteGuard<RWSpinLock> guard(m_filesystems_lock);
-        auto it = m_filesystems.lower_bound(fsid);
-        if (it == m_filesystems.end() || it->first != fsid)
-            it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
-        return &it->second;
-    }
+    if (it == m_filesystems.end() || it->first != fsid)
+        it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
+
+    return &it->second;
 }
 
 bool Node::get_fs(uint64_t fsid, FS *& fs)
 {
-    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-
     auto it = m_filesystems.find(fsid);
     if (it != m_filesystems.end()) {
         fs = &it->second;
         return true;
     }
     return false;
-}
-
-void Node::get_filesystems(std::vector<FS*> & filesystems)
-{
-    ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-
-    filesystems.reserve(m_filesystems.size());
-    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-        filesystems.push_back(&it->second);
 }
 
 bool Node::match(const Filter & filter, uint32_t item_types) const
@@ -252,8 +239,6 @@ bool Node::match(const Filter & filter, uint32_t item_types) const
     bool found_group = false;
     bool found_couple = false;
     bool found_namespace = false;
-
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
 
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         const Backend & backend = it->second;
@@ -309,7 +294,7 @@ void Node::print_info(std::ostream & ostr) const
             "    tx_rate: " << m_stat.tx_rate << "\n"
             "    rx_rate: " << m_stat.rx_rate << "\n"
             "  }\n"
-            "  number of backends: " << get_backend_count() << "\n"
+            "  number of backends: " << m_backends.size() << "\n"
             "}";
 }
 
@@ -350,13 +335,10 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (print_backends) {
         writer.Key("backends");
         writer.StartArray();
-        {
-            ReadGuard<RWSpinLock> guard(m_backends_lock);
-            for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-                if (backends.empty() || std::binary_search(backends.begin(),
-                            backends.end(), &it->second))
-                    it->second.print_json(writer);
-            }
+        for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+            if (backends.empty() || std::binary_search(backends.begin(),
+                        backends.end(), &it->second))
+                it->second.print_json(writer);
         }
         writer.EndArray();
     }
@@ -364,13 +346,10 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (print_fs) {
         writer.Key("filesystems");
         writer.StartArray();
-        {
-            ReadGuard<RWSpinLock> guard(m_filesystems_lock);
-            for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
-                if (filesystems.empty() || std::binary_search(filesystems.begin(),
-                            filesystems.end(), &it->second))
-                    it->second.print_json(writer);
-            }
+        for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+            if (filesystems.empty() || std::binary_search(filesystems.begin(),
+                        filesystems.end(), &it->second))
+                it->second.print_json(writer);
         }
         writer.EndArray();
     }

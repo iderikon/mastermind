@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __399b96bc_e6ca_4613_afad_b47d434d2bea
 #define __399b96bc_e6ca_4613_afad_b47d434d2bea
@@ -76,6 +77,8 @@ public:
 
     void init(const BackendStat & stat);
 
+    void clone_from(const Backend & other);
+
     Node & get_node()
     { return m_node; }
     const Node & get_node() const
@@ -100,34 +103,36 @@ public:
     void recalculate();
 
     uint64_t get_vfs_free_space() const
-    { return m_vfs_free_space; }
+    { return m_calculated.vfs_free_space; }
     uint64_t get_vfs_total_space() const
-    { return m_vfs_total_space; }
+    { return m_calculated.vfs_total_space; }
     uint64_t get_vfs_used_space() const
-    { return m_vfs_used_space; }
+    { return m_calculated.vfs_used_space; }
 
     uint64_t get_free_space() const
-    { return m_free_space; }
+    { return m_calculated.free_space; }
     uint64_t get_total_space() const
-    { return m_total_space; }
+    { return m_calculated.total_space; }
     uint64_t get_used_space() const
-    { return m_used_space; }
+    { return m_calculated.used_space; }
     uint64_t get_effective_space() const
-    { return m_effective_space; }
+    { return m_calculated.effective_space; }
 
     double get_fragmentation() const
-    { return m_fragmentation; }
+    { return m_calculated.fragmentation; }
 
     int get_read_rps() const
-    { return m_read_rps; }
+    { return m_calculated.read_rps; }
 
     int get_write_rps() const
-    { return m_write_rps; }
+    { return m_calculated.write_rps; }
 
     bool full() const;
 
     Status get_status() const
-    { return m_status; }
+    { return m_calculated.status; }
+
+    void merge(const Backend & other);
 
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
@@ -145,26 +150,29 @@ private:
 
     BackendStat m_stat;
 
-    uint64_t m_vfs_free_space;
-    uint64_t m_vfs_total_space;
-    uint64_t m_vfs_used_space;
+    struct {
+        uint64_t vfs_free_space;
+        uint64_t vfs_total_space;
+        uint64_t vfs_used_space;
 
-    uint64_t m_records;
+        uint64_t records;
 
-    int64_t m_free_space;
-    int64_t m_total_space;
-    int64_t m_used_space;
-    int64_t m_effective_space;
-    int64_t m_effective_free_space;
+        int64_t free_space;
+        int64_t total_space;
+        int64_t used_space;
+        int64_t effective_space;
+        int64_t effective_free_space;
 
-    double m_fragmentation;
+        double fragmentation;
 
-    int m_read_rps;
-    int m_write_rps;
-    int m_max_read_rps;
-    int m_max_write_rps;
+        int read_rps;
+        int write_rps;
+        int max_read_rps;
+        int max_write_rps;
 
-    Status m_status;
+        Status status;
+    } m_calculated;
+
     bool m_read_only;
     bool m_disabled;
 };

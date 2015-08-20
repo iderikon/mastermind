@@ -1,35 +1,37 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #include "Backend.h"
 #include "Couple.h"
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
-#include "Guard.h"
 #include "Metrics.h"
 #include "Namespace.h"
 #include "Node.h"
+#include "Storage.h"
+#include "WorkerApplication.h"
 
 #include <algorithm>
 
-Couple::Couple(const std::vector<Group*> & groups, bool forbidden_unmatched_space)
+Couple::Couple(Storage & storage, const std::vector<Group*> & groups)
     :
-    m_forbidden_unmatched_space(forbidden_unmatched_space),
+    m_storage(storage),
     m_status(INIT),
     m_status_text(""),
     m_update_status_time(0)
@@ -37,10 +39,21 @@ Couple::Couple(const std::vector<Group*> & groups, bool forbidden_unmatched_spac
     m_groups = groups;
 }
 
+Couple::Couple(Storage & storage)
+    :
+    m_storage(storage),
+    m_status(INIT),
+    m_status_text(""),
+    m_update_status_time(0)
+{}
+
+void Couple::clone_from(const Couple & other)
+{
+    merge(other);
+}
+
 bool Couple::check(const std::vector<int> & groups) const
 {
-    ReadGuard<RWSpinLock> guard(m_groups_lock);
-
     if (m_groups.size() != groups.size())
         return false;
     for (size_t i = 0; i < m_groups.size(); ++i)
@@ -63,8 +76,6 @@ void Couple::bind_groups()
 
 void Couple::get_group_ids(std::vector<int> & groups) const
 {
-    ReadGuard<RWSpinLock> guard(m_groups_lock);
-
     groups.reserve(m_groups.size());
     for (size_t i = 0; i < m_groups.size(); ++i)
         groups.push_back(m_groups[i]->get_id());
@@ -72,15 +83,12 @@ void Couple::get_group_ids(std::vector<int> & groups) const
 
 void Couple::get_groups(std::vector<Group*> & groups) const
 {
-    ReadGuard<RWSpinLock> guard(m_groups_lock);
     groups.assign(m_groups.begin(), m_groups.end());
 }
 
 void Couple::update_status()
 {
     Stopwatch watch(m_update_status_time);
-
-    ReadGuard<RWSpinLock> guard(m_groups_lock);
 
     if (m_groups.empty()) {
         m_status = BAD;
@@ -114,7 +122,7 @@ void Couple::update_status()
     }
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
-        if (m_forbidden_unmatched_space) {
+        if (m_storage.get_app().get_config().forbidden_unmatched_group_total_space) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i]->get_total_space() != m_groups[0]->get_total_space()) {
                     m_status = BROKEN;
@@ -164,6 +172,19 @@ void Couple::update_status()
     // TODO: account job
 }
 
+void Couple::merge(const Couple & other)
+{
+    if (m_groups.size() != other.m_groups.size()) {
+        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Couple merge: internal inconsistency: different number of groups");
+    }
+
+    // XXX timestamp
+    m_status = other.m_status;
+    m_status_text = other.m_status_text;
+    m_update_status_time = other.m_update_status_time;
+}
+
 bool Couple::match(const Filter & filter, uint32_t item_types) const
 {
     if ((item_types & Filter::Couple) && !filter.couples.empty()) {
@@ -179,8 +200,6 @@ bool Couple::match(const Filter & filter, uint32_t item_types) const
 
     if (!check_groups && !check_namespace && !check_nodes && !check_backends && !check_fs)
         return true;
-
-    ReadGuard<RWSpinLock> guard(m_groups_lock);
 
     if (m_groups.empty())
         return false;
@@ -212,9 +231,8 @@ bool Couple::match(const Filter & filter, uint32_t item_types) const
     bool found_node = false;
     bool found_fs = false;
 
-    std::vector<Backend*> backends;
     for (Group *group : m_groups) {
-        group->get_backends(backends);
+        std::set<Backend*> & backends = group->get_backends();
         for (Backend *backend : backends) {
             if (check_backends && !found_backend) {
                 if (std::binary_search(filter.backends.begin(), filter.backends.end(),
@@ -234,7 +252,6 @@ bool Couple::match(const Filter & filter, uint32_t item_types) const
             if (check_backends == found_backend && check_nodes == found_node && check_fs == found_fs)
                 return true;
         }
-        backends.clear();
     }
 
     return false;
@@ -245,13 +262,8 @@ void Couple::print_info(std::ostream & ostr) const
     ostr << "Couple {\n"
             "  key: " << m_key << "\n"
             "  groups: [ ";
-
-    {
-        ReadGuard<RWSpinLock> guard(m_groups_lock);
-        for (size_t i = 0; i < m_groups.size(); ++i)
-            ostr << m_groups[i]->get_id() << ' ';
-    }
-
+    for (Group *group : m_groups)
+        ostr << group->get_id() << ' ';
     ostr << "]\n"
             "  status: " << status_str(m_status) << "\n"
             "  status_text: '" << m_status_text << "'\n"
@@ -264,11 +276,8 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) con
 
     writer.Key("groups");
     writer.StartArray();
-    {
-        ReadGuard<RWSpinLock> guard(m_groups_lock);
-        for (Group *group : m_groups)
-            writer.Uint64(group->get_id());
-    }
+    for (Group *group : m_groups)
+        writer.Uint64(group->get_id());
     writer.EndArray();
 
     writer.Key("status");

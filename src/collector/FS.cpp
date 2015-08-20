@@ -1,24 +1,24 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #include "Backend.h"
 #include "Filter.h"
 #include "FS.h"
-#include "Guard.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
@@ -30,35 +30,31 @@ FS::FS(Node & node, uint64_t fsid)
     m_fsid(fsid),
     m_status(OK)
 {
-    m_stat.ts_sec = 0;
-    m_stat.ts_usec = 0;
-    m_stat.total_space = 0;
-
+    std::memset(&m_stat, 0, sizeof(m_stat));
     m_key = node.get_key() + "/" + std::to_string(fsid);
 }
 
-void FS::add_backend(Backend *backend)
+FS::FS(Node & node)
+    :
+    m_node(node),
+    m_fsid(0),
+    m_status(OK)
 {
-    WriteGuard<RWSpinLock> guard(m_backends_lock);
-    m_backends.insert(backend);
+    std::memset(&m_stat, 0, sizeof(m_stat));
 }
 
-void FS::remove_backend(Backend *backend)
+void FS::clone_from(const FS & other)
 {
-    WriteGuard<RWSpinLock> guard(m_backends_lock);
-    m_backends.erase(backend);
-}
+    m_fsid = other.m_fsid;
+    m_key = other.m_key;
+    std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
+    m_status = other.m_status;
 
-void FS::get_backends(std::vector<Backend*> & backends) const
-{
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-    backends.assign(m_backends.begin(), m_backends.end());
-}
-
-size_t FS::get_backend_count() const
-{
-    ReadGuard<RWSpinLock> guard(m_backends_lock);
-    return m_backends.size();
+    if (!other.m_backends.empty()) {
+        BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
+                "Internal inconsistency detected: cloning FS '%s' from other "
+                "one with non-empty set of backends", m_key.c_str());
+    }
 }
 
 void FS::update(const Backend & backend)
@@ -74,14 +70,11 @@ void FS::update_status()
     Status prev = m_status;
 
     uint64_t total_space = 0;
-    {
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-        for (Backend *backend : m_backends) {
-            Backend::Status status = backend->get_status();
-            if (status != Backend::OK && status != Backend::BROKEN)
-                continue;
-            total_space += backend->get_total_space();
-        }
+    for (Backend *backend : m_backends) {
+        Backend::Status status = backend->get_status();
+        if (status != Backend::OK && status != Backend::BROKEN)
+            continue;
+        total_space += backend->get_total_space();
     }
 
     m_status = (total_space <= m_stat.total_space) ? OK : BROKEN;
@@ -89,6 +82,16 @@ void FS::update_status()
         BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_INFO,
                 "FS %s/%lu status change %d -> %d",
                 m_node.get_key().c_str(), m_fsid, int(prev), int(m_status));
+}
+
+void FS::merge(const FS & other)
+{
+    uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
+    uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
+    if (my_ts < other_ts) {
+        std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
+        m_status = other.m_status;
+    }
 }
 
 bool FS::match(const Filter & filter, uint32_t item_types) const
@@ -108,8 +111,6 @@ bool FS::match(const Filter & filter, uint32_t item_types) const
     if ((item_types & Filter::Backend) && !filter.backends.empty()) {
         bool found_backend = false;
 
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
-
         for (Backend *backend : m_backends) {
             if (std::binary_search(filter.backends.begin(), filter.backends.end(),
                         backend->get_key())) {
@@ -128,8 +129,6 @@ bool FS::match(const Filter & filter, uint32_t item_types) const
 
     if (check_groups || check_couples || check_namespaces) {
         bool matched = false;
-
-        ReadGuard<RWSpinLock> guard(m_backends_lock);
 
         for (Backend *backend : m_backends) {
             if (backend->get_group() == NULL)
@@ -157,7 +156,7 @@ void FS::print_info(std::ostream & ostr) const
             "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
             "    total_space: " << m_stat.total_space << "\n"
             "  }\n"
-            "  number of backends: " << get_backend_count() << "\n"
+            "  number of backends: " << m_backends.size() << "\n"
             "  status: " << status_str(m_status) << "\n"
             "}";
 }

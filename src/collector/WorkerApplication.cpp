@@ -1,19 +1,20 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #include "Storage.h"
 #include "CocaineHandlers.h"
@@ -47,18 +48,14 @@ private:
 
 WorkerApplication::WorkerApplication()
     :
-    m_logger(NULL),
-    m_elliptics_logger(NULL),
-    m_storage(*this),
-    m_discovery(*this),
-    m_discovery_timer(*this, 60)
+    m_logger(nullptr),
+    m_elliptics_logger(nullptr),
+    m_collector(*this)
 {}
 
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     :
-    m_storage(*this),
-    m_discovery(*this),
-    m_discovery_timer(*this, 60)
+    m_collector(*this)
 {
     init();
 
@@ -92,34 +89,25 @@ void WorkerApplication::init()
 
     m_logger = new ioremap::elliptics::file_logger(
             LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
-    if (!m_logger)
-        throw worker_error("failed to open log file " LOG_FILE);
 
     m_elliptics_logger = new ioremap::elliptics::file_logger(
             ELLIPTICS_LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
-    if (!m_elliptics_logger)
-        throw worker_error("failed to open log file " ELLIPTICS_LOG_FILE);
 
-    if (m_discovery.init_curl() || m_discovery.init_elliptics())
-        throw worker_error("failed to initialize discovery");
-
-    if (m_discovery_timer.init())
-        throw worker_error("failed to start discovery timer");
-
+    if (m_collector.init())
+        throw worker_error("failed to initialize collector");
 }
 
 void WorkerApplication::start()
 {
-    m_thread_pool.start();
-    m_discovery_timer.start();
+    m_collector.start();
 }
 
-int WorkerApplication::load_config()
+void WorkerApplication::load_config()
 {
     ConfigParser parser(m_config);
 
     FILE *f = fopen(CONFIG_FILE, "rb");
-    if (f == NULL)
+    if (f == nullptr)
         throw worker_error("Cannot open " CONFIG_FILE);
 
     static char buf[65536];
@@ -134,6 +122,4 @@ int WorkerApplication::load_config()
 
     if (m_config.reserved_space == 0)
         throw worker_error("Incorrect value 0 for reserved_space");
-
-    return 0;
 }

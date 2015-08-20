@@ -1,24 +1,23 @@
 /*
- * Copyright (c) YANDEX LLC, 2015. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- */
+   Copyright (c) YANDEX LLC, 2015. All rights reserved.
+   This file is part of Mastermind.
+
+   Mastermind is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 3.0 of the License, or (at your option) any later version.
+
+   Mastermind is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with Mastermind.
+*/
 
 #ifndef __046c58ff_e6c4_49a6_a920_eee87b111685
 #define __046c58ff_e6c4_49a6_a920_eee87b111685
-
-#include "RWSpinLock.h"
 
 #include <iostream>
 #include <rapidjson/writer.h>
@@ -47,8 +46,10 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Group(Backend & backend, Storage & storage);
-    Group(int id, Storage & storage);
+    Group(Storage & storage, int id);
+    Group(Storage & storage);
+
+    void clone_from(const Group & other);
 
     int get_id() const
     { return m_id; }
@@ -70,7 +71,8 @@ public:
 
     bool has_backend(Backend & backend) const;
     void add_backend(Backend & backend);
-    void get_backends(std::vector<Backend*> & backends) const;
+    std::set<Backend*> & get_backends()
+    { return m_backends; }
 
     bool full() const;
     uint64_t get_total_space() const;
@@ -102,26 +104,27 @@ public:
     uint64_t get_metadata_process_time() const
     { return m_metadata_process_time; }
 
+    void merge(const Group & other);
+
     bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
 
     void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
-    int m_id;
-
     Storage & m_storage;
+
+    int m_id;
     Couple *m_couple;
 
     std::set<Backend*> m_backends;
-    mutable RWSpinLock m_backends_lock;
 
     bool m_clean;
     std::vector<char> m_metadata;
     std::string m_status_text;
     Status m_status;
-    mutable RWSpinLock m_metadata_lock;
 
+    uint64_t m_metadata_process_start;
     uint64_t m_metadata_process_time;
 
     bool m_frozen;
