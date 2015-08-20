@@ -152,56 +152,6 @@ void Backend::merge(const Backend & other)
     }
 }
 
-bool Backend::match(const Filter & filter, uint32_t item_types) const
-{
-    if ((item_types & Filter::Group) && !filter.groups.empty()) {
-        if (!std::binary_search(filter.groups.begin(), filter.groups.end(),
-                    m_stat.group))
-            return false;
-    }
-
-    if ((item_types & Filter::Backend) && !filter.backends.empty()) {
-        if (!std::binary_search(filter.backends.begin(), filter.backends.end(),
-                    get_key()))
-            return false;
-    }
-
-    if ((item_types & Filter::Node) && !filter.nodes.empty()) {
-        if (!std::binary_search(filter.nodes.begin(), filter.nodes.end(),
-                    m_node.get_key()))
-            return false;
-    }
-
-    if ((item_types & Filter::Couple) && !filter.couples.empty()) {
-        if (m_group == NULL || m_group->get_couple() == NULL)
-            return false;
-
-        if (!std::binary_search(filter.couples.begin(), filter.couples.end(),
-                    m_group->get_couple()->get_key()))
-            return false;
-    }
-
-    if ((item_types & Filter::Namespace) && !filter.namespaces.empty()) {
-        if (m_group == NULL || m_group->get_namespace() == NULL)
-            return false;
-
-        if (!std::binary_search(filter.namespaces.begin(), filter.namespaces.end(),
-                    m_group->get_namespace()->get_name()))
-            return false;
-    }
-
-    if ((item_types & Filter::FS) && !filter.filesystems.empty()) {
-        if (m_fs == NULL)
-            return false;
-
-        if (!std::binary_search(filter.filesystems.begin(), filter.filesystems.end(),
-                    m_fs->get_key()))
-            return false;
-    }
-
-    return true;
-}
-
 void Backend::print_info(std::ostream & ostr) const
 {
     ostr << "Backend {\n"

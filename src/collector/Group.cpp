@@ -444,67 +444,6 @@ void Group::merge(const Group & other)
     }
 }
 
-bool Group::match(const Filter & filter, uint32_t item_types) const
-{
-    if ((item_types & Filter::Group) && !filter.groups.empty()) {
-        if (!std::binary_search(filter.groups.begin(), filter.groups.end(), m_id))
-            return false;
-    }
-
-    if ((item_types & Filter::Namespace) && !filter.namespaces.empty()) {
-        Namespace *ns = m_namespace;
-
-        if (ns == nullptr)
-            return false;
-
-        if (!std::binary_search(filter.namespaces.begin(), filter.namespaces.end(), ns->get_name()))
-            return false;
-    }
-
-    if ((item_types & Filter::Couple) && !filter.couples.empty()) {
-        if (m_couple == nullptr)
-            return false;
-
-        if (!std::binary_search(filter.couples.begin(), filter.couples.end(), m_couple->get_key()))
-            return false;
-    }
-
-    bool check_nodes = (item_types & Filter::Node) && !filter.nodes.empty();
-    bool check_backends = (item_types & Filter::Backend) && !filter.backends.empty();
-    bool check_fs = (item_types & Filter::FS) && !filter.filesystems.empty();
-
-    bool found_node = false;
-    bool found_backend = false;
-    bool found_fs = false;
-
-    if (check_nodes || check_backends || check_fs) {
-        for (Backend *backend : m_backends) {
-            if (check_nodes && !found_node) {
-                if (!std::binary_search(filter.nodes.begin(), filter.nodes.end(),
-                            backend->get_node().get_key()))
-                    found_node = true;
-            }
-            if (check_backends && !found_backend) {
-                if (std::binary_search(filter.backends.begin(), filter.backends.end(),
-                            backend->get_key()))
-                    found_backend = true;
-            }
-            if (check_fs && !found_fs) {
-                if (backend->get_fs() != nullptr && std::binary_search(filter.filesystems.begin(),
-                            filter.filesystems.end(), backend->get_fs()->get_key()))
-                    found_fs = true;
-            }
-
-            if (check_nodes == found_node && check_backends == found_backend && check_fs == found_fs)
-                return true;
-        }
-
-        return false;
-    }
-
-    return true;
-}
-
 void Group::print_info(std::ostream & ostr) const
 {
     ostr << "Group " << m_id << " {\n"

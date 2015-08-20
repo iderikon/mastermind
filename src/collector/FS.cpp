@@ -94,59 +94,6 @@ void FS::merge(const FS & other)
     }
 }
 
-bool FS::match(const Filter & filter, uint32_t item_types) const
-{
-    if ((item_types & Filter::FS) && !filter.filesystems.empty()) {
-        if (!std::binary_search(filter.filesystems.begin(),
-                    filter.filesystems.end(), m_key))
-            return false;
-    }
-
-    if ((item_types & Filter::Node) && !filter.nodes.empty()) {
-        if (!std::binary_search(filter.nodes.begin(), filter.nodes.end(),
-                    m_node.get_key()))
-            return false;
-    }
-
-    if ((item_types & Filter::Backend) && !filter.backends.empty()) {
-        bool found_backend = false;
-
-        for (Backend *backend : m_backends) {
-            if (std::binary_search(filter.backends.begin(), filter.backends.end(),
-                        backend->get_key())) {
-                found_backend = true;
-                break;
-            }
-        }
-
-        if (!found_backend)
-            return false;
-    }
-
-    bool check_groups = (item_types & Filter::Group) && !filter.groups.empty();
-    bool check_couples = (item_types & Filter::Couple) && !filter.couples.empty();
-    bool check_namespaces = (item_types && Filter::Namespace) && !filter.namespaces.empty();
-
-    if (check_groups || check_couples || check_namespaces) {
-        bool matched = false;
-
-        for (Backend *backend : m_backends) {
-            if (backend->get_group() == NULL)
-                continue;
-            if (backend->get_group()->match(filter,
-                        item_types & (Filter::Group|Filter::Couple|Filter::Namespace))) {
-                matched = true;
-                break;
-            }
-        }
-
-        if (!matched)
-            return false;
-    }
-
-    return true;
-}
-
 void FS::print_info(std::ostream & ostr) const
 {
     ostr << "FS {\n"

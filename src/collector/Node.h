@@ -100,8 +100,6 @@ public:
     std::map<uint64_t, FS> & get_filesystems()
     { return m_filesystems; }
 
-    bool match(const Filter & filter, uint32_t item_types = 0xFFFFFFFF) const;
-
     void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             const std::vector<Backend*> & backends,

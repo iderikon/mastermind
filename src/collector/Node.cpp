@@ -217,68 +217,6 @@ bool Node::get_fs(uint64_t fsid, FS *& fs)
     return false;
 }
 
-bool Node::match(const Filter & filter, uint32_t item_types) const
-{
-    bool check_nodes = (item_types & Filter::Node) && !filter.nodes.empty();
-    if (check_nodes) {
-        if (!std::binary_search(filter.nodes.begin(), filter.nodes.end(), m_key))
-            return false;
-    }
-
-    bool check_backends = (item_types & Filter::Backend) && !filter.backends.empty();
-    bool check_fs = (item_types & Filter::FS) && !filter.filesystems.empty();
-    bool check_groups = (item_types & Filter::Group) && !filter.groups.empty();
-    bool check_couples = (item_types & Filter::Couple) && !filter.couples.empty();
-    bool check_namespaces = (item_types & Filter::Namespace) && !filter.namespaces.empty();
-
-    if (!check_backends && !check_fs && !check_groups && !check_couples && !check_namespaces)
-        return true;
-
-    bool found_backend = false;
-    bool found_fs = false;
-    bool found_group = false;
-    bool found_couple = false;
-    bool found_namespace = false;
-
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-        const Backend & backend = it->second;
-
-        if (check_backends && !found_backend) {
-            if (std::binary_search(filter.backends.begin(), filter.backends.end(),
-                        backend.get_key()))
-                found_backend = true;
-        }
-        if (check_fs && !found_fs) {
-            if (backend.get_fs() != NULL && std::binary_search(filter.filesystems.begin(),
-                        filter.filesystems.end(), backend.get_fs()->get_key()))
-                found_fs = true;
-        }
-        if (check_groups && !found_group) {
-            if (std::binary_search(filter.groups.begin(), filter.groups.end(),
-                        backend.get_stat().group))
-                found_group = true;
-        }
-        if (check_couples && !found_couple) {
-            if (backend.get_group() != NULL && backend.get_group()->get_couple() != NULL &&
-                    std::binary_search(filter.couples.begin(), filter.couples.end(),
-                        backend.get_group()->get_couple()->get_key()))
-                found_couple = true;
-        }
-        if (check_namespaces && !found_namespace) {
-            if (backend.get_group() != NULL && backend.get_group()->get_namespace() != NULL &&
-                    std::binary_search(filter.namespaces.begin(), filter.namespaces.end(),
-                        backend.get_group()->get_namespace()->get_name()))
-                found_namespace = true;
-        }
-
-        if (check_backends == found_backend && check_fs == found_fs && check_groups == found_group &&
-                check_couples == found_couple && check_namespaces == found_namespace)
-            return true;
-    }
-
-    return false;
-}
-
 void Node::print_info(std::ostream & ostr) const
 {
     ostr << "Node {\n"
