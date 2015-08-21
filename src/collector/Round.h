@@ -35,6 +35,7 @@ class Node;
 class WorkerApplication;
 
 class on_force_update;
+class on_refresh;
 
 class Round
 {
@@ -47,6 +48,7 @@ public:
 
     Round(Collector & collector);
     Round(Collector & collector, std::shared_ptr<on_force_update> handler);
+    Round(Collector & collector, std::shared_ptr<on_refresh> handler);
     ~Round();
 
     Collector & get_collector()
@@ -56,6 +58,9 @@ public:
 
     Storage & get_storage()
     { return m_storage; }
+
+    const Storage::Entries & get_entries()
+    { return m_entries; }
 
     ioremap::elliptics::session & get_session()
     { return m_session; }
@@ -69,6 +74,9 @@ public:
     std::shared_ptr<on_force_update> get_on_force_handler()
     { return m_on_force_handler; }
 
+    std::shared_ptr<on_refresh> get_on_refresh_handler()
+    { return m_on_refresh_handler; }
+
     void start();
 
 private:
@@ -77,9 +85,11 @@ private:
     static void step4_perform_update(void *arg);
 
     int perform_download();
+    int add_download(Node & node);
 
     friend class GroupMetadataHandle;
     class GroupMetadataHandle;
+    void dispatch_request_group_metadata(Group & group);
     static void request_group_metadata(void *arg);
 
     // done reading a metakey from a single group
@@ -119,9 +129,11 @@ private:
     Storage m_storage;
     ioremap::elliptics::session m_session;
 
-    Filter m_filter;
     Type m_type;
     std::shared_ptr<on_force_update> m_on_force_handler;
+    std::shared_ptr<on_refresh> m_on_refresh_handler;
+
+    Storage::Entries m_entries;
 
     dispatch_queue_t m_queue;
 

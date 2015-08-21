@@ -26,7 +26,7 @@
 
 #include <time.h>
 
-#define SECONDS(nsec) (double(nsec) / 1000000000.0)
+#define MSEC(nsec) (double(nsec) / 1000000.0)
 
 template<typename COUNT>
 class Distribution

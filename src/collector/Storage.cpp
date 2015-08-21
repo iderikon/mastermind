@@ -173,7 +173,7 @@ bool Storage::get_namespace(const std::string & name, Namespace *& ns)
 
 void Storage::update()
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups and couples");
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
 
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
         it->second.update_filesystems();
@@ -183,6 +183,22 @@ void Storage::update()
 
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
         it->second.update_status();
+
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
+}
+
+void Storage::update(const Entries & entries)
+{
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
+
+    for (Node *node : entries.nodes)
+        node->update_filesystems();
+
+    for (Group *group : entries.groups)
+        group->process_metadata();
+
+    for (Couple *couple : entries.couples)
+        couple->update_status();
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }
@@ -431,6 +447,13 @@ void Storage::merge(const Storage & other)
     merge_map(*this, m_nodes, other.m_nodes);
     merge_map(*this, m_groups, other.m_groups);
     merge_map(*this, m_couples, other.m_couples);
+}
+
+void Storage::merge(const Entries & entries)
+{
+    merge_map(*this, m_nodes, entries.nodes);
+    merge_map(*this, m_groups, entries.groups);
+    merge_map(*this, m_couples, entries.couples);
 }
 
 bool Storage::split_node_num(const std::string & key, std::string & node, uint64_t & id)

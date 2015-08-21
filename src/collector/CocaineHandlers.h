@@ -319,10 +319,17 @@ public:
         m_app(app)
     {}
 
+    WorkerApplication & get_app()
+    { return m_app; }
+
     void on_chunk(const char *chunk, size_t size);
+
+    Filter & get_filter()
+    { return m_filter; }
 
 private:
     WorkerApplication & m_app;
+    Filter m_filter;
 };
 
 #endif

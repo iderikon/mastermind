@@ -69,10 +69,22 @@ void Collector::step1_start_forced(void *arg)
             static_cast<std::shared_ptr<on_force_update>*>(arg));
     Collector & self = (*handler_ptr)->get_app().get_collector();
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector user-requested round: step 1");
+    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector user-requested full round: step 1");
 
     Round *round = new Round(self, *handler_ptr);
     self.m_discovery.resolve_nodes(*round);
+    round->start();
+}
+
+void Collector::step1_start_refresh(void *arg)
+{
+    std::unique_ptr<std::shared_ptr<on_refresh>> handler_ptr(
+            static_cast<std::shared_ptr<on_refresh>*>(arg));
+    Collector & self = (*handler_ptr)->get_app().get_collector();
+
+    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector user-requested refresh round: step 1");
+
+    Round *round = new Round(self, *handler_ptr);
     round->start();
 }
 
@@ -81,9 +93,14 @@ void Collector::step5_merge(void *arg)
     std::unique_ptr<Round> round(static_cast<Round*>(arg));
     Collector & self = round->get_collector();
 
+    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Merging storage");
+
     Stopwatch watch(self.m_merge_time);
 
-    self.m_storage.merge(round->get_storage());
+    if (round->get_type() != Round::FORCED_PARTIAL)
+        self.m_storage.merge(round->get_storage());
+    else
+        self.m_storage.merge(round->get_entries());
 
     watch.stop();
 
@@ -100,10 +117,17 @@ void Collector::step5_merge(void *arg)
             std::shared_ptr<on_force_update> handler = round->get_on_force_handler();
 
             std::ostringstream ostr;
-            ostr << "Update completed in " << SECONDS(round_clock.total) << " seconds";
+            ostr << "Update completed in " << MSEC(round_clock.total) << " ms";
             handler->response()->write(ostr.str());
             handler->response()->close();
         }
+    } else {
+        std::shared_ptr<on_refresh> handler = round->get_on_refresh_handler();
+
+        std::ostringstream ostr;
+        ostr << "Refresh completed in " << MSEC(round_clock.total) << " ms";
+        handler->response()->write(ostr.str());
+        handler->response()->close();
     }
 }
 
@@ -160,6 +184,11 @@ void Collector::list_namespaces(std::shared_ptr<on_list_namespaces> handler)
 void Collector::node_list_backends(std::shared_ptr<on_node_list_backends> handler)
 {
     dispatch_async_f(m_queue, new std::shared_ptr<on_node_list_backends>(handler), &Collector::execute_node_list_backends);
+}
+
+void Collector::refresh(std::shared_ptr<on_refresh> handler)
+{
+    dispatch_async_f(m_queue, new std::shared_ptr<on_refresh>(handler), &Collector::step1_start_refresh);
 }
 
 void Collector::execute_get_snapshot(void *arg)
@@ -298,13 +327,13 @@ void Collector::execute_summary(void *arg)
     ostr << self.m_storage.get_namespaces().size() << " namespaces\n";
 
     ostr << "Round metrics:\n"
-            "  Total time: " << SECONDS(self.m_round_clock.total) << " s\n"
-            "  HTTP download time: " << SECONDS(self.m_round_clock.perform_download) << " s\n"
+            "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"
+            "  HTTP download time: " << MSEC(self.m_round_clock.perform_download) << " ms\n"
             "  Remaining JSON parsing after HTTP download completed: "
-                << SECONDS(self.m_round_clock.finish_monitor_stats) << " s\n"
-            "  Metadata download: " << SECONDS(self.m_round_clock.metadata_download) << " s\n"
-            "  Storage update: " << SECONDS(self.m_round_clock.storage_update) << " s\n"
-            "  Storage merge: " << SECONDS(self.m_merge_time) << " s\n";
+                << MSEC(self.m_round_clock.finish_monitor_stats) << " ms\n"
+            "  Metadata download: " << MSEC(self.m_round_clock.metadata_download) << " ms\n"
+            "  Storage update: " << MSEC(self.m_round_clock.storage_update) << " ms\n"
+            "  Storage merge: " << MSEC(self.m_merge_time) << " ms\n";
 
     {
         SerialDistribution distrib_procfs_parse;

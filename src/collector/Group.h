@@ -54,6 +54,9 @@ public:
     int get_id() const
     { return m_id; }
 
+    int get_key() const
+    { return m_id; }
+
     Status get_status() const
     { return m_status; }
 

@@ -78,6 +78,7 @@ public:
 
     // process downloaded metadata, recalculate states, etc.
     void update();
+    void update(const Entries & entries);
 
     // group_ids must be sorted
     void create_couple(const std::vector<int> & groups_ids, Group *group);
@@ -86,6 +87,7 @@ public:
     void select(Filter & filter, Entries & entries);
 
     void merge(const Storage & other);
+    void merge(const Entries & entries);
 
     void print_json(uint32_t item_types, std::string & str);
     void print_json(Filter & filter, std::string & str);
@@ -116,6 +118,20 @@ public:
                 my->second.clone_from(other->second);
             }
             ++other;
+        }
+    }
+
+    template<typename T, typename K, typename V>
+    static void merge_map(T & self, std::map<K, V> & map, const std::vector<V*> & entries)
+    {
+        for (V *entry : entries) {
+            auto my = map.lower_bound(entry->get_key());
+            if (my != map.end() && my->first == entry->get_key()) {
+                my->second.merge(*entry);
+            } else {
+                my = map.insert(my, std::make_pair(entry->get_key(), V(self)));
+                my->second.clone_from(*entry);
+            }
         }
     }
 

@@ -16,6 +16,7 @@
    License along with Mastermind.
 */
 
+#include "CocaineHandlers.h"
 #include "FS.h"
 #include "Metrics.h"
 #include "Round.h"
@@ -143,6 +144,21 @@ Round::Round(Collector & collector, std::shared_ptr<on_force_update> handler)
     m_on_force_handler = handler;
 }
 
+Round::Round(Collector & collector, std::shared_ptr<on_refresh> handler)
+    :
+    m_collector(collector),
+    m_storage(collector.get_storage()),
+    m_session(collector.get_discovery().get_session().clone()),
+    m_type(FORCED_PARTIAL),
+    m_epollfd(-1),
+    m_curl_handle(nullptr),
+    m_timeout_ms(0)
+{
+    clock_start(m_clock.total);
+    m_queue = dispatch_queue_create("round", DISPATCH_QUEUE_CONCURRENT);
+    m_on_refresh_handler = handler;
+}
+
 Round::~Round()
 {
     dispatch_release(m_queue);
@@ -158,7 +174,7 @@ void Round::start()
     BH_LOG(get_app().get_logger(), DNET_LOG_INFO,
             "Starting %s discovery with %lu nodes",
             (m_type == REGULAR) ? "regular" : (m_type == FORCED_FULL) ? "forced full" : "forced partial",
-            m_storage.get_nodes().size());
+            (m_type == FORCED_PARTIAL ? m_entries.nodes.size() : m_storage.get_nodes().size()));
 
     dispatch_async_f(m_queue, this, &Round::step2_curl_download);
 }
@@ -167,10 +183,19 @@ void Round::step2_curl_download(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
 
+    if (self.m_type == FORCED_PARTIAL)
+        self.m_storage.select(self.m_on_refresh_handler->get_filter(), self.m_entries);
+
     self.perform_download();
 
     clock_start(self.m_clock.finish_monitor_stats);
     dispatch_barrier_async_f(self.m_queue, &self, &Round::step3_prepare_metadata_download);
+}
+
+void Round::dispatch_request_group_metadata(Group & group)
+{
+    GroupMetadataHandle *handle = new GroupMetadataHandle(*this, group, m_session);
+    dispatch_async_f(m_queue, handle, &Round::request_group_metadata);
 }
 
 void Round::step3_prepare_metadata_download(void *arg)
@@ -180,16 +205,29 @@ void Round::step3_prepare_metadata_download(void *arg)
     clock_stop(self.m_clock.finish_monitor_stats);
 
     self.m_storage.update_group_structure();
-    std::map<int, Group> & groups = self.m_storage.get_groups();
 
-    BH_LOG(self.get_app().get_logger(), DNET_LOG_INFO, "Scheduling metadata download for %lu groups", groups.size());
+    self.m_nr_groups = (self.m_type != FORCED_PARTIAL
+            ? self.m_storage.get_groups().size()
+            : self.m_entries.groups.size());
+
+    if (!self.m_nr_groups) {
+        BH_LOG(self.get_app().get_logger(), DNET_LOG_INFO,
+                "No groups to download metadata");
+        step4_perform_update(arg);
+    }
+
+    BH_LOG(self.get_app().get_logger(), DNET_LOG_INFO,
+            "Scheduling metadata download for %lu groups", self.m_nr_groups);
+
     clock_start(self.m_clock.metadata_download);
 
-    self.m_nr_groups = groups.size();
-    for (auto it = groups.begin(); it != groups.end(); ++it) {
-        Group & group = it->second;
-        GroupMetadataHandle *handle = new GroupMetadataHandle(self, group, self.m_session);
-        dispatch_async_f(self.m_queue, handle, &Round::request_group_metadata);
+    if (self.m_type != FORCED_PARTIAL) {
+        std::map<int, Group> & groups = self.m_storage.get_groups();
+        for (auto it = groups.begin(); it != groups.end(); ++it)
+            self.dispatch_request_group_metadata(it->second);
+    } else {
+        for (Group * group : self.m_entries.groups)
+            self.dispatch_request_group_metadata(*group);
     }
 }
 
@@ -198,7 +236,10 @@ void Round::step4_perform_update(void *arg)
     Round & self = *static_cast<Round*>(arg);
 
     Stopwatch watch(self.m_clock.storage_update);
-    self.m_storage.update();
+    if (self.m_type != FORCED_PARTIAL)
+        self.m_storage.update();
+    else
+        self.m_storage.update(self.m_entries);
     watch.stop();
 
     self.m_collector.finalize_round(&self);
@@ -249,21 +290,13 @@ int Round::perform_download()
         return -1;
     }
 
-    std::map<std::string, Node> & nodes = m_storage.get_nodes();
-
-    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-        Node & node = it->second;
-
-        BH_LOG(get_app().get_logger(), DNET_LOG_INFO, "Scheduling stat download for node %s",
-                node.get_key().c_str());
-
-        CURL *easy = create_easy_handle(&node);
-        if (easy == nullptr) {
-            BH_LOG(get_app().get_logger(), DNET_LOG_ERROR,
-                    "Cannot create easy handle to download node stat");
-            return -1;
-        }
-        curl_multi_add_handle(m_curl_handle, easy);
+    if (m_type == FORCED_PARTIAL) {
+        for (Node *node : m_entries.nodes)
+            add_download(*node);
+    } else {
+        std::map<std::string, Node> & storage_nodes = m_storage.get_nodes();
+        for (auto it = storage_nodes.begin(); it != storage_nodes.end(); ++it)
+            add_download(it->second);
     }
 
     int running_handles = 0;
@@ -322,6 +355,22 @@ int Round::perform_download()
     }
 
     return res;
+}
+
+int Round::add_download(Node & node)
+{
+    BH_LOG(get_app().get_logger(), DNET_LOG_INFO,
+            "Scheduling stat download for node %s", node.get_key().c_str());
+
+    CURL *easy = create_easy_handle(&node);
+    if (easy == nullptr) {
+        BH_LOG(get_app().get_logger(), DNET_LOG_ERROR,
+                "Cannot create easy handle to download node stat");
+        return -1;
+    }
+    curl_multi_add_handle(m_curl_handle, easy);
+
+    return 0;
 }
 
 CURL *Round::create_easy_handle(Node *node)

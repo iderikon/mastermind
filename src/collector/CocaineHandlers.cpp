@@ -156,21 +156,17 @@ void on_get_snapshot::on_chunk(const char *chunk, size_t size)
 
 void on_refresh::on_chunk(const char *chunk, size_t size)
 {
-/* TODO
     std::string request(chunk, size);
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Refresh requested: '%s'", request.c_str());
 
-    Filter filter;
-
     if (!request.empty()) {
-        if (parse_filter(request, filter) != 0) {
+        if (parse_filter(request, m_filter) != 0) {
             response()->error(-1, "Incorrect filter syntax");
             response()->close();
             return;
         }
     }
 
-    m_app.get_storage().refresh(filter, shared_from_this());
-*/
+    m_app.get_collector().refresh(shared_from_this());
 }

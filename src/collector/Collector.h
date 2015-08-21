@@ -40,6 +40,7 @@ class on_list_nodes;
 class on_node_info;
 class on_node_list_backends;
 class on_summary;
+class on_refresh;
 
 class Collector
 {
@@ -73,10 +74,12 @@ public:
     void group_couple_info(std::shared_ptr<on_group_couple_info> handler);
     void list_namespaces(std::shared_ptr<on_list_namespaces> handler);
     void node_list_backends(std::shared_ptr<on_node_list_backends> handler);
+    void refresh(std::shared_ptr<on_refresh> handler);
 
 private:
     static void step1_start_round(void *arg);
     static void step1_start_forced(void *arg);
+    static void step1_start_refresh(void *arg);
     static void step5_merge(void *arg);
 
     static void execute_force_update(void *arg);
