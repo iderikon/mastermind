@@ -87,13 +87,12 @@ private:
     int perform_download();
     int add_download(Node & node);
 
-    friend class GroupMetadataHandle;
-    class GroupMetadataHandle;
-    void dispatch_request_group_metadata(Group & group);
-    static void request_group_metadata(void *arg);
+    static void request_metadata_apply_helper(void *arg);
+    static void request_group_metadata(void *arg, size_t idx);
 
     // done reading a metakey from a single group
-    void handle_group_download_completed();
+    void result(size_t group_idx, const ioremap::elliptics::read_result_entry & entry);
+    void final(size_t group_idx, const ioremap::elliptics::error_info & error);
 
 public:
     CURL *create_easy_handle(Node *node);
@@ -134,6 +133,9 @@ private:
     std::shared_ptr<on_refresh> m_on_refresh_handler;
 
     Storage::Entries m_entries;
+
+    std::vector<Group*> m_groups_to_read;
+    std::vector<ioremap::elliptics::session> m_group_read_sessions;
 
     dispatch_queue_t m_queue;
 

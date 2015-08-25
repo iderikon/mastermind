@@ -73,48 +73,6 @@ Round::ClockStat & Round::ClockStat::operator = (const ClockStat & other)
     return *this;
 }
 
-class Round::GroupMetadataHandle
-{
-public:
-    GroupMetadataHandle(Round & round, Group & group, elliptics::session & session)
-        :
-        m_round(round),
-        m_group(group),
-        m_session(session.clone())
-    {}
-
-    Round & get_round()
-    { return m_round; }
-
-    Group & get_group()
-    { return m_group; }
-
-    elliptics::session & get_session()
-    { return m_session; }
-
-    void result(const elliptics::read_result_entry & entry)
-    {
-        elliptics::data_pointer file = entry.file();
-        m_group.save_metadata((const char *) file.data(), file.size());
-    }
-
-    void final(const elliptics::error_info & error)
-    {
-        if (error) {
-            std::ostringstream ostr;
-            ostr << "Metadata download failed: " << error.message();
-            m_group.set_status_text(ostr.str());
-        }
-        m_round.handle_group_download_completed();
-        delete this;
-    }
-
-private:
-    Round & m_round;
-    Group & m_group;
-    elliptics::session m_session;
-};
-
 Round::Round(Collector & collector)
     :
     m_collector(collector),
@@ -192,12 +150,6 @@ void Round::step2_curl_download(void *arg)
     dispatch_barrier_async_f(self.m_queue, &self, &Round::step3_prepare_metadata_download);
 }
 
-void Round::dispatch_request_group_metadata(Group & group)
-{
-    GroupMetadataHandle *handle = new GroupMetadataHandle(*this, group, m_session);
-    dispatch_async_f(m_queue, handle, &Round::request_group_metadata);
-}
-
 void Round::step3_prepare_metadata_download(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
@@ -221,19 +173,36 @@ void Round::step3_prepare_metadata_download(void *arg)
 
     clock_start(self.m_clock.metadata_download);
 
+    self.m_groups_to_read.reserve(self.m_nr_groups);
+    self.m_group_read_sessions.reserve(self.m_nr_groups);
+
     if (self.m_type != FORCED_PARTIAL) {
         std::map<int, Group> & groups = self.m_storage.get_groups();
         for (auto it = groups.begin(); it != groups.end(); ++it)
-            self.dispatch_request_group_metadata(it->second);
+            self.m_groups_to_read.push_back(&it->second);
     } else {
         for (Group * group : self.m_entries.groups)
-            self.dispatch_request_group_metadata(*group);
+            self.m_groups_to_read.push_back(group);
     }
+
+    for (int i = 0; i < self.m_nr_groups; ++i)
+        self.m_group_read_sessions.push_back(self.m_session.clone());
+
+    dispatch_async_f(self.m_queue, &self, &Round::request_metadata_apply_helper);
+}
+
+void Round::request_metadata_apply_helper(void *arg)
+{
+    Round & self = *static_cast<Round*>(arg);
+    dispatch_apply_f(self.m_nr_groups, self.m_queue, &self, &Round::request_group_metadata);
 }
 
 void Round::step4_perform_update(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
+
+    self.m_groups_to_read.clear();
+    self.m_group_read_sessions.clear();
 
     Stopwatch watch(self.m_clock.storage_update);
     if (self.m_type != FORCED_PARTIAL)
@@ -245,23 +214,23 @@ void Round::step4_perform_update(void *arg)
     self.m_collector.finalize_round(&self);
 }
 
-void Round::request_group_metadata(void *arg)
+void Round::request_group_metadata(void *arg, size_t idx)
 {
-    GroupMetadataHandle *handle = static_cast<GroupMetadataHandle*>(arg);
+    Round & self = *static_cast<Round*>(arg);
 
-    std::vector<int> group_id(1, handle->get_group().get_id());
+    std::vector<int> group_id(1, self.m_groups_to_read[idx]->get_id());
     static const elliptics::key key("symmetric_groups");
 
-    elliptics::session & session = handle->get_session();
+    elliptics::session & session = self.m_group_read_sessions[idx];
     session.set_namespace("metabalancer");
     session.set_groups(group_id);
 
-    BH_LOG(handle->get_round().get_app().get_logger(), DNET_LOG_DEBUG,
+    BH_LOG(self.get_app().get_logger(), DNET_LOG_DEBUG,
             "Scheduling metadata download for group %d", group_id[0]);
 
     elliptics::async_read_result res = session.read_data(key, group_id, 0, 0);
-    res.connect(std::bind(&GroupMetadataHandle::result, handle, std::placeholders::_1),
-            std::bind(&GroupMetadataHandle::final, handle, std::placeholders::_1));
+    res.connect(std::bind(&Round::result, &self, idx, std::placeholders::_1),
+            std::bind(&Round::final, &self, idx, std::placeholders::_1));
 }
 
 int Round::perform_download()
@@ -453,8 +422,20 @@ size_t Round::write_func(char *ptr, size_t size, size_t nmemb, void *userdata)
     return size * nmemb;
 }
 
-void Round::handle_group_download_completed()
+void Round::result(size_t group_idx, const elliptics::read_result_entry & entry)
 {
+    elliptics::data_pointer file = entry.file();
+    m_groups_to_read[group_idx]->save_metadata((const char *) file.data(), file.size());
+}
+
+void Round::final(size_t group_idx, const elliptics::error_info & error)
+{
+    if (error) {
+        std::ostringstream ostr;
+        ostr << "Metadata download failed: " << error.message();
+        m_groups_to_read[group_idx]->set_status_text(ostr.str());
+    }
+
     if (! --m_nr_groups) {
         BH_LOG(get_app().get_logger(), DNET_LOG_INFO, "Group metadata download completed");
         clock_stop(m_clock.metadata_download);
