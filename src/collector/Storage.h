@@ -101,6 +101,11 @@ private:
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             uint32_t item_types);
 
+    template<typename SOURCE_ITEM, typename RESULT_ITEM>
+    static void filter_items(std::vector<SOURCE_ITEM*> & source_items,
+            std::vector<RESULT_ITEM*> & result_items,
+            bool & first_pass);
+
 public:
     template<typename T, typename K, typename V>
     static void merge_map(T & self, std::map<K, V> & map, const std::map<K, V> & other_map)

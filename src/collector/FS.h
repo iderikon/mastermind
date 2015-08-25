@@ -77,6 +77,13 @@ public:
     std::set<Backend*> & get_backends()
     { return m_backends; }
 
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<Couple*> & couples) const;
+    void get_items(std::vector<Namespace*> & namespaces) const;
+    void get_items(std::vector<Backend*> & backends) const;
+    void get_items(std::vector<Group*> & groups) const;
+    void get_items(std::vector<Node*> & nodes) const;
+
     void update(const Backend & backend);
     void update_status();
 

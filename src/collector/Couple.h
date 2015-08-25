@@ -23,8 +23,12 @@
 #include <rapidjson/writer.h>
 #include <vector>
 
+class Backend;
 class Filter;
+class FS;
 class Group;
+class Namespace;
+class Node;
 class Storage;
 
 class Couple
@@ -60,6 +64,13 @@ public:
 
     void get_group_ids(std::vector<int> & groups) const;
     void get_groups(std::vector<Group*> & groups) const;
+
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<Group*> & groups) const;
+    void get_items(std::vector<Namespace*> & namespaces) const;
+    void get_items(std::vector<Node*> & nodes) const;
+    void get_items(std::vector<Backend*> & backends) const;
+    void get_items(std::vector<FS*> & filesystems) const;
 
     void update_status();
 

@@ -65,6 +65,35 @@ void Backend::clone_from(const Backend & other)
     m_group->add_backend(*this);
 }
 
+void Backend::get_items(std::vector<Couple*> & couples) const
+{
+    if (m_group != nullptr)
+        m_group->get_items(couples);
+}
+
+void Backend::get_items(std::vector<Namespace*> & namespaces) const
+{
+    if (m_group != nullptr)
+        m_group->get_items(namespaces);
+}
+
+void Backend::get_items(std::vector<Node*> & nodes) const
+{
+    nodes.push_back(&m_node);
+}
+
+void Backend::get_items(std::vector<Group*> & groups) const
+{
+    if (m_group != nullptr)
+        groups.push_back(m_group);
+}
+
+void Backend::get_items(std::vector<FS*> & filesystems) const
+{
+    if (m_fs != nullptr)
+        filesystems.push_back(m_fs);
+}
+
 void Backend::update(const BackendStat & stat)
 {
     double ts1 = double(m_stat.ts_sec) + double(m_stat.ts_usec) / 1000000.0;

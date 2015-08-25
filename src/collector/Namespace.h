@@ -44,6 +44,37 @@ public:
     std::set<Couple*> & get_couples()
     { return m_couples; }
 
+    // NB: get_items() may return duplicates
+
+    void get_items(std::vector<Couple*> & couples) const
+    {
+        couples.insert(couples.end(), m_couples.begin(), m_couples.end());
+    }
+
+    void get_items(std::vector<Node*> & nodes) const
+    {
+        for (Couple *couple : m_couples)
+            couple->get_items(nodes);
+    }
+
+    void get_items(std::vector<Backend*> & backends) const
+    {
+        for (Couple *couple : m_couples)
+            couple->get_items(backends);
+    }
+
+    void get_items(std::vector<Group*> & groups) const
+    {
+        for (Couple *couple : m_couples)
+            couple->get_items(groups);
+    }
+
+    void get_items(std::vector<FS*> & filesystems) const
+    {
+        for (Couple *couple : m_couples)
+            couple->get_items(filesystems);
+    }
+
 private:
     const std::string m_name;
     std::set<Couple*> m_couples;

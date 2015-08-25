@@ -86,6 +86,43 @@ void Couple::get_groups(std::vector<Group*> & groups) const
     groups.assign(m_groups.begin(), m_groups.end());
 }
 
+void Couple::get_items(std::vector<Group*> & groups) const
+{
+    groups.insert(groups.end(), m_groups.begin(), m_groups.end());
+}
+
+void Couple::get_items(std::vector<Namespace*> & namespaces) const
+{
+    if (!m_groups.empty()) {
+        Namespace *ns = m_groups.front()->get_namespace();
+        namespaces.push_back(ns);
+    }
+}
+
+void Couple::get_items(std::vector<Node*> & nodes) const
+{
+    for (Group *group : m_groups) {
+        std::set<Backend*> & backends = group->get_backends();
+        for (Backend *backend : backends)
+            nodes.push_back(&backend->get_node());
+    }
+}
+
+void Couple::get_items(std::vector<Backend*> & backends) const
+{
+    for (Group *group : m_groups)
+        group->get_items(backends);
+}
+
+void Couple::get_items(std::vector<FS*> & filesystems) const
+{
+    for (Group *group : m_groups) {
+        std::set<Backend*> & backends = group->get_backends();
+        for (Backend *backend : backends)
+            backend->get_items(filesystems);
+    }
+}
+
 void Couple::update_status()
 {
     Stopwatch watch(m_update_status_time);

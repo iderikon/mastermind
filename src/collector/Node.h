@@ -89,6 +89,13 @@ public:
     { return m_backends; }
     bool get_backend(int id, Backend *& backend);
 
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<Couple*> & couples);
+    void get_items(std::vector<Namespace*> & namespaces);
+    void get_items(std::vector<Backend*> & backends);
+    void get_items(std::vector<Group*> & groups);
+    void get_items(std::vector<FS*> & filesystems);
+
     void pick_new_backends(std::vector<Backend*> & backends);
 
     void update_filesystems();

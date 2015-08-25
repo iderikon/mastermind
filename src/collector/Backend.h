@@ -19,14 +19,17 @@
 #ifndef __399b96bc_e6ca_4613_afad_b47d434d2bea
 #define __399b96bc_e6ca_4613_afad_b47d434d2bea
 
+class Couple;
 class Group;
 class Filter;
 class FS;
+class Namespace;
 class Node;
 
 #include <cstdint>
 #include <iostream>
 #include <rapidjson/writer.h>
+#include <vector>
 
 struct BackendStat
 {
@@ -91,6 +94,13 @@ public:
     { m_group = group; }
     Group *get_group() const
     { return m_group; }
+
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<Couple*> & couples) const;
+    void get_items(std::vector<Namespace*> & namespaces) const;
+    void get_items(std::vector<Node*> & nodes) const;
+    void get_items(std::vector<Group*> & groups) const;
+    void get_items(std::vector<FS*> & filesystems) const;
 
     const std::string & get_key() const
     { return m_key; }

@@ -103,6 +103,38 @@ void Group::add_backend(Backend & backend)
     m_backends.insert(&backend);
 }
 
+void Group::get_items(std::vector<Couple*> & couples) const
+{
+    if (m_couple != nullptr)
+        couples.push_back(m_couple);
+}
+
+void Group::get_items(std::vector<Namespace*> & namespaces) const
+{
+    if (m_namespace != nullptr)
+        namespaces.push_back(m_namespace);
+}
+
+void Group::get_items(std::vector<Node*> & nodes) const
+{
+    for (Backend *backend : m_backends)
+        nodes.push_back(&backend->get_node());
+}
+
+void Group::get_items(std::vector<Backend*> & backends) const
+{
+    backends.insert(backends.end(), m_backends.begin(), m_backends.end());
+}
+
+void Group::get_items(std::vector<FS*> & filesystems) const
+{
+    for (Backend *backend : m_backends) {
+        FS *fs = backend->get_fs();
+        if (fs != nullptr)
+            filesystems.push_back(fs);
+    }
+}
+
 bool Group::full() const
 {
     for (const Backend *backend : m_backends) {

@@ -170,6 +170,43 @@ bool Node::get_backend(int id, Backend *& backend)
     return false;
 }
 
+void Node::get_items(std::vector<Couple*> & couples)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        const Backend & backend = it->second;
+        backend.get_items(couples);
+    }
+}
+
+void Node::get_items(std::vector<Namespace*> & namespaces)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        const Backend & backend = it->second;
+        backend.get_items(namespaces);
+    }
+}
+
+void Node::get_items(std::vector<Backend*> & backends)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        backends.push_back(&it->second);
+}
+
+void Node::get_items(std::vector<Group*> & groups)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        Group *group = it->second.get_group();
+        if (group != nullptr)
+            groups.push_back(group);
+    }
+}
+
+void Node::get_items(std::vector<FS*> & filesystems)
+{
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+        filesystems.push_back(&it->second);
+}
+
 void Node::pick_new_backends(std::vector<Backend*> & backends)
 {
     backends.clear();
