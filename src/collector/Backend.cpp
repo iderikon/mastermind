@@ -181,56 +181,8 @@ void Backend::merge(const Backend & other)
     }
 }
 
-void Backend::print_info(std::ostream & ostr) const
-{
-    ostr << "Backend {\n"
-            "  node: " << m_node.get_key() << "\n"
-            "  fs: " << (m_fs != NULL ? m_fs->get_key().c_str() : "NULL") << "\n"
-            "  BackendStat {\n"
-            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
-            "    backend_id: " << m_stat.backend_id << "\n"
-            "    state: " << m_stat.state << "\n"
-            "    vfs_blocks: " << m_stat.vfs_blocks << "\n"
-            "    vfs_bavail: " << m_stat.vfs_bavail << "\n"
-            "    vfs_bsize: " << m_stat.vfs_bsize << "\n"
-            "    records_total: " << m_stat.records_total << "\n"
-            "    records_removed: " << m_stat.records_removed << "\n"
-            "    records_removed_size: " << m_stat.records_removed_size << "\n"
-            "    base_size: " << m_stat.base_size << "\n"
-            "    fsid: " << m_stat.fsid << "\n"
-            "    defrag_state: " << m_stat.defrag_state << "\n"
-            "    want_defrag: " << m_stat.want_defrag << "\n"
-            "    read_ios: " << m_stat.read_ios << "\n"
-            "    write_ios: " << m_stat.write_ios << "\n"
-            "    error: " << m_stat.error << "\n"
-            "    blob_size_limit: " << m_stat.blob_size_limit << "\n"
-            "    max_blob_base_size: " << m_stat.max_blob_base_size << "\n"
-            "    blob_size: " << m_stat.blob_size << "\n"
-            "    group: " << m_stat.group << "\n"
-            "  }\n"
-            "  calculated: {"
-            "    vfs_free_space: " << m_calculated.vfs_free_space << "\n"
-            "    vfs_total_space: " << m_calculated.vfs_total_space << "\n"
-            "    vfs_used_space: " << m_calculated.vfs_used_space << "\n"
-            "    records: " << m_calculated.records << "\n"
-            "    free_space: " << m_calculated.free_space << "\n"
-            "    total_space: " << m_calculated.total_space << "\n"
-            "    used_space: " << m_calculated.used_space << "\n"
-            "    effective_space: " << m_calculated.effective_space << "\n"
-            "    effective_free_space: " << m_calculated.effective_free_space << "\n"
-            "    fragmentation: " << m_calculated.fragmentation << "\n"
-            "    read_rps: " << m_calculated.read_rps << "\n"
-            "    write_rps: " << m_calculated.write_rps << "\n"
-            "    max_read_rps: " << m_calculated.max_read_rps << "\n"
-            "    max_write_rps: " << m_calculated.max_write_rps << "\n"
-            "    status: " << status_str(m_calculated.status) << "\n"
-            "    disabled: " << m_disabled << "\n"
-            "    read_only: " << m_read_only << "\n"
-            "  }\n"
-            "}";
-}
-
-void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        bool show_internals) const
 {
     writer.StartObject();
 
@@ -240,6 +192,10 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) co
     writer.Uint64(m_stat.ts_sec);
     writer.Key("tv_usec");
     writer.Uint64(m_stat.ts_usec);
+    if (show_internals) {
+        writer.Key("user_friendly");
+        writer.String(timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec).c_str());
+    }
     writer.EndObject();
 
     writer.Key("node");
@@ -297,6 +253,10 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) co
     writer.Uint64(m_calculated.total_space);
     writer.Key("used_space");
     writer.Uint64(m_calculated.used_space);
+    writer.Key("effective_space");
+    writer.Uint64(m_calculated.effective_space);
+    writer.Key("effective_free_space");
+    writer.Uint64(m_calculated.effective_free_space);
     writer.Key("fragmentation");
     writer.Double(m_calculated.fragmentation);
     writer.Key("read_rps");

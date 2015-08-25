@@ -35,8 +35,13 @@ struct Filter
     };
 
     Filter()
-        : item_types(0)
+        :
+        show_internals(0),
+        item_types(0)
     {}
+
+    uint64_t show_internals;
+    uint32_t item_types;
 
     std::vector<std::string> namespaces;
     std::vector<std::string> couples;
@@ -44,8 +49,6 @@ struct Filter
     std::vector<std::string> backends;
     std::vector<std::string> nodes;
     std::vector<std::string> filesystems;
-
-    uint32_t item_types;
 
     void sort();
     bool empty() const;

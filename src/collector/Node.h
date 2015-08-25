@@ -107,12 +107,12 @@ public:
     std::map<uint64_t, FS> & get_filesystems()
     { return m_filesystems; }
 
-    void print_info(std::ostream & ostr) const;
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             const std::vector<Backend*> & backends,
             const std::vector<FS*> & filesystems,
             bool print_backends,
-            bool print_fs) const;
+            bool print_fs,
+            bool show_internals) const;
 
 public:
     struct ClockStat

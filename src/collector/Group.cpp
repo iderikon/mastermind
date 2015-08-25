@@ -476,54 +476,8 @@ void Group::merge(const Group & other)
     }
 }
 
-void Group::print_info(std::ostream & ostr) const
-{
-    ostr << "Group " << m_id << " {\n"
-            "  couple:   [ ";
-
-    if (m_couple != nullptr) {
-        std::vector<int> group_ids;
-        m_couple->get_group_ids(group_ids);
-        for (size_t i = 0; i < group_ids.size(); ++i)
-            ostr << group_ids[i] << ' ';
-    }
-
-    ostr << "]\n"
-            "  backends: [ ";
-
-    size_t i = 1;
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it, ++i) {
-        if (i != 1)
-            ostr << "              ";
-
-        ostr << (*it)->get_node().get_key() << '/' << (*it)->get_stat().backend_id;
-
-        if (i < m_backends.size())
-            ostr << '\n';
-    }
-    ostr << " ]\n"
-            "  clean: " << std::boolalpha << m_clean << "\n"
-            "  status_text: " << m_status_text << "\n"
-            "  status: " << status_str(m_status) << "\n"
-            "  metadata_process_start: " << m_metadata_process_start << "\n"
-            "  metadata_process_time: " << m_metadata_process_time << "\n"
-            "  frozen: " << m_frozen << "\n"
-            "  version: " << m_version << "\n"
-            "  namespace: ";
-
-    if (m_namespace != nullptr)
-        ostr << m_namespace->get_name() << '\n';
-    else
-        ostr << "<null>\n";
-
-    ostr << "  service: {\n"
-            "    migrating: " << m_service.migrating << "\n"
-            "    job_id: '" << m_service.job_id << "'\n"
-            "  }\n"
-            "}";
-}
-
-void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        bool show_internals) const
 {
     writer.StartObject();
 
@@ -551,6 +505,15 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) cons
     writer.Uint64(m_version);
     writer.Key("namespace");
     writer.String(m_namespace != nullptr ? m_namespace->get_name().c_str() : "");
+
+    if (show_internals) {
+        writer.Key("clean");
+        writer.Bool(m_clean);
+        writer.Key("metadata_process_start");
+        writer.Uint64(m_metadata_process_start);
+        writer.Key("metadata_process_time");
+        writer.Uint64(m_metadata_process_time);
+    }
 
     if (m_service.migrating || !m_service.job_id.empty()) {
         writer.Key("service");

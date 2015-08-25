@@ -42,6 +42,7 @@ public:
         std::vector<Backend*> backends;
         std::vector<Node*> nodes;
         std::vector<FS*> filesystems;
+        std::vector<Namespace*> namespaces;
 
         void sort();
     };
@@ -89,17 +90,17 @@ public:
     void merge(const Storage & other);
     void merge(const Entries & entries);
 
-    void print_json(uint32_t item_types, std::string & str);
-    void print_json(Filter & filter, std::string & str);
+    void print_json(uint32_t item_types, bool show_internals, std::string & str);
+    void print_json(Filter & filter, bool show_internals, std::string & str);
 
 private:
     void handle_backend(Backend & backend);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            Entries & entries, uint32_t item_types);
+            Entries & entries, uint32_t item_types, bool show_internals);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            uint32_t item_types);
+            uint32_t item_types, bool show_internals);
 
     template<typename SOURCE_ITEM, typename RESULT_ITEM>
     static void filter_items(std::vector<SOURCE_ITEM*> & source_items,

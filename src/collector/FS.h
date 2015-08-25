@@ -95,8 +95,8 @@ public:
 
     void merge(const FS & other);
 
-    void print_info(std::ostream & ostr) const;
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            bool show_internals) const;
 
 private:
     Node & m_node;

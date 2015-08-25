@@ -22,29 +22,33 @@
 
 enum FilterKey
 {
-    FilterSec   = 2,
-    ItemTypes   = 4,
-    Namespaces  = 8,
-    Couples     = 0x10,
-    Groups      = 0x20,
-    Backends    = 0x40,
-    Nodes       = 0x80,
-    Filesystems = 0x100
+    FilterSec     = 2,
+    ItemTypes     = 4,
+    Namespaces    = 8,
+    Couples       = 0x10,
+    Groups        = 0x20,
+    Backends      = 0x40,
+    Nodes         = 0x80,
+    Filesystems   = 0x100,
+    Options       = 0x200,
+    ShowInternals = 0x400
 };
 
 static const Parser::Folder filter_1[] = {
     { "filter",     0, FilterSec },
     { "item_types", 0, ItemTypes },
+    { "options",    0, Options   },
     { NULL, 0, 0 }
 };
 
 static const Parser::Folder filter_2[] = {
-    { "namespaces",  FilterSec, Namespaces  },
-    { "couples",     FilterSec, Couples     },
-    { "groups",      FilterSec, Groups      },
-    { "backends",    FilterSec, Backends    },
-    { "nodes",       FilterSec, Nodes       },
-    { "filesystems", FilterSec, Filesystems },
+    { "namespaces",     FilterSec, Namespaces    },
+    { "couples",        FilterSec, Couples       },
+    { "groups",         FilterSec, Groups        },
+    { "backends",       FilterSec, Backends      },
+    { "nodes",          FilterSec, Nodes         },
+    { "filesystems",    FilterSec, Filesystems   },
+    { "show_internals", Options,   ShowInternals },
     { NULL, 0, 0 }
 };
 
@@ -54,6 +58,7 @@ static const Parser::Folder * const filter_folders[] = {
 };
 
 static const Parser::UIntInfo filter_uint_info[] = {
+    { Options|ShowInternals, SET, offsetof(Filter, show_internals) },
     { 0, 0, 0 }
 };
 
@@ -111,6 +116,9 @@ bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy
 
 bool FilterParser::UInteger(uint64_t val)
 {
+    if (m_keys == (Options|ShowInternals|1))
+        return super::UInteger(val);
+
     if (m_array_depth != 1)
         return true;
 

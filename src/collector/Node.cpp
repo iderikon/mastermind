@@ -254,30 +254,12 @@ bool Node::get_fs(uint64_t fsid, FS *& fs)
     return false;
 }
 
-void Node::print_info(std::ostream & ostr) const
-{
-    ostr << "Node {\n"
-            "  host: " << m_host << "\n"
-            "  port: " << m_port << "\n"
-            "  family: " << m_family << "\n"
-            "  Stat {\n"
-            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
-            "    la: " << m_stat.la1 << "\n"
-            "    tx_bytes: " << m_stat.tx_bytes << "\n"
-            "    rx_bytes: " << m_stat.rx_bytes << "\n"
-            "    load_average: " << m_stat.load_average << "\n"
-            "    tx_rate: " << m_stat.tx_rate << "\n"
-            "    rx_rate: " << m_stat.rx_rate << "\n"
-            "  }\n"
-            "  number of backends: " << m_backends.size() << "\n"
-            "}";
-}
-
 void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         const std::vector<Backend*> & backends,
         const std::vector<FS*> & filesystems,
         bool print_backends,
-        bool print_fs) const
+        bool print_fs,
+        bool show_internals) const
 {
     writer.StartObject();
 
@@ -287,6 +269,10 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_stat.ts_sec);
     writer.Key("tv_usec");
     writer.Uint64(m_stat.ts_usec);
+    if (show_internals) {
+        writer.Key("user_friendly");
+        writer.String(timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec).c_str());
+    }
     writer.EndObject();
 
     writer.Key("host");
@@ -307,13 +293,18 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("rx_rate");
     writer.Double(m_stat.rx_rate);
 
+    if (show_internals) {
+        writer.Key("la");
+        writer.Uint64(m_stat.la1);
+    }
+
     if (print_backends) {
         writer.Key("backends");
         writer.StartArray();
         for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
             if (backends.empty() || std::binary_search(backends.begin(),
                         backends.end(), &it->second))
-                it->second.print_json(writer);
+                it->second.print_json(writer, show_internals);
         }
         writer.EndArray();
     }
@@ -324,7 +315,7 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
             if (filesystems.empty() || std::binary_search(filesystems.begin(),
                         filesystems.end(), &it->second))
-                it->second.print_json(writer);
+                it->second.print_json(writer, show_internals);
         }
         writer.EndArray();
     }

@@ -222,20 +222,8 @@ void Couple::merge(const Couple & other)
     m_update_status_time = other.m_update_status_time;
 }
 
-void Couple::print_info(std::ostream & ostr) const
-{
-    ostr << "Couple {\n"
-            "  key: " << m_key << "\n"
-            "  groups: [ ";
-    for (Group *group : m_groups)
-        ostr << group->get_id() << ' ';
-    ostr << "]\n"
-            "  status: " << status_str(m_status) << "\n"
-            "  status_text: '" << m_status_text << "'\n"
-            "}";
-}
-
-void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        bool show_internals) const
 {
     writer.StartObject();
 
@@ -249,6 +237,11 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) con
     writer.String(status_str(m_status));
     writer.Key("status_text");
     writer.String(m_status_text);
+
+    if (show_internals) {
+        writer.Key("update_status_time");
+        writer.Uint64(m_update_status_time);
+    }
 
     writer.EndObject();
 }

@@ -441,21 +441,44 @@ void Storage::select(Filter & filter, Entries & entries)
                 filter_items(namespaces, entries.filesystems, first_pass);
         }
     }
+
+    if (filter.item_types & Filter::Namespace) {
+        if (!filter.namespaces.empty()) {
+            entries.namespaces = namespaces;
+        } else {
+            bool first_pass = true;
+
+            if (!(filter.item_types & Filter::Group) && !groups.empty())
+                filter_items(groups, entries.namespaces, first_pass);
+
+            if (!(filter.item_types & Filter::Node) && !nodes.empty())
+                filter_items(nodes, entries.namespaces, first_pass);
+
+            if (!(filter.item_types & Filter::Backend) && !backends.empty())
+                filter_items(backends, entries.namespaces, first_pass);
+
+            if (!(filter.item_types & Filter::Couple) && !couples.empty())
+                filter_items(couples, entries.namespaces, first_pass);
+
+            if (!(filter.item_types & Filter::FS) && !filesystems.empty())
+                filter_items(filesystems, entries.namespaces, first_pass);
+        }
+    }
 }
 
-void Storage::print_json(uint32_t item_types, std::string & str)
+void Storage::print_json(uint32_t item_types, bool show_internals, std::string & str)
 {
     rapidjson::StringBuffer buf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
 
     writer.StartObject();
-    print_json(writer, item_types);
+    print_json(writer, item_types, show_internals);
     writer.EndObject();
 
     str = buf.GetString();
 }
 
-void Storage::print_json(Filter & filter, std::string & str)
+void Storage::print_json(Filter & filter, bool show_internals, std::string & str)
 {
     filter.sort();
 
@@ -466,14 +489,14 @@ void Storage::print_json(Filter & filter, std::string & str)
     rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
 
     writer.StartObject();
-    print_json(writer, entries, filter.item_types);
+    print_json(writer, entries, filter.item_types, show_internals);
     writer.EndObject();
 
     str = buf.GetString();
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-        Entries & entries, uint32_t item_types)
+        Entries & entries, uint32_t item_types, bool show_internals)
 {
     entries.sort();
 
@@ -482,7 +505,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.StartArray();
         for (Node *node : entries.nodes)
             node->print_json(writer, entries.backends, entries.filesystems,
-                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
+                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS), show_internals);
         writer.EndArray();
     }
 
@@ -490,7 +513,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("groups");
         writer.StartArray();
         for (Group *group : entries.groups)
-            group->print_json(writer);
+            group->print_json(writer, show_internals);
         writer.EndArray();
     }
 
@@ -498,20 +521,28 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("couples");
         writer.StartArray();
         for (Couple *couple : entries.couples)
-            couple->print_json(writer);
+            couple->print_json(writer, show_internals);
+        writer.EndArray();
+    }
+
+    if (!entries.namespaces.empty()) {
+        writer.Key("namespaces");
+        writer.StartArray();
+        for (Namespace *ns : entries.namespaces)
+            writer.String(ns->get_name().c_str());
         writer.EndArray();
     }
 }
 
 void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-        uint32_t item_types)
+        uint32_t item_types, bool show_internals)
 {
     if (!!(item_types & (Filter::Node | Filter::Backend | Filter::FS))) {
         writer.Key("nodes");
         writer.StartArray();
         for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
             it->second.print_json(writer, std::vector<Backend*>(), std::vector<FS*>(),
-                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS));
+                    !!(item_types & Filter::Backend), !!(item_types & Filter::FS), show_internals);
         }
         writer.EndArray();
     }
@@ -520,7 +551,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("groups");
         writer.StartArray();
         for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-            it->second.print_json(writer);
+            it->second.print_json(writer, show_internals);
         writer.EndArray();
     }
 
@@ -528,7 +559,16 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("couples");
         writer.StartArray();
         for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-            it->second.print_json(writer); writer.EndArray();
+            it->second.print_json(writer, show_internals);
+        writer.EndArray();
+    }
+
+    if (!!(item_types & Filter::Namespace)) {
+        writer.Key("namespaces");
+        writer.StartArray();
+        for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
+            writer.String(it->first.c_str());
+        writer.EndArray();
     }
 }
 

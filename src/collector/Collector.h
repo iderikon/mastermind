@@ -29,18 +29,10 @@
 
 class WorkerApplication;
 
-class on_backend_info;
 class on_force_update;
-class on_fs_info;
 class on_get_snapshot;
-class on_group_couple_info;
-class on_group_info;
-class on_list_namespaces;
-class on_list_nodes;
-class on_node_info;
-class on_node_list_backends;
-class on_summary;
 class on_refresh;
+class on_summary;
 
 class Collector
 {
@@ -65,15 +57,7 @@ public:
 public:
     void force_update(std::shared_ptr<on_force_update> handler);
     void get_snapshot(std::shared_ptr<on_get_snapshot> handler);
-    void group_info(std::shared_ptr<on_group_info> handler);
-    void list_nodes(std::shared_ptr<on_list_nodes> handler);
-    void node_info(std::shared_ptr<on_node_info> handler);
     void summary(std::shared_ptr<on_summary> handler);
-    void backend_info(std::shared_ptr<on_backend_info> handler);
-    void fs_info(std::shared_ptr<on_fs_info> handler);
-    void group_couple_info(std::shared_ptr<on_group_couple_info> handler);
-    void list_namespaces(std::shared_ptr<on_list_namespaces> handler);
-    void node_list_backends(std::shared_ptr<on_node_list_backends> handler);
     void refresh(std::shared_ptr<on_refresh> handler);
 
 private:
@@ -84,15 +68,7 @@ private:
 
     static void execute_force_update(void *arg);
     static void execute_get_snapshot(void *arg);
-    static void execute_group_info(void *arg);
-    static void execute_list_nodes(void *arg);
-    static void execute_node_info(void *arg);
     static void execute_summary(void *arg);
-    static void execute_backend_info(void *arg);
-    static void execute_fs_info(void *arg);
-    static void execute_group_couple_info(void *arg);
-    static void execute_list_namespaces(void *arg);
-    static void execute_node_list_backends(void *arg);
 
 private:
     WorkerApplication & m_app;

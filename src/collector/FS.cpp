@@ -125,21 +125,8 @@ void FS::merge(const FS & other)
     }
 }
 
-void FS::print_info(std::ostream & ostr) const
-{
-    ostr << "FS {\n"
-            "  node: " << m_node.get_key() << "\n"
-            "  fsid: " << m_fsid << "\n"
-            "  Stat {\n"
-            "    ts: " << timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec) << "\n"
-            "    total_space: " << m_stat.total_space << "\n"
-            "  }\n"
-            "  number of backends: " << m_backends.size() << "\n"
-            "  status: " << status_str(m_status) << "\n"
-            "}";
-}
-
-void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
+void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+        bool show_internals) const
 {
     writer.StartObject();
 
@@ -149,6 +136,10 @@ void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const
     writer.Uint64(m_stat.ts_sec);
     writer.Key("tv_usec");
     writer.Uint64(m_stat.ts_usec);
+    if (show_internals) {
+        writer.Key("user_friendly");
+        writer.String(timeval_user_friendly(m_stat.ts_sec, m_stat.ts_usec).c_str());
+    }
     writer.EndObject();
 
     writer.Key("host");
