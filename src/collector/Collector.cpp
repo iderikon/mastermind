@@ -30,6 +30,7 @@ Collector::Collector(WorkerApplication & app)
     m_merge_time(0)
 {
     m_queue = dispatch_queue_create("collector", DISPATCH_QUEUE_CONCURRENT);
+    dispatch_set_target_queue(m_queue, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0));
 }
 
 int Collector::init()
