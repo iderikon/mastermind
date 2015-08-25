@@ -76,7 +76,7 @@ Round::ClockStat & Round::ClockStat::operator = (const ClockStat & other)
 Round::Round(Collector & collector)
     :
     m_collector(collector),
-    m_storage(collector.get_storage()),
+    m_old_storage_version(collector.get_storage_version()),
     m_session(collector.get_discovery().get_session().clone()),
     m_type(REGULAR),
     m_epollfd(-1),
@@ -84,13 +84,14 @@ Round::Round(Collector & collector)
     m_timeout_ms(0)
 {
     clock_start(m_clock.total);
+    m_storage.reset(new Storage(collector.get_storage()));
     m_queue = dispatch_queue_create("round", DISPATCH_QUEUE_CONCURRENT);
 }
 
 Round::Round(Collector & collector, std::shared_ptr<on_force_update> handler)
     :
     m_collector(collector),
-    m_storage(collector.get_storage()),
+    m_old_storage_version(collector.get_storage_version()),
     m_session(collector.get_discovery().get_session().clone()),
     m_type(FORCED_FULL),
     m_epollfd(-1),
@@ -98,6 +99,7 @@ Round::Round(Collector & collector, std::shared_ptr<on_force_update> handler)
     m_timeout_ms(0)
 {
     clock_start(m_clock.total);
+    m_storage.reset(new Storage(collector.get_storage()));
     m_queue = dispatch_queue_create("round", DISPATCH_QUEUE_CONCURRENT);
     m_on_force_handler = handler;
 }
@@ -105,7 +107,7 @@ Round::Round(Collector & collector, std::shared_ptr<on_force_update> handler)
 Round::Round(Collector & collector, std::shared_ptr<on_refresh> handler)
     :
     m_collector(collector),
-    m_storage(collector.get_storage()),
+    m_old_storage_version(collector.get_storage_version()),
     m_session(collector.get_discovery().get_session().clone()),
     m_type(FORCED_PARTIAL),
     m_epollfd(-1),
@@ -113,6 +115,7 @@ Round::Round(Collector & collector, std::shared_ptr<on_refresh> handler)
     m_timeout_ms(0)
 {
     clock_start(m_clock.total);
+    m_storage.reset(new Storage(collector.get_storage()));
     m_queue = dispatch_queue_create("round", DISPATCH_QUEUE_CONCURRENT);
     m_on_refresh_handler = handler;
 }
@@ -127,12 +130,20 @@ WorkerApplication & Round::get_app()
     return m_collector.get_app();
 }
 
+void Round::update_storage(Storage & storage, uint64_t version)
+{
+    Stopwatch watch(m_clock.merge_time);
+
+    m_old_storage_version = version;
+    m_storage->merge(storage);
+}
+
 void Round::start()
 {
     BH_LOG(get_app().get_logger(), DNET_LOG_INFO,
             "Starting %s discovery with %lu nodes",
             (m_type == REGULAR) ? "regular" : (m_type == FORCED_FULL) ? "forced full" : "forced partial",
-            (m_type == FORCED_PARTIAL ? m_entries.nodes.size() : m_storage.get_nodes().size()));
+            (m_type == FORCED_PARTIAL ? m_entries.nodes.size() : m_storage->get_nodes().size()));
 
     dispatch_async_f(m_queue, this, &Round::step2_curl_download);
 }
@@ -142,7 +153,7 @@ void Round::step2_curl_download(void *arg)
     Round & self = *static_cast<Round*>(arg);
 
     if (self.m_type == FORCED_PARTIAL)
-        self.m_storage.select(self.m_on_refresh_handler->get_filter(), self.m_entries);
+        self.m_storage->select(self.m_on_refresh_handler->get_filter(), self.m_entries);
 
     self.perform_download();
 
@@ -156,10 +167,10 @@ void Round::step3_prepare_metadata_download(void *arg)
 
     clock_stop(self.m_clock.finish_monitor_stats);
 
-    self.m_storage.update_group_structure();
+    self.m_storage->update_group_structure();
 
     self.m_nr_groups = (self.m_type != FORCED_PARTIAL
-            ? self.m_storage.get_groups().size()
+            ? self.m_storage->get_groups().size()
             : self.m_entries.groups.size());
 
     if (!self.m_nr_groups) {
@@ -177,7 +188,7 @@ void Round::step3_prepare_metadata_download(void *arg)
     self.m_group_read_sessions.reserve(self.m_nr_groups);
 
     if (self.m_type != FORCED_PARTIAL) {
-        std::map<int, Group> & groups = self.m_storage.get_groups();
+        std::map<int, Group> & groups = self.m_storage->get_groups();
         for (auto it = groups.begin(); it != groups.end(); ++it)
             self.m_groups_to_read.push_back(&it->second);
     } else {
@@ -206,9 +217,9 @@ void Round::step4_perform_update(void *arg)
 
     Stopwatch watch(self.m_clock.storage_update);
     if (self.m_type != FORCED_PARTIAL)
-        self.m_storage.update();
+        self.m_storage->update();
     else
-        self.m_storage.update(self.m_entries);
+        self.m_storage->update(self.m_entries);
     watch.stop();
 
     self.m_collector.finalize_round(&self);
@@ -263,7 +274,7 @@ int Round::perform_download()
         for (Node *node : m_entries.nodes)
             add_download(*node);
     } else {
-        std::map<std::string, Node> & storage_nodes = m_storage.get_nodes();
+        std::map<std::string, Node> & storage_nodes = m_storage->get_nodes();
         for (auto it = storage_nodes.begin(); it != storage_nodes.end(); ++it)
             add_download(it->second);
     }

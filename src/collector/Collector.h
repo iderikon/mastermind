@@ -46,7 +46,10 @@ public:
     { return m_discovery; }
 
     Storage & get_storage()
-    { return m_storage; }
+    { return *m_storage; }
+
+    uint64_t get_storage_version() const
+    { return m_storage_version; }
 
     int init();
 
@@ -64,7 +67,8 @@ private:
     static void step1_start_round(void *arg);
     static void step1_start_forced(void *arg);
     static void step1_start_refresh(void *arg);
-    static void step5_merge(void *arg);
+    static void step5_compare_and_swap(void *arg);
+    static void step6_merge_and_try_again(void *arg);
 
     static void execute_force_update(void *arg);
     static void execute_get_snapshot(void *arg);
@@ -74,11 +78,12 @@ private:
     WorkerApplication & m_app;
 
     Discovery m_discovery;
-    Storage m_storage;
     dispatch_queue_t m_queue;
 
+    std::unique_ptr<Storage> m_storage;
+    uint64_t m_storage_version;
+
     Round::ClockStat m_round_clock;
-    uint64_t m_merge_time;
 };
 
 #endif

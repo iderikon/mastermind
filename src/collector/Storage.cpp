@@ -592,13 +592,6 @@ void Storage::merge(const Storage & other)
     merge_map(*this, m_couples, other.m_couples);
 }
 
-void Storage::merge(const Entries & entries)
-{
-    merge_map(*this, m_nodes, entries.nodes);
-    merge_map(*this, m_groups, entries.groups);
-    merge_map(*this, m_couples, entries.couples);
-}
-
 bool Storage::split_node_num(const std::string & key, std::string & node, uint64_t & id)
 {
     size_t slash_pos = key.rfind('/');

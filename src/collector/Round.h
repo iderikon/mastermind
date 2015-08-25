@@ -57,7 +57,15 @@ public:
     WorkerApplication & get_app();
 
     Storage & get_storage()
-    { return m_storage; }
+    { return *m_storage; }
+
+    uint64_t get_old_storage_version() const
+    { return m_old_storage_version; }
+
+    void swap_storage(std::unique_ptr<Storage> & storage)
+    { m_storage.swap(storage); }
+
+    void update_storage(Storage & storage, uint64_t version);
 
     const Storage::Entries & get_entries()
     { return m_entries; }
@@ -66,7 +74,7 @@ public:
     { return m_session; }
 
     void add_node(const char *host, int port, int family)
-    { m_storage.add_node(host, port, family); }
+    { m_storage->add_node(host, port, family); }
 
     Type get_type() const
     { return m_type; }
@@ -117,6 +125,7 @@ public:
         uint64_t finish_monitor_stats;
         uint64_t metadata_download;
         uint64_t storage_update;
+        uint64_t merge_time;
     };
 
     ClockStat & get_clock()
@@ -125,7 +134,9 @@ public:
 private:
     Collector & m_collector;
 
-    Storage m_storage;
+    std::unique_ptr<Storage> m_storage;
+    uint64_t m_old_storage_version;
+
     ioremap::elliptics::session m_session;
 
     Type m_type;

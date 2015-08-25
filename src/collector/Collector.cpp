@@ -26,11 +26,12 @@ Collector::Collector(WorkerApplication & app)
     :
     m_app(app),
     m_discovery(app),
-    m_storage(app),
-    m_merge_time(0)
+    m_storage_version(1)
 {
     m_queue = dispatch_queue_create("collector", DISPATCH_QUEUE_CONCURRENT);
     dispatch_set_target_queue(m_queue, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0));
+
+    m_storage.reset(new Storage(app));
 }
 
 int Collector::init()
@@ -50,7 +51,7 @@ void Collector::start()
 
 void Collector::finalize_round(Round *round)
 {
-    dispatch_barrier_async_f(m_queue, round, &Collector::step5_merge);
+    dispatch_barrier_async_f(m_queue, round, &Collector::step5_compare_and_swap);
 }
 
 void Collector::step1_start_round(void *arg)
@@ -89,21 +90,22 @@ void Collector::step1_start_refresh(void *arg)
     round->start();
 }
 
-void Collector::step5_merge(void *arg)
+void Collector::step5_compare_and_swap(void *arg)
 {
     std::unique_ptr<Round> round(static_cast<Round*>(arg));
     Collector & self = round->get_collector();
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Merging storage");
-
-    Stopwatch watch(self.m_merge_time);
-
-    if (round->get_type() != Round::FORCED_PARTIAL)
-        self.m_storage.merge(round->get_storage());
-    else
-        self.m_storage.merge(round->get_entries());
-
-    watch.stop();
+    if (self.m_storage_version == round->get_old_storage_version()) {
+        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Substituting storage");
+        round->swap_storage(self.m_storage);
+        ++self.m_storage_version;
+    } else {
+        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO,
+                "Collector's storage has newer version %lu (Round's one has %lu)",
+                self.m_storage_version, round->get_old_storage_version());
+        dispatch_async_f(self.m_queue, round.release(), &Collector::step6_merge_and_try_again);
+        return;
+    }
 
     Round::ClockStat & round_clock = round->get_clock();
     clock_stop(round_clock.total);
@@ -130,6 +132,16 @@ void Collector::step5_merge(void *arg)
         handler->response()->write(ostr.str());
         handler->response()->close();
     }
+}
+
+void Collector::step6_merge_and_try_again(void *arg)
+{
+    Round *round = static_cast<Round*>(arg);
+    Collector & self = round->get_collector();
+
+    round->update_storage(*self.m_storage, self.m_storage_version);
+    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Storage updated, scheduling a new CAS");
+    dispatch_barrier_async_f(self.m_queue, round, &Collector::step5_compare_and_swap);
 }
 
 void Collector::force_update(std::shared_ptr<on_force_update> handler)
@@ -162,9 +174,9 @@ void Collector::execute_get_snapshot(void *arg)
     std::string result;
 
     if (filter.empty())
-        self.m_storage.print_json(filter.item_types, !!filter.show_internals, result);
+        self.m_storage->print_json(filter.item_types, !!filter.show_internals, result);
     else
-        self.m_storage.print_json(filter, !!filter.show_internals, result);
+        self.m_storage->print_json(filter, !!filter.show_internals, result);
 
     (*handler_ptr)->response()->write(result);
     (*handler_ptr)->response()->close();
@@ -176,9 +188,9 @@ void Collector::execute_summary(void *arg)
             static_cast<std::shared_ptr<on_summary>*>(arg));
     Collector & self = (*handler_ptr)->get_app().get_collector();
 
-    std::map<std::string, Node> & nodes = self.m_storage.get_nodes();
-    std::map<int, Group> & groups = self.m_storage.get_groups();
-    std::map<std::string, Couple> & couples = self.m_storage.get_couples();
+    std::map<std::string, Node> & nodes = self.m_storage->get_nodes();
+    std::map<int, Group> & groups = self.m_storage->get_groups();
+    std::map<std::string, Couple> & couples = self.m_storage->get_couples();
 
     std::map<Group::Status, int> group_status;
     std::map<Couple::Status, int> couple_status;
@@ -222,7 +234,7 @@ void Collector::execute_summary(void *arg)
         ostr << it->second << ' ' << Couple::status_str(it->first) << ' ';
     ostr << ")\n";
 
-    ostr << self.m_storage.get_namespaces().size() << " namespaces\n";
+    ostr << self.m_storage->get_namespaces().size() << " namespaces\n";
 
     ostr << "Round metrics:\n"
             "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"
@@ -231,7 +243,7 @@ void Collector::execute_summary(void *arg)
                 << MSEC(self.m_round_clock.finish_monitor_stats) << " ms\n"
             "  Metadata download: " << MSEC(self.m_round_clock.metadata_download) << " ms\n"
             "  Storage update: " << MSEC(self.m_round_clock.storage_update) << " ms\n"
-            "  Storage merge: " << MSEC(self.m_merge_time) << " ms\n";
+            "  Storage merge: " << MSEC(self.m_round_clock.merge_time) << " ms\n";
 
     {
         SerialDistribution distrib_procfs_parse;

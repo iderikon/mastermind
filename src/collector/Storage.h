@@ -127,20 +127,6 @@ public:
         }
     }
 
-    template<typename T, typename K, typename V>
-    static void merge_map(T & self, std::map<K, V> & map, const std::vector<V*> & entries)
-    {
-        for (V *entry : entries) {
-            auto my = map.lower_bound(entry->get_key());
-            if (my != map.end() && my->first == entry->get_key()) {
-                my->second.merge(*entry);
-            } else {
-                my = map.insert(my, std::make_pair(entry->get_key(), V(self)));
-                my->second.clone_from(*entry);
-            }
-        }
-    }
-
     static bool split_node_num(const std::string & key, std::string & node, uint64_t & id);
 
 private:
