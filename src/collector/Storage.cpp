@@ -240,11 +240,16 @@ void Storage::filter_items(std::vector<SOURCE_ITEM*> & source_items,
 {
     if (result_items.empty() && !first_pass)
         return;
-    first_pass = false;
 
     std::vector<RESULT_ITEM*> all_items;
     for (SOURCE_ITEM *source_item : source_items)
         source_item->get_items(all_items);
+
+    if (first_pass) {
+        result_items = all_items;
+        first_pass = false;
+        return;
+    }
 
     remove_duplicates(all_items);
     std::vector<RESULT_ITEM*> result_tmp(all_items.size());
