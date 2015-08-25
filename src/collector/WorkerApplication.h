@@ -25,12 +25,13 @@
 #include <cocaine/framework/dispatch.hpp>
 #include <elliptics/logger.hpp>
 
+#include <memory>
+
 class WorkerApplication
 {
 public:
     WorkerApplication();
     WorkerApplication(cocaine::framework::dispatch_t & d);
-    ~WorkerApplication();
 
     void init();
     void start();
@@ -39,7 +40,7 @@ public:
     { return *m_logger; }
 
     void set_logger(ioremap::elliptics::logger_base *logger)
-    { m_logger = logger; }
+    { m_logger.reset(logger); }
 
     ioremap::elliptics::logger_base & get_elliptics_logger()
     { return *m_elliptics_logger; }
@@ -54,8 +55,8 @@ private:
     void load_config();
 
 private:
-    ioremap::elliptics::logger_base *m_logger;
-    ioremap::elliptics::logger_base *m_elliptics_logger;
+    std::unique_ptr<ioremap::elliptics::logger_base> m_logger;
+    std::unique_ptr<ioremap::elliptics::logger_base> m_elliptics_logger;
 
     Config m_config;
     Collector m_collector;

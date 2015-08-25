@@ -23,10 +23,6 @@
 #include <string>
 #include <vector>
 
-#define CONFIG_FILE        "/etc/elliptics/mastermind.conf"
-#define LOG_FILE           "/var/log/mastermind/mastermind-stat.log"
-#define ELLIPTICS_LOG_FILE "/var/log/mastermind/elliptics-stat.log"
-
 struct Config
 {
     struct NodeInfo
@@ -59,6 +55,10 @@ struct Config
     uint64_t io_thread_num;
     uint64_t nonblocking_io_thread_num;
     std::vector<NodeInfo> nodes;
+
+    constexpr static const char *config_file        = "/etc/elliptics/mastermind.conf";
+    constexpr static const char *log_file           = "/var/log/mastermind/mastermind-collector.log";
+    constexpr static const char *elliptics_log_file = "/var/log/mastermind/elliptics-collector.log";
 };
 
 #endif

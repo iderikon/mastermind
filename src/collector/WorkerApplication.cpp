@@ -26,25 +26,7 @@
 #include <rapidjson/filereadstream.h>
 
 #include <cstdio>
-#include <exception>
-
-namespace {
-
-class worker_error : public std::exception
-{
-public:
-    worker_error(const char *text)
-        : m_text(text)
-    {}
-
-    virtual const char *what() const throw()
-    { return m_text; }
-
-private:
-    const char *m_text;
-};
-
-} // unnamed namespace
+#include <stdexcept>
 
 WorkerApplication::WorkerApplication()
     :
@@ -67,24 +49,18 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     start();
 }
 
-WorkerApplication::~WorkerApplication()
-{
-    delete m_elliptics_logger;
-    delete m_logger;
-}
-
 void WorkerApplication::init()
 {
     load_config();
 
-    m_logger = new ioremap::elliptics::file_logger(
-            LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
+    m_logger.reset(new ioremap::elliptics::file_logger(
+            Config::log_file, ioremap::elliptics::log_level(m_config.dnet_log_mask)));
 
-    m_elliptics_logger = new ioremap::elliptics::file_logger(
-            ELLIPTICS_LOG_FILE, ioremap::elliptics::log_level(m_config.dnet_log_mask));
+    m_elliptics_logger.reset(new ioremap::elliptics::file_logger(
+            Config::elliptics_log_file, ioremap::elliptics::log_level(m_config.dnet_log_mask)));
 
     if (m_collector.init())
-        throw worker_error("failed to initialize collector");
+        throw std::runtime_error("failed to initialize collector");
 }
 
 void WorkerApplication::start()
@@ -96,9 +72,9 @@ void WorkerApplication::load_config()
 {
     ConfigParser parser(m_config);
 
-    FILE *f = fopen(CONFIG_FILE, "rb");
+    FILE *f = fopen(Config::config_file, "rb");
     if (f == nullptr)
-        throw worker_error("Cannot open " CONFIG_FILE);
+        throw std::runtime_error(std::string("Cannot open ") + Config::config_file);
 
     static char buf[65536];
     rapidjson::FileReadStream is(f, buf, sizeof(buf));
@@ -108,8 +84,8 @@ void WorkerApplication::load_config()
     fclose(f);
 
     if (!parser.good())
-        throw worker_error("Error parsing " CONFIG_FILE);
+        throw std::runtime_error(std::string("Error parsing ") + Config::config_file);
 
     if (m_config.reserved_space == 0)
-        throw worker_error("Incorrect value 0 for reserved_space");
+        throw std::runtime_error("Incorrect value 0 for reserved_space");
 }
