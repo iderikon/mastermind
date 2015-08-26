@@ -65,7 +65,6 @@ public:
     void bind_groups();
 
     void get_group_ids(std::vector<int> & groups) const;
-    void get_groups(std::vector<Group*> & groups) const;
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<Group*> & groups) const;
@@ -78,9 +77,6 @@ public:
 
     Status get_status() const
     { return m_status; }
-
-    const std::string & get_status_text() const
-    { return m_status_text; }
 
     uint64_t get_update_status_duration() const
     { return m_update_status_duration; }

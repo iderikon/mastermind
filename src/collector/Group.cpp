@@ -314,16 +314,10 @@ void Group::process_metadata()
 
     if (m_couple != nullptr) {
         if (!m_couple->check(couple)) {
-            std::vector<int> couple_groups;
-            m_couple->get_group_ids(couple_groups);
-
             ostr << "Couple in group metadata [ ";
             for (size_t i = 0; i < couple.size(); ++i)
                 ostr << couple[i] << ' ';
-            ostr << "] doesn't match to existing one [ ";
-            for (size_t i = 0; i < couple_groups.size(); ++i)
-                ostr << couple_groups[i] << ' ';
-            ostr << ']';
+            ostr << "] doesn't match to existing one " << m_couple->get_key();
 
             m_status_text = ostr.str();
             m_status = BAD;
@@ -391,21 +385,6 @@ bool Group::check_metadata_equals(const Group & other) const
     return (m_frozen == other.m_frozen &&
             m_couple == other.m_couple &&
             m_namespace == other.m_namespace);
-}
-
-void Group::set_status_text(const std::string & status_text)
-{
-    m_status_text = status_text;
-}
-
-void Group::get_status_text(std::string & status_text) const
-{
-    status_text = m_status_text;
-}
-
-void Group::get_job_id(std::string & job_id) const
-{
-    job_id = m_service.job_id;
 }
 
 void Group::merge(const Group & other, bool & have_newer)

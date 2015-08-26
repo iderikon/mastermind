@@ -96,9 +96,8 @@ public:
     void set_status(Status status)
     { m_status = status; }
 
-    void set_status_text(const std::string & status_text);
-
-    void get_status_text(std::string & status_text) const;
+    void set_status_text(const std::string & status_text)
+    { m_status_text = status_text; }
 
     bool get_frozen() const
     { return m_frozen; }

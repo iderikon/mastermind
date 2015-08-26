@@ -82,11 +82,6 @@ void Couple::get_group_ids(std::vector<int> & groups) const
         groups.push_back(m_groups[i]->get_id());
 }
 
-void Couple::get_groups(std::vector<Group*> & groups) const
-{
-    groups.assign(m_groups.begin(), m_groups.end());
-}
-
 void Couple::get_items(std::vector<Group*> & groups) const
 {
     groups.insert(groups.end(), m_groups.begin(), m_groups.end());
