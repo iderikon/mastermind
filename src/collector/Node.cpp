@@ -72,7 +72,8 @@ void Node::clone_from(const Node & other)
     m_key = other.m_key;
     m_download_data = other.m_download_data;
 
-    merge(other);
+    bool have_newer;
+    merge(other, have_newer);
 }
 
 void Node::update(const NodeStat & stat)
@@ -221,17 +222,19 @@ void Node::update_filesystems()
         it->second.update_status();
 }
 
-void Node::merge(const Node & other)
+void Node::merge(const Node & other, bool & have_newer)
 {
     uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
     uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
     if (my_ts < other_ts) {
         std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
         std::memcpy(&m_clock, &other.m_clock, sizeof(m_clock));
+    } else if (my_ts > other_ts) {
+        have_newer = true;
     }
 
-    Storage::merge_map(*this, m_backends, other.m_backends);
-    Storage::merge_map(*this, m_filesystems, other.m_filesystems);
+    Storage::merge_map(*this, m_backends, other.m_backends, have_newer);
+    Storage::merge_map(*this, m_filesystems, other.m_filesystems, have_newer);
 }
 
 FS *Node::get_fs(uint64_t fsid)

@@ -78,7 +78,8 @@ Storage::Storage(const Storage & other)
     :
     m_app(other.m_app)
 {
-    merge(other);
+    bool have_newer;
+    merge(other, have_newer);
 }
 
 Storage::~Storage()
@@ -585,11 +586,12 @@ void Storage::update_group_structure()
     }
 }
 
-void Storage::merge(const Storage & other)
+void Storage::merge(const Storage & other, bool & have_newer)
 {
-    merge_map(*this, m_nodes, other.m_nodes);
-    merge_map(*this, m_groups, other.m_groups);
-    merge_map(*this, m_couples, other.m_couples);
+    have_newer = false;
+    merge_map(*this, m_nodes, other.m_nodes, have_newer);
+    merge_map(*this, m_groups, other.m_groups, have_newer);
+    merge_map(*this, m_couples, other.m_couples, have_newer);
 }
 
 bool Storage::split_node_num(const std::string & key, std::string & node, uint64_t & id)

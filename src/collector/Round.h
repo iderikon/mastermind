@@ -65,7 +65,7 @@ public:
     void swap_storage(std::unique_ptr<Storage> & storage)
     { m_storage.swap(storage); }
 
-    void update_storage(Storage & storage, uint64_t version);
+    void update_storage(Storage & storage, uint64_t version, bool & have_newer);
 
     const Storage::Entries & get_entries()
     { return m_entries; }

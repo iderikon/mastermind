@@ -89,7 +89,8 @@ Group::Group(Storage & storage)
 void Group::clone_from(const Group & other)
 {
     m_id = other.m_id;
-    merge(other);
+    bool have_newer;
+    merge(other, have_newer);
 }
 
 bool Group::has_backend(Backend & backend) const
@@ -407,10 +408,13 @@ void Group::get_job_id(std::string & job_id) const
     job_id = m_service.job_id;
 }
 
-void Group::merge(const Group & other)
+void Group::merge(const Group & other, bool & have_newer)
 {
-    if (m_metadata_process_start >= other.m_metadata_process_start)
+    if (m_metadata_process_start >= other.m_metadata_process_start) {
+        if (m_metadata_process_start > other.m_metadata_process_start)
+            have_newer = true;
         return;
+    }
 
     m_clean = other.m_clean;
     m_metadata = other.m_metadata;

@@ -21,7 +21,6 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
-#include "Metrics.h"
 #include "Namespace.h"
 #include "Node.h"
 #include "Storage.h"
@@ -33,8 +32,8 @@ Couple::Couple(Storage & storage, const std::vector<Group*> & groups)
     :
     m_storage(storage),
     m_status(INIT),
-    m_status_text(""),
-    m_update_status_time(0)
+    m_modified_time(0),
+    m_update_status_duration(0)
 {
     m_groups = groups;
 }
@@ -44,12 +43,13 @@ Couple::Couple(Storage & storage)
     m_storage(storage),
     m_status(INIT),
     m_status_text(""),
-    m_update_status_time(0)
+    m_update_status_duration(0)
 {}
 
 void Couple::clone_from(const Couple & other)
 {
-    merge(other);
+    bool have_newer;
+    merge(other, have_newer);
 }
 
 bool Couple::check(const std::vector<int> & groups) const
@@ -72,6 +72,7 @@ void Couple::bind_groups()
         if (i != (m_groups.size() - 1))
             m_key += ':';
     }
+    clock_get(m_modified_time);
 }
 
 void Couple::get_group_ids(std::vector<int> & groups) const
@@ -125,11 +126,11 @@ void Couple::get_items(std::vector<FS*> & filesystems) const
 
 void Couple::update_status()
 {
-    Stopwatch watch(m_update_status_time);
+    Stopwatch watch(m_update_status_duration);
 
     if (m_groups.empty()) {
-        m_status = BAD;
-        m_status_text = "Couple has no groups";
+        modify(m_status, BAD);
+        modify(m_status_text, "Couple has no groups");
         return;
     }
 
@@ -142,8 +143,8 @@ void Couple::update_status()
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
         if (!g->check_metadata_equals(*m_groups[i])) {
-            m_status = BAD;
-            m_status_text = "Groups have different metadata";
+            modify(m_status, BAD);
+            modify(m_status_text, "Groups have different metadata");
             return;
         }
 
@@ -153,8 +154,8 @@ void Couple::update_status()
     }
 
     if (have_frozen) {
-        m_status = FROZEN;
-        m_status_text = "Some groups are frozen";
+        modify(m_status, FROZEN);
+        modify(m_status_text, "Some groups are frozen");
         return;
     }
 
@@ -162,8 +163,9 @@ void Couple::update_status()
         if (m_storage.get_app().get_config().forbidden_unmatched_group_total_space) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i]->get_total_space() != m_groups[0]->get_total_space()) {
-                    m_status = BROKEN;
-                    m_status_text = "Couple has unequal total space in groups";
+                    modify(m_status, BROKEN);
+                    modify(m_status_text, "Couple has unequal total space in groups");
+                    return;
                 }
             }
         }
@@ -177,11 +179,11 @@ void Couple::update_status()
         }
 
         if (full) {
-            m_status = FULL;
-            m_status_text = "Couple is FULL";
+            modify(m_status, FULL);
+            modify(m_status_text, "Couple is FULL");
         } else {
-            m_status = OK;
-            m_status_text = "Couple is OK";
+            modify(m_status, OK);
+            modify(m_status_text, "Couple is OK");
         }
         return;
     }
@@ -189,37 +191,45 @@ void Couple::update_status()
     for (size_t i = 0; i < statuses.size(); ++i) {
         Group::Status status = statuses[i];
         if (status == Group::INIT) {
-            m_status = INIT;
-            m_status_text = "Some groups are uninitialized";
+            modify(m_status, INIT);
+            modify(m_status_text, "Some groups are uninitialized");
+            return;
         } else if (status == Group::BAD) {
-            m_status = BAD;
-            m_status_text = "Some groups are in state BAD";
+            modify(m_status, BAD);
+            modify(m_status_text, "Some groups are in state BAD");
+            return;
         } else if (status == Group::BROKEN) {
-            m_status = BROKEN;
-            m_status_text = "Some groups are in state BROKEN";
+            modify(m_status, BROKEN);
+            modify(m_status_text, "Some groups are in state BROKEN");
+            return;
         } else if (status == Group::RO || status == Group::MIGRATING) {
-            m_status = BAD;
-            m_status_text = "Some groups are read-only";
+            modify(m_status, BAD);
+            modify(m_status_text, "Some groups are read-only");
+            return;
         }
     }
 
-    m_status = BAD;
-    m_status_text = "Couple is BAD for unknown reason";
+    modify(m_status, BAD);
+    modify(m_status_text, "Couple is BAD for unknown reason");
 
     // TODO: account job
 }
 
-void Couple::merge(const Couple & other)
+void Couple::merge(const Couple & other, bool & have_newer)
 {
     if (m_groups.size() != other.m_groups.size()) {
         BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
                 "Couple merge: internal inconsistency: different number of groups");
     }
 
-    // XXX timestamp
+    if (m_modified_time > other.m_modified_time) {
+        have_newer = true;
+        return;
+    }
+
     m_status = other.m_status;
     m_status_text = other.m_status_text;
-    m_update_status_time = other.m_update_status_time;
+    m_update_status_duration = other.m_update_status_duration;
 }
 
 void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -236,11 +246,11 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("status");
     writer.String(status_str(m_status));
     writer.Key("status_text");
-    writer.String(m_status_text);
+    writer.String(m_status_text.c_str());
 
     if (show_internals) {
-        writer.Key("update_status_time");
-        writer.Uint64(m_update_status_time);
+        writer.Key("update_status_duration");
+        writer.Uint64(m_update_status_duration);
     }
 
     writer.EndObject();

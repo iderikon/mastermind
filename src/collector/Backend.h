@@ -142,7 +142,7 @@ public:
     Status get_status() const
     { return m_calculated.status; }
 
-    void merge(const Backend & other);
+    void merge(const Backend & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;

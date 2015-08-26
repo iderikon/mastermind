@@ -19,6 +19,8 @@
 #ifndef __558a6717_eede_4557_af95_a7447e1ae5ff
 #define __558a6717_eede_4557_af95_a7447e1ae5ff
 
+#include "Metrics.h"
+
 #include <iostream>
 #include <rapidjson/writer.h>
 #include <vector>
@@ -77,16 +79,26 @@ public:
     Status get_status() const
     { return m_status; }
 
-    const char *get_status_text() const
+    const std::string & get_status_text() const
     { return m_status_text; }
 
-    uint64_t get_update_status_time() const
-    { return m_update_status_time; }
+    uint64_t get_update_status_duration() const
+    { return m_update_status_duration; }
 
-    void merge(const Couple & other);
+    void merge(const Couple & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
+
+private:
+    template <typename T, typename V>
+    void modify(T & member, const V & value)
+    {
+        if (member != value) {
+            member = value;
+            clock_get(m_modified_time);
+        }
+    }
 
 private:
     Storage & m_storage;
@@ -94,9 +106,10 @@ private:
     std::string m_key;
 
     Status m_status;
-    const char *m_status_text;
+    std::string m_status_text;
 
-    uint64_t m_update_status_time;
+    uint64_t m_modified_time;
+    uint64_t m_update_status_duration;
 };
 
 #endif

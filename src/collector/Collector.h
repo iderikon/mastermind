@@ -70,6 +70,8 @@ private:
     static void step5_compare_and_swap(void *arg);
     static void step6_merge_and_try_again(void *arg);
 
+    void schedule_next_round();
+
     static void execute_force_update(void *arg);
     static void execute_get_snapshot(void *arg);
     static void execute_summary(void *arg);

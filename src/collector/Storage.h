@@ -87,7 +87,7 @@ public:
     // select entries matching filter
     void select(Filter & filter, Entries & entries);
 
-    void merge(const Storage & other);
+    void merge(const Storage & other, bool & have_newer);
 
     void print_json(uint32_t item_types, bool show_internals, std::string & str);
     void print_json(Filter & filter, bool show_internals, std::string & str);
@@ -108,7 +108,8 @@ private:
 
 public:
     template<typename T, typename K, typename V>
-    static void merge_map(T & self, std::map<K, V> & map, const std::map<K, V> & other_map)
+    static void merge_map(T & self, std::map<K, V> & map,
+            const std::map<K, V> & other_map, bool & have_newer)
     {
         auto my = map.begin();
         auto other = other_map.begin();
@@ -117,13 +118,16 @@ public:
             while (my != map.end() && my->first < other->first)
                 ++my;
             if (my != map.end() && my->first == other->first) {
-                my->second.merge(other->second);
+                my->second.merge(other->second, have_newer);
             } else {
                 my = map.insert(my, std::make_pair(other->first, V(self)));
                 my->second.clone_from(other->second);
             }
             ++other;
         }
+
+        if (map.size() > other_map.size())
+            have_newer = true;
     }
 
     static bool split_node_num(const std::string & key, std::string & node, uint64_t & id);

@@ -93,7 +93,7 @@ public:
     void set_status(Status status)
     { m_status = status; }
 
-    void merge(const FS & other);
+    void merge(const FS & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;

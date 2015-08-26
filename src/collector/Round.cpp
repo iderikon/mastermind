@@ -130,12 +130,12 @@ WorkerApplication & Round::get_app()
     return m_collector.get_app();
 }
 
-void Round::update_storage(Storage & storage, uint64_t version)
+void Round::update_storage(Storage & storage, uint64_t version, bool & have_newer)
 {
     Stopwatch watch(m_clock.merge_time);
 
     m_old_storage_version = version;
-    m_storage->merge(storage);
+    m_storage->merge(storage, have_newer);
 }
 
 void Round::start()

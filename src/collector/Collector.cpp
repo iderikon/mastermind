@@ -96,7 +96,7 @@ void Collector::step5_compare_and_swap(void *arg)
     Collector & self = round->get_collector();
 
     if (self.m_storage_version == round->get_old_storage_version()) {
-        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Substituting storage");
+        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Swapping storage");
         round->swap_storage(self.m_storage);
         ++self.m_storage_version;
     } else {
@@ -114,8 +114,7 @@ void Collector::step5_compare_and_swap(void *arg)
     if (type == Round::REGULAR || type == Round::FORCED_FULL) {
         self.m_round_clock = round->get_clock();
         if (type == Round::REGULAR) {
-            dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 60000000000L),
-                    self.m_queue, &self, &Collector::step1_start_round);
+            self.schedule_next_round();
         } else {
             std::shared_ptr<on_force_update> handler = round->get_on_force_handler();
 
@@ -139,9 +138,39 @@ void Collector::step6_merge_and_try_again(void *arg)
     Round *round = static_cast<Round*>(arg);
     Collector & self = round->get_collector();
 
-    round->update_storage(*self.m_storage, self.m_storage_version);
+    bool have_newer = false;
+    round->update_storage(*self.m_storage, self.m_storage_version, have_newer);
+
+    if (!have_newer) {
+        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO,
+                "Existing storage is up-to-date, not performing swap");
+        Round::Type type = round->get_type();
+        if (type == Round::REGULAR) {
+            self.schedule_next_round();
+        } else {
+            static const std::string response = "Round completed, but nothing to update yet";
+            if (type == Round::FORCED_FULL) {
+                std::shared_ptr<on_force_update> handler = round->get_on_force_handler();
+                handler->response()->write(response);
+                handler->response()->close();
+            } else {
+                std::shared_ptr<on_refresh> handler = round->get_on_refresh_handler();
+                handler->response()->write(response);
+                handler->response()->close();
+            }
+        }
+    }
+
     BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Storage updated, scheduling a new CAS");
     dispatch_barrier_async_f(self.m_queue, round, &Collector::step5_compare_and_swap);
+}
+
+void Collector::schedule_next_round()
+{
+    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Scheduling next round");
+
+    dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 60000000000L),
+            m_queue, this, &Collector::step1_start_round);
 }
 
 void Collector::force_update(std::shared_ptr<on_force_update> handler)
@@ -272,7 +301,7 @@ void Collector::execute_summary(void *arg)
     {
         SerialDistribution distrib;
         for (auto it = couples.begin(); it != couples.end(); ++it)
-            distrib.add_sample(it->second.get_update_status_time());
+            distrib.add_sample(it->second.get_update_status_duration());
         ostr << "Distribution for couple update_status:\n" << distrib.str() << '\n';
     }
 

@@ -114,7 +114,7 @@ public:
     uint64_t get_metadata_process_time() const
     { return m_metadata_process_time; }
 
-    void merge(const Group & other);
+    void merge(const Group & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;

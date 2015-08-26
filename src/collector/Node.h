@@ -100,7 +100,7 @@ public:
 
     void update_filesystems();
 
-    void merge(const Node & other);
+    void merge(const Node & other, bool & have_newer);
 
     FS *get_fs(uint64_t fsid);
     bool get_fs(uint64_t fsid, FS *& fs);

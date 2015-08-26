@@ -115,13 +115,15 @@ void FS::update_status()
                 m_node.get_key().c_str(), m_fsid, int(prev), int(m_status));
 }
 
-void FS::merge(const FS & other)
+void FS::merge(const FS & other, bool & have_newer)
 {
     uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
     uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
     if (my_ts < other_ts) {
         std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
         m_status = other.m_status;
+    } else if (my_ts > other_ts) {
+        have_newer = true;
     }
 }
 

@@ -104,11 +104,16 @@ private:
 typedef Distribution<int> SerialDistribution;
 typedef Distribution<std::atomic<int>> ConcurrentDistribution;
 
-inline void clock_start(uint64_t & value)
+inline void clock_get(uint64_t & value)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     value = ts.tv_sec * 1000000000 + ts.tv_nsec;
+}
+
+inline void clock_start(uint64_t & value)
+{
+    clock_get(value);
 }
 
 inline void clock_stop(uint64_t & value)
