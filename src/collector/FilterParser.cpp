@@ -99,7 +99,7 @@ bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy
             m_filter.item_types |= Filter::Group;
         else if (length == 6 && !std::strncmp(str, "couple", 6))
             m_filter.item_types |= Filter::Couple;
-        else if (length == 5 && !std::strncmp(str, "namespace", 5))
+        else if (length == 9 && !std::strncmp(str, "namespace", 5))
             m_filter.item_types |= Filter::Namespace;
         else if (length == 4 && !std::strncmp(str, "node", 4))
             m_filter.item_types |= Filter::Node;

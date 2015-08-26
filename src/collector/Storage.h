@@ -88,7 +88,6 @@ public:
     void select(Filter & filter, Entries & entries);
 
     void merge(const Storage & other);
-    void merge(const Entries & entries);
 
     void print_json(uint32_t item_types, bool show_internals, std::string & str);
     void print_json(Filter & filter, bool show_internals, std::string & str);

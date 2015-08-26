@@ -296,6 +296,16 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (show_internals) {
         writer.Key("la");
         writer.Uint64(m_stat.la1);
+
+        writer.Key("clock_stat");
+        writer.StartObject();
+        writer.Key("procfs_parse");
+        writer.Uint64(m_clock.procfs_parse);
+        writer.Key("backend_parse");
+        writer.Uint64(m_clock.backend_parse);
+        writer.Key("update_fs");
+        writer.Uint64(m_clock.update_fs);
+        writer.EndObject();
     }
 
     if (print_backends) {
