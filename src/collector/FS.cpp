@@ -111,8 +111,7 @@ void FS::update_status()
     m_status = (total_space <= m_stat.total_space) ? OK : BROKEN;
     if (m_status != prev)
         BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_INFO,
-                "FS %s/%lu status change %d -> %d",
-                m_node.get_key().c_str(), m_fsid, int(prev), int(m_status));
+                "FS %s status change %d -> %d", m_key.c_str(), int(prev), int(m_status));
 }
 
 void FS::merge(const FS & other, bool & have_newer)
