@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-class Couple;
+class Group;
 
 class Namespace
 {
@@ -35,49 +35,49 @@ public:
     const std::string & get_name() const
     { return m_name; }
 
-    void add_couple(Couple & couple)
-    { m_couples.insert(&couple); }
+    void add_group(Group & group)
+    { m_groups.insert(&group); }
 
-    void remove_couple(Couple & couple)
-    { m_couples.erase(&couple); }
+    void remove_group(Group & group)
+    { m_groups.erase(&group); }
 
-    std::set<Couple*> & get_couples()
-    { return m_couples; }
+    std::set<Group*> & get_groups()
+    { return m_groups; }
 
     // NB: get_items() may return duplicates
 
-    void get_items(std::vector<Couple*> & couples) const
+    void get_items(std::vector<Group*> & groups) const
     {
-        couples.insert(couples.end(), m_couples.begin(), m_couples.end());
+        groups.insert(groups.end(), m_groups.begin(), m_groups.end());
     }
 
     void get_items(std::vector<Node*> & nodes) const
     {
-        for (Couple *couple : m_couples)
-            couple->get_items(nodes);
+        for (Group *group : m_groups)
+            group->get_items(nodes);
     }
 
     void get_items(std::vector<Backend*> & backends) const
     {
-        for (Couple *couple : m_couples)
-            couple->get_items(backends);
-    }
-
-    void get_items(std::vector<Group*> & groups) const
-    {
-        for (Couple *couple : m_couples)
-            couple->get_items(groups);
+        for (Group *group : m_groups)
+            group->get_items(backends);
     }
 
     void get_items(std::vector<FS*> & filesystems) const
     {
-        for (Couple *couple : m_couples)
-            couple->get_items(filesystems);
+        for (Group *group : m_groups)
+            group->get_items(filesystems);
+    }
+
+    void get_items(std::vector<Couple*> & couples) const
+    {
+        for (Group *group : m_groups)
+            group->get_items(couples);
     }
 
 private:
     const std::string m_name;
-    std::set<Couple*> m_couples;
+    std::set<Group*> m_groups;
 };
 
 #endif

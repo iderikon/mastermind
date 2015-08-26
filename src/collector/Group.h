@@ -46,8 +46,8 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Group(Storage & storage, int id);
-    Group(Storage & storage);
+    Group(int id);
+    Group();
 
     void clone_from(const Group & other);
 
@@ -57,6 +57,36 @@ public:
     int get_key() const
     { return m_id; }
 
+    bool has_backend(Backend & backend) const;
+    void add_backend(Backend & backend);
+
+    std::set<Backend*> & get_backends()
+    { return m_backends; }
+
+    void metadata_download_failed(const std::string & why);
+
+    void save_metadata(const char *metadata, size_t size);
+    int parse_metadata();
+
+    bool metadata_parsed() const
+    { return m_metadata_parsed; }
+
+    const std::string & get_namespace_name() const
+    { return m_metadata.namespace_name; }
+
+    void set_namespace(Namespace *ns)
+    { m_namespace = ns; }
+
+    Namespace *get_namespace()
+    { return m_namespace; }
+
+    void update_status(bool forbidden_dht);
+
+    const std::vector<int> & get_couple_group_ids() const
+    { return m_metadata.couple; }
+
+    int check_metadata_equals(const Group & other);
+
     Status get_status() const
     { return m_status; }
 
@@ -65,17 +95,6 @@ public:
 
     Couple *get_couple()
     { return m_couple; }
-
-    Namespace *get_namespace()
-    { return m_namespace; }
-
-    void set_namespace(Namespace *ns)
-    { m_namespace = ns; }
-
-    bool has_backend(Backend & backend) const;
-    void add_backend(Backend & backend);
-    std::set<Backend*> & get_backends()
-    { return m_backends; }
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<Couple*> & couples) const;
@@ -87,31 +106,17 @@ public:
     bool full() const;
     uint64_t get_total_space() const;
 
-    void save_metadata(const char *metadata, size_t size);
-
-    void process_metadata();
-
-    bool check_metadata_equals(const Group & other) const;
-
-    void set_status(Status status)
-    { m_status = status; }
-
-    void set_status_text(const std::string & status_text)
-    { m_status_text = status_text; }
-
     bool get_frozen() const
-    { return m_frozen; }
+    { return m_metadata.frozen; }
 
     int get_version() const
-    { return m_version; }
+    { return m_metadata.version; }
 
     bool get_service_migrating() const
-    { return m_service.migrating; }
+    { return m_metadata.service.migrating; }
 
-    void get_job_id(std::string & job_id) const;
-
-    uint64_t get_metadata_process_time() const
-    { return m_metadata_process_time; }
+    uint64_t get_metadata_parse_duration() const
+    { return m_metadata_parse_duration; }
 
     void merge(const Group & other, bool & have_newer);
 
@@ -119,29 +124,33 @@ public:
             bool show_internals) const;
 
 private:
-    Storage & m_storage;
-
     int m_id;
-    Couple *m_couple;
-
     std::set<Backend*> m_backends;
 
     bool m_clean;
-    std::vector<char> m_metadata;
-    std::string m_status_text;
-    Status m_status;
+    std::vector<char> m_metadata_file;
+    uint64_t m_metadata_download_time;
 
-    uint64_t m_metadata_process_start;
-    uint64_t m_metadata_process_time;
+    // values extracted from file
+    struct {
+        int version;
+        bool frozen;
+        std::vector<int> couple;
+        std::string namespace_name;
+        struct {
+            bool migrating;
+            std::string job_id;
+        } service;
+    } m_metadata;
 
-    bool m_frozen;
-    int m_version;
+    bool m_metadata_parsed;
+    uint64_t m_metadata_parse_duration;
+
+    Couple *m_couple;
     Namespace *m_namespace;
 
-    struct {
-        bool migrating;
-        std::string job_id;
-    } m_service;
+    std::string m_status_text;
+    Status m_status;
 };
 
 #endif

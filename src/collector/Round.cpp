@@ -216,10 +216,13 @@ void Round::step4_perform_update(void *arg)
     self.m_group_read_sessions.clear();
 
     Stopwatch watch(self.m_clock.storage_update);
+    self.m_storage->update();
+#if 0 // TODO
     if (self.m_type != FORCED_PARTIAL)
         self.m_storage->update();
     else
         self.m_storage->update(self.m_entries);
+#endif
     watch.stop();
 
     self.m_collector.finalize_round(&self);
@@ -441,11 +444,8 @@ void Round::result(size_t group_idx, const elliptics::read_result_entry & entry)
 
 void Round::final(size_t group_idx, const elliptics::error_info & error)
 {
-    if (error) {
-        std::ostringstream ostr;
-        ostr << "Metadata download failed: " << error.message();
-        m_groups_to_read[group_idx]->set_status_text(ostr.str());
-    }
+    if (error)
+        m_groups_to_read[group_idx]->metadata_download_failed(error.message());
 
     if (! --m_nr_groups) {
         BH_LOG(get_app().get_logger(), DNET_LOG_INFO, "Group metadata download completed");

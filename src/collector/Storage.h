@@ -79,7 +79,7 @@ public:
 
     // process downloaded metadata, recalculate states, etc.
     void update();
-    void update(const Entries & entries);
+    // void update(const Entries & entries);
 
     // group_ids must be sorted
     void create_couple(const std::vector<int> & groups_ids, Group *group);
@@ -105,6 +105,9 @@ private:
     static void filter_items(std::vector<SOURCE_ITEM*> & source_items,
             std::vector<RESULT_ITEM*> & result_items,
             bool & first_pass);
+
+    void merge_groups(const Storage & other_storage, bool & have_newer);
+    void merge_couples(const Storage & other_storage, bool & have_newer);
 
 public:
     template<typename T, typename K, typename V>

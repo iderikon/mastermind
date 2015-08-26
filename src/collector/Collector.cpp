@@ -294,7 +294,7 @@ void Collector::execute_summary(void *arg)
     {
         SerialDistribution distrib;
         for (auto it = groups.begin(); it != groups.end(); ++it)
-            distrib.add_sample(it->second.get_metadata_process_time());
+            distrib.add_sample(it->second.get_metadata_parse_duration());
         ostr << "Distribution for group metadata processing:\n" << distrib.str() << '\n';
     }
 

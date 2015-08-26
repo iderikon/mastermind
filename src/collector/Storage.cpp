@@ -119,7 +119,7 @@ void Storage::handle_backend(Backend & backend)
     if (it != m_groups.end() && it->first == int(backend.get_stat().group)) {
         it->second.add_backend(backend);
     } else {
-        it = m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(*this, backend.get_stat().group)));
+        it = m_groups.insert(it, std::make_pair(backend.get_stat().group, Group(backend.get_stat().group)));
         it->second.add_backend(backend);
     }
 
@@ -140,7 +140,7 @@ Group & Storage::get_group(int id)
 {
     auto it = m_groups.lower_bound(id);
     if (it == m_groups.end() || it->first != id)
-        it = m_groups.insert(it, std::make_pair(id, Group(*this, id)));
+        it = m_groups.insert(it, std::make_pair(id, Group(id)));
     return it->second;
 }
 
@@ -179,15 +179,79 @@ void Storage::update()
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
         it->second.update_filesystems();
 
-    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        it->second.process_metadata();
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
+        Group & group = it->second;
+        if (group.parse_metadata() != 0)
+            continue;
+
+        const std::string & metadata_ns = group.get_namespace_name();
+        Namespace *ns = group.get_namespace();
+        if (ns == nullptr || ns->get_name() != metadata_ns) {
+            ns = &get_namespace(metadata_ns);
+            group.set_namespace(ns);
+            ns->add_group(group);
+        }
+
+        group.update_status(m_app.get_config().forbidden_dht_groups);
+    }
+
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
+        Group & group = it->second;
+        if (!group.metadata_parsed())
+            continue;
+
+        const std::vector<int> & group_ids = group.get_couple_group_ids();
+        if (group_ids.empty())
+            continue;
+
+        std::vector<Group*> groups(group_ids.size());
+        for (size_t i = 0; i < group_ids.size(); ++i) {
+            int id = group_ids[i];
+            if (id == it->first)
+                groups[i] = &group;
+            else
+                groups[i] = &get_group(id);
+        }
+
+        Couple *couple0 = groups[0]->get_couple();
+        if (couple0 != nullptr) {
+            bool equal = true;
+            for (size_t i = 1; i < groups.size(); ++i) {
+                if (groups[i]->get_couple() != couple0) {
+                    equal = false;
+                    break;
+                }
+            }
+            if (equal)
+                continue;
+        }
+
+        bool md_ok = true;
+        for (size_t i = 1; i < groups.size(); ++i) {
+            if (groups[0]->check_metadata_equals(*groups[i]) != 0) {
+                md_ok = false;
+                break;
+            }
+        }
+        if (!md_ok)
+            continue;
+
+        std::string key = CoupleKey(group_ids);
+        auto it = m_couples.lower_bound(key);
+        if (it == m_couples.end() || it->first != key) {
+            it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
+            for (Group *group : groups)
+                group->set_couple(&it->second);
+        }
+    }
 
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        it->second.update_status();
+        it->second.update_status(m_app.get_config().forbidden_unmatched_group_total_space);
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }
 
+#if 0
 void Storage::update(const Entries & entries)
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
@@ -203,36 +267,7 @@ void Storage::update(const Entries & entries)
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }
-
-void Storage::create_couple(const std::vector<int> & group_ids, Group *group)
-{
-    std::vector<Group*> groups;
-    groups.reserve(group_ids.size());
-
-    for (int id : group_ids) {
-        if (id == group->get_id()) {
-            groups.push_back(group);
-        } else {
-            auto it = m_groups.lower_bound(id);
-            if (it == m_groups.end() || it->first != id)
-                it = m_groups.insert(it, std::make_pair(id, Group(*this, id)));
-            groups.push_back(&it->second);
-        }
-    }
-
-    std::string key = CoupleKey(group_ids);
-
-    auto it = m_couples.lower_bound(key);
-    if (it == m_couples.end() || it->first != key) {
-        it = m_couples.insert(it, std::make_pair(key, Couple(*this, groups)));
-
-        Couple & couple = it->second;
-        couple.bind_groups();
-        Namespace *ns = group->get_namespace();
-        if (ns != nullptr)
-            ns->add_couple(couple);
-    }
-}
+#endif
 
 template<typename SOURCE_ITEM, typename RESULT_ITEM>
 void Storage::filter_items(std::vector<SOURCE_ITEM*> & source_items,
@@ -586,12 +621,75 @@ void Storage::update_group_structure()
     }
 }
 
+void Storage::merge_groups(const Storage & other_storage, bool & have_newer)
+{
+    auto my = m_groups.begin();
+    auto other = other_storage.m_groups.begin();
+
+    while (other != other_storage.m_groups.end()) {
+        while (my != m_groups.end() && my->first < other->first)
+            ++my;
+        if (my != m_groups.end() && my->first == other->first) {
+            my->second.merge(other->second, have_newer);
+        } else {
+            const Group & other_group = other->second;
+            my = m_groups.insert(my, std::make_pair(other->first, Group(other_group.get_id())));
+            my->second.merge(other_group, have_newer);
+        }
+        ++other;
+    }
+
+    if (m_groups.size() > other_storage.m_groups.size())
+        have_newer = true;
+}
+
+void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
+{
+    auto my = m_couples.begin();
+    auto other = other_storage.m_couples.begin();
+    while (other != other_storage.m_couples.end()) {
+        while (my != m_couples.end() && my->first < other->first)
+            ++my;
+        if (my != m_couples.end() && my->first == other->first) {
+            my->second.merge(other->second, have_newer);
+        } else {
+            const Couple & other_couple = other->second;
+            const std::vector<Group*> & other_groups = other_couple.get_groups();
+
+            std::vector<Group*> my_groups;
+            my_groups.reserve(other_groups.size());
+
+            for (size_t i = 0; i < other_groups.size(); ++i) {
+                int id = other_groups[i]->get_id();
+                auto gr = m_groups.find(id);
+
+                if (gr != m_groups.end()) {
+                    my_groups.push_back(&gr->second);
+                } else {
+                    BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                            "Merge storage: internal inconsistency: have no group %d for couple", id);
+                }
+            }
+
+            my = m_couples.insert(my, std::make_pair(other_couple.get_key(), Couple(my_groups)));
+            Couple & my_couple = my->second;
+
+            for (Group *group : my_groups)
+                group->set_couple(&my_couple);
+
+            my_couple.merge(other_couple, have_newer);
+        }
+    }
+    if (m_couples.size() > other_storage.m_couples.size())
+        have_newer = true;
+}
+
 void Storage::merge(const Storage & other, bool & have_newer)
 {
     have_newer = false;
     merge_map(*this, m_nodes, other.m_nodes, have_newer);
-    merge_map(*this, m_groups, other.m_groups, have_newer);
-    merge_map(*this, m_couples, other.m_couples, have_newer);
+    merge_groups(other, have_newer);
+    merge_couples(other, have_newer);
 }
 
 bool Storage::split_node_num(const std::string & key, std::string & node, uint64_t & id)

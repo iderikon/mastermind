@@ -23,33 +23,21 @@
 #include "Group.h"
 #include "Namespace.h"
 #include "Node.h"
-#include "Storage.h"
-#include "WorkerApplication.h"
 
 #include <algorithm>
 
-Couple::Couple(Storage & storage, const std::vector<Group*> & groups)
+Couple::Couple(const std::vector<Group*> & groups)
     :
-    m_storage(storage),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
 {
+    for (size_t i = 0; i < groups.size(); ++i) {
+        m_key += std::to_string(groups[i]->get_id());
+        if (i != (m_groups.size() - 1))
+            m_key += ':';
+    }
     m_groups = groups;
-}
-
-Couple::Couple(Storage & storage)
-    :
-    m_storage(storage),
-    m_status(INIT),
-    m_status_text(""),
-    m_update_status_duration(0)
-{}
-
-void Couple::clone_from(const Couple & other)
-{
-    bool have_newer;
-    merge(other, have_newer);
 }
 
 bool Couple::check(const std::vector<int> & groups) const
@@ -61,25 +49,6 @@ bool Couple::check(const std::vector<int> & groups) const
             return false;
 
     return true;
-}
-
-void Couple::bind_groups()
-{
-    m_key.clear();
-    for (size_t i = 0; i < m_groups.size(); ++i) {
-        m_groups[i]->set_couple(this);
-        m_key += std::to_string(m_groups[i]->get_id());
-        if (i != (m_groups.size() - 1))
-            m_key += ':';
-    }
-    clock_get(m_modified_time);
-}
-
-void Couple::get_group_ids(std::vector<int> & groups) const
-{
-    groups.reserve(m_groups.size());
-    for (size_t i = 0; i < m_groups.size(); ++i)
-        groups.push_back(m_groups[i]->get_id());
 }
 
 void Couple::get_items(std::vector<Group*> & groups) const
@@ -119,7 +88,7 @@ void Couple::get_items(std::vector<FS*> & filesystems) const
     }
 }
 
-void Couple::update_status()
+void Couple::update_status(bool forbidden_unmatched_total)
 {
     Stopwatch watch(m_update_status_duration);
 
@@ -137,7 +106,7 @@ void Couple::update_status()
     bool have_frozen = g->get_frozen();
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
-        if (!g->check_metadata_equals(*m_groups[i])) {
+        if (g->check_metadata_equals(*m_groups[i]) != 0) {
             modify(m_status, BAD);
             modify(m_status_text, "Groups have different metadata");
             return;
@@ -155,7 +124,7 @@ void Couple::update_status()
     }
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
-        if (m_storage.get_app().get_config().forbidden_unmatched_group_total_space) {
+        if (forbidden_unmatched_total) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i]->get_total_space() != m_groups[0]->get_total_space()) {
                     modify(m_status, BROKEN);
@@ -212,11 +181,6 @@ void Couple::update_status()
 
 void Couple::merge(const Couple & other, bool & have_newer)
 {
-    if (m_groups.size() != other.m_groups.size()) {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Couple merge: internal inconsistency: different number of groups");
-    }
-
     if (m_modified_time > other.m_modified_time) {
         have_newer = true;
         return;

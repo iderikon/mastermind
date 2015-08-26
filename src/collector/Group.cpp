@@ -54,43 +54,20 @@ bool parse_couple(msgpack::object & obj, std::vector<int> & couple)
 
 } // unnamed namespace
 
-Group::Group(Storage & storage, int id)
+Group::Group(int id)
     :
-    m_storage(storage),
     m_id(id),
-    m_couple(nullptr),
     m_clean(true),
-    m_status(INIT),
-    m_metadata_process_start(0),
-    m_metadata_process_time(0),
-    m_frozen(false),
-    m_version(0),
-    m_namespace(nullptr)
-{
-    m_service.migrating = false;
-}
-
-Group::Group(Storage & storage)
-    :
-    m_storage(storage),
-    m_id(0),
+    m_metadata_download_time(0),
+    m_metadata_parsed(false),
+    m_metadata_parse_duration(0),
     m_couple(nullptr),
-    m_clean(true),
-    m_status(INIT),
-    m_metadata_process_start(0),
-    m_metadata_process_time(0),
-    m_frozen(false),
-    m_version(0),
-    m_namespace(nullptr)
+    m_namespace(nullptr),
+    m_status(INIT)
 {
-    m_service.migrating = false;
-}
-
-void Group::clone_from(const Group & other)
-{
-    m_id = other.m_id;
-    bool have_newer;
-    merge(other, have_newer);
+    m_metadata.version = 0;
+    m_metadata.frozen = false;
+    m_metadata.service.migrating = false;
 }
 
 bool Group::has_backend(Backend & backend) const
@@ -154,35 +131,44 @@ uint64_t Group::get_total_space() const
     return res;
 }
 
+void Group::metadata_download_failed(const std::string & why)
+{
+    if (m_status == INIT) {
+        std::ostringstream ostr;
+        ostr << "Metadata download failed: " << why;
+        m_status_text = ostr.str();
+    }
+}
+
 void Group::save_metadata(const char *metadata, size_t size)
 {
-    if (m_clean && !m_metadata.empty() && m_metadata.size() == size &&
-            !std::memcmp(&m_metadata[0], metadata, size))
+    if (m_clean && !m_metadata_file.empty() && m_metadata_file.size() == size &&
+            !std::memcmp(&m_metadata_file[0], metadata, size))
         return;
 
-    m_metadata.assign(metadata, metadata + size);
+    clock_get(m_metadata_download_time);
+    m_metadata_file.assign(metadata, metadata + size);
     m_clean = false;
 }
 
-void Group::process_metadata()
+int Group::parse_metadata()
 {
     if (m_clean)
-        return;
-
-    clock_start(m_metadata_process_start);
-    Stopwatch watch(m_metadata_process_time);
+        return 0;
 
     m_clean = true;
+    m_metadata_parsed = false;
 
-    std::ostringstream ostr;
+    Stopwatch watch(m_metadata_parse_duration);
 
     m_status_text.clear();
 
     msgpack::unpacked result;
     msgpack::object obj;
 
+    std::ostringstream ostr;
     try {
-        msgpack::unpack(&result, &m_metadata[0], m_metadata.size());
+        msgpack::unpack(&result, &m_metadata_file[0], m_metadata_file.size());
         obj = result.get();
     } catch (std::exception & e) {
         ostr << "msgpack could not parse group metadata: " << e.what();
@@ -193,7 +179,7 @@ void Group::process_metadata()
     if (!ostr.str().empty()) {
         m_status_text = ostr.str();
         m_status = BAD;
-        return;
+        return -1;
     }
 
     int version = 0;
@@ -265,8 +251,7 @@ void Group::process_metadata()
                         }
                         else if (srv_size == 6 && !std::strncmp(srv_ptr, "job_id", 6)) {
                             if (srv_kv.val.type == msgpack::type::RAW) {
-                                service_job_id.assign(
-                                        srv_kv.val.via.raw.ptr, srv_kv.val.via.raw.size);
+                                service_job_id.assign(srv_kv.val.via.raw.ptr, srv_kv.val.via.raw.size);
                             } else {
                                 ostr << "Invalid 'job_id' value type " << srv_kv.val.type;
                                 ok = false;
@@ -293,49 +278,32 @@ void Group::process_metadata()
     if (!ostr.str().empty()) {
         m_status_text = ostr.str();
         m_status = BAD;
-        return;
+        return -1;
     }
 
-    m_version = version;
-    m_frozen = frozen;
-    m_service.migrating = service_migrating;
-    m_service.job_id = service_job_id;
+    m_metadata.version = version;
+    m_metadata.frozen = frozen;
+    m_metadata.couple = couple;
+    m_metadata.namespace_name = ns;
+    m_metadata.service.migrating = service_migrating;
+    m_metadata.service.job_id = service_job_id;
+    m_metadata_parsed = true;
 
-    if (m_namespace == nullptr) {
-        m_namespace = &m_storage.get_namespace(ns);
-    } else if (m_namespace->get_name() != ns) {
-        m_status = BAD;
-        ostr << "Group moved to another namespace: '"
-             << m_namespace->get_name() << "' -> '"
-             << ns << '\'';
-        m_status_text = ostr.str();
-        return;
-    }
+    return 0;
+}
 
-    if (m_couple != nullptr) {
-        if (!m_couple->check(couple)) {
-            ostr << "Couple in group metadata [ ";
-            for (size_t i = 0; i < couple.size(); ++i)
-                ostr << couple[i] << ' ';
-            ostr << "] doesn't match to existing one " << m_couple->get_key();
-
-            m_status_text = ostr.str();
-            m_status = BAD;
-
-            return;
-        }
-    } else {
-        m_storage.create_couple(couple, this);
-    }
-
+void Group::update_status(bool forbidden_dht)
+{
     if (m_backends.empty()) {
         m_status = INIT;
         m_status_text = "No node backends";
-    } else if (m_backends.size() > 1 && m_storage.get_app().get_config().forbidden_dht_groups) {
+    } else if (m_backends.size() > 1 && forbidden_dht) {
         m_status = BROKEN;
 
+        std::ostringstream ostr;
         ostr << "DHT groups are forbidden but the group has " << m_backends.size() << " backends";
         m_status_text = ostr.str();
+        return;
     } else {
         bool have_bad = false;
         bool have_ro = false;
@@ -357,9 +325,11 @@ void Group::process_metadata()
             m_status = BROKEN;
             m_status_text = "Some of backends are in state BROKEN";
         } else if (have_ro) {
-            if (m_service.migrating) {
+            if (m_metadata.service.migrating) {
                 m_status = MIGRATING;
-                ostr << "Group is migrating, job id is '" << m_service.job_id << '\'';
+
+                std::ostringstream ostr;
+                ostr << "Group is migrating, job id is '" << m_metadata.service.job_id << '\'';
                 m_status_text = ostr.str();
                 // TODO: check whether the job was initiated
             } else {
@@ -377,86 +347,50 @@ void Group::process_metadata()
     }
 }
 
-bool Group::check_metadata_equals(const Group & other) const
+int Group::check_metadata_equals(const Group & other)
 {
     if (m_status == INIT || other.m_status == INIT)
-        return true;
+        return 0;
 
-    return (m_frozen == other.m_frozen &&
-            m_couple == other.m_couple &&
-            m_namespace == other.m_namespace);
+    if (m_metadata.frozen != other.m_metadata.frozen ||
+            m_metadata.couple != other.m_metadata.couple ||
+            m_metadata.namespace_name != other.m_metadata.namespace_name) {
+        std::ostringstream ostr;
+        ostr << "Groups " << m_id << " and " << other.m_id << " have different metadata";
+        m_status_text = ostr.str();
+        m_status = BAD;
+        return -1;
+    }
+
+    return 0;
 }
 
 void Group::merge(const Group & other, bool & have_newer)
 {
-    if (m_metadata_process_start >= other.m_metadata_process_start) {
-        if (m_metadata_process_start > other.m_metadata_process_start)
-            have_newer = true;
+    if (m_metadata_download_time > other.m_metadata_download_time) {
+        have_newer = true;
         return;
     }
 
+    if (m_metadata_download_time == other.m_metadata_download_time)
+        return;
+
     m_clean = other.m_clean;
-    m_metadata = other.m_metadata;
+    m_metadata_file = other.m_metadata_file;
+    m_metadata_download_time = other.m_metadata_download_time;
+
+    m_metadata.version = other.m_metadata.version;
+    m_metadata.frozen = other.m_metadata.frozen;
+    m_metadata.couple = other.m_metadata.couple;
+    m_metadata.namespace_name = other.m_metadata.namespace_name;
+    m_metadata.service.migrating = other.m_metadata.service.migrating;
+    m_metadata.service.job_id = other.m_metadata.service.job_id;
+
+    m_metadata_parsed = other.m_metadata_parsed;
+    m_metadata_parse_duration = other.m_metadata_parse_duration;
+
     m_status_text = other.m_status_text;
     m_status = other.m_status;
-
-    m_metadata_process_start = other.m_metadata_process_start;
-    m_metadata_process_time = other.m_metadata_process_time;
-
-    m_frozen = other.m_frozen;
-    m_version = other.m_version;
-    m_service.migrating = other.m_service.migrating;
-    m_service.job_id = other.m_service.job_id;
-
-    if (other.m_couple != nullptr) {
-        if (m_couple == nullptr) {
-            Couple *couple = nullptr;
-            if (m_storage.get_couple(other.m_couple->get_key(), couple)) {
-                m_couple = couple;
-            } else {
-                std::vector<int> group_ids;
-                other.m_couple->get_group_ids(group_ids);
-                m_storage.create_couple(group_ids, this);
-                // Storage::create_couple invokes Couple::bind_groups, so no need to set m_couple here
-            }
-        } else {
-            // TODO: m_couple != nullptr && m_couple->m_key != other.m_couple->m_key
-            if (m_couple->get_key() != other.m_couple->get_key()) {
-                BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                        "Group merge: unhandled case: group has moved from couple %s to couple %s",
-                        m_couple->get_key().c_str(), other.m_couple->get_key().c_str());
-            }
-        }
-    } else if (m_couple != nullptr) {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Group merge: unhandled case: group has gone from couple %s", m_couple->get_key().c_str());
-        // TODO
-    }
-
-    if (other.m_namespace != nullptr) {
-        if (m_namespace == nullptr) {
-            m_namespace = &m_storage.get_namespace(other.m_namespace->get_name());
-        } else {
-            // TODO: handle change of namespace
-            if (m_namespace->get_name() != other.m_namespace->get_name()) {
-                BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                        "Group merge: unhandled case: group has moved from namespace %s to namespace %s",
-                        m_namespace->get_name().c_str(), other.m_namespace->get_name().c_str());
-            }
-        }
-    }
-
-    // TODO!!!
-    if (m_couple != nullptr && m_namespace != nullptr)
-        m_namespace->add_couple(*m_couple);
-
-    // As of m_backends, it must have been initialized during
-    // Storage merge => Node merge => Backend clone ctor
-    if (m_backends.size() != other.m_backends.size()) {
-        BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Internal inconsistency: Group merge: subject group has %lu backends, other has %lu",
-                m_backends.size(), other.m_backends.size());
-    }
 }
 
 void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -482,29 +416,55 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.String(m_status_text.c_str());
     writer.Key("status");
     writer.String(status_str(m_status));
-    writer.Key("frozen");
-    writer.Bool(m_frozen);
-    writer.Key("version");
-    writer.Uint64(m_version);
-    writer.Key("namespace");
-    writer.String(m_namespace != nullptr ? m_namespace->get_name().c_str() : "");
+
+    if (m_metadata_parsed) {
+        writer.Key("frozen");
+        writer.Bool(m_metadata.frozen);
+        writer.Key("version");
+        writer.Uint64(m_metadata.version);
+        writer.Key("namespace");
+        writer.String(m_metadata.namespace_name.c_str());
+        if (m_metadata.service.migrating || !m_metadata.service.job_id.empty()) {
+            writer.Key("service");
+            writer.StartObject();
+            writer.Key("migrating");
+            writer.Bool(m_metadata.service.migrating);
+            writer.Key("job_id");
+            writer.String(m_metadata.service.job_id.c_str());
+            writer.EndObject();
+        }
+    }
 
     if (show_internals) {
         writer.Key("clean");
         writer.Bool(m_clean);
-        writer.Key("metadata_process_start");
-        writer.Uint64(m_metadata_process_start);
-        writer.Key("metadata_process_time");
-        writer.Uint64(m_metadata_process_time);
-    }
+        writer.Key("metadata_download_time");
+        writer.Uint64(m_metadata_download_time);
+        writer.Key("metadata_parsed");
+        writer.Bool(m_metadata_parsed);
+        writer.Key("metadata_parse_duration");
+        writer.Uint64(m_metadata_parse_duration);
 
-    if (m_service.migrating || !m_service.job_id.empty()) {
-        writer.Key("service");
+        writer.Key("metadata_internal");
         writer.StartObject();
-        writer.Key("migrating");
-        writer.Bool(m_service.migrating);
-        writer.Key("job_id");
-        writer.String(m_service.job_id.c_str());
+            writer.Key("version");
+            writer.Uint64(m_metadata.version);
+            writer.Key("frozen");
+            writer.Bool(m_metadata.frozen);
+            writer.Key("couple");
+            writer.StartArray();
+            for (int id : m_metadata.couple)
+                writer.Uint64(id);
+            writer.EndArray();
+            writer.Key("namespace_name");
+            writer.String(m_metadata.namespace_name.c_str());
+            writer.Key("service");
+            writer.StartObject();
+                writer.Key("migrating");
+                writer.Bool(m_metadata.service.migrating);
+                writer.Key("job_id");
+                writer.String(m_metadata.service.job_id.c_str());
+            writer.EndObject();
         writer.EndObject();
     }
 

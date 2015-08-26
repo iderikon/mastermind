@@ -52,16 +52,18 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Couple(Storage & storage, const std::vector<Group*> & groups);
-    Couple(Storage & storage);
-
-    void clone_from(const Couple & other);
+    Couple(const std::vector<Group*> & groups);
 
     const std::string & get_key() const
     { return m_key; }
 
+    const std::vector<Group*> & get_groups() const
+    { return m_groups; }
+
+    /////TODO!!!
     bool check(const std::vector<int> & groups) const;
 
+    /////TODO!!!
     void bind_groups();
 
     void get_group_ids(std::vector<int> & groups) const;
@@ -73,7 +75,7 @@ public:
     void get_items(std::vector<Backend*> & backends) const;
     void get_items(std::vector<FS*> & filesystems) const;
 
-    void update_status();
+    void update_status(bool forbidden_unmatched_total);
 
     Status get_status() const
     { return m_status; }
@@ -97,9 +99,8 @@ private:
     }
 
 private:
-    Storage & m_storage;
-    std::vector<Group*> m_groups;
     std::string m_key;
+    std::vector<Group*> m_groups;
 
     Status m_status;
     std::string m_status_text;
