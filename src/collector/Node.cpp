@@ -42,16 +42,12 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_port(port),
     m_family(family)
 {
-    m_key = m_host;
-    m_key += ':';
-    m_key += std::to_string(m_port);
-    m_key += ':';
-    m_key += std::to_string(m_family);
-
-    m_download_data.reserve(4096);
+    m_key = key(host, port, family);
 
     std::memset(&m_stat, 0, sizeof(m_stat));
     std::memset(&m_clock, 0, sizeof(m_clock));
+
+    m_download_data.reserve(4096);
 }
 
 Node::Node(Storage & storage)
@@ -62,6 +58,15 @@ Node::Node(Storage & storage)
 {
     std::memset(&m_stat, 0, sizeof(m_stat));
     std::memset(&m_clock, 0, sizeof(m_clock));
+
+    m_download_data.reserve(4096);
+}
+
+std::string Node::key(const char *host, int port, int family)
+{
+    std::ostringstream ostr;
+    ostr << host << ':' << port << ':' << family;
+    return ostr.str();
 }
 
 void Node::clone_from(const Node & other)
@@ -74,62 +79,6 @@ void Node::clone_from(const Node & other)
 
     bool have_newer;
     merge(other, have_newer);
-}
-
-void Node::update(const NodeStat & stat)
-{
-    double ts1 = double(m_stat.ts_sec) + double(m_stat.ts_usec) / 1000000.0;
-    double ts2 = double(stat.ts_sec) + double(stat.ts_usec) / 1000000.0;
-    double d_ts = ts2 - ts1;
-
-    if (d_ts > 1.0) {
-        if (m_stat.tx_bytes < stat.tx_bytes)
-            m_stat.tx_rate = double(stat.tx_bytes - m_stat.tx_bytes) / d_ts;
-        if (m_stat.rx_bytes < stat.rx_bytes)
-            m_stat.rx_rate = double(stat.rx_bytes - m_stat.rx_bytes) / d_ts;
-    }
-
-    m_stat.load_average = double(stat.la1) / 100.0;
-
-    m_stat.ts_sec = stat.ts_sec;
-    m_stat.ts_usec = stat.ts_usec;
-    m_stat.la1 = stat.la1;
-    m_stat.tx_bytes = stat.tx_bytes;
-    m_stat.rx_bytes = stat.rx_bytes;
-}
-
-void Node::handle_backend(const BackendStat & new_stat)
-{
-    auto it = m_backends.lower_bound(new_stat.backend_id);
-
-    bool found = it != m_backends.end() && it->first == int(new_stat.backend_id);
-    if (!found && !new_stat.state)
-        return;
-
-    uint64_t old_fsid = 0;
-    if (found) {
-        old_fsid = it->second.get_stat().fsid;
-        it->second.update(new_stat);
-    } else {
-        it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
-        it->second.init(new_stat);
-        m_new_backends.push_back(it->second);
-    }
-
-    Backend & backend = it->second;
-
-    uint64_t new_fsid = backend.get_stat().fsid;
-    FS & new_fs = get_fs(new_fsid);
-    if (new_fsid != old_fsid) {
-        if (old_fsid)
-            get_fs(old_fsid).remove_backend(backend);
-        backend.set_fs(new_fs);
-        new_fs.add_backend(backend);
-    }
-
-    backend.recalculate(m_storage.get_app().get_config().reserved_space);
-    new_fs.update(backend);
-    backend.update_status();
 }
 
 void Node::parse_stats(void *arg)
@@ -177,38 +126,70 @@ void Node::parse_stats(void *arg)
     }
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Couple>> & couples)
+void Node::update(const NodeStat & stat)
 {
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-        const Backend & backend = it->second;
-        backend.get_items(couples);
+    double ts1 = double(m_stat.ts_sec) + double(m_stat.ts_usec) / 1000000.0;
+    double ts2 = double(stat.ts_sec) + double(stat.ts_usec) / 1000000.0;
+    double d_ts = ts2 - ts1;
+
+    if (d_ts > 1.0) {
+        if (m_stat.tx_bytes < stat.tx_bytes)
+            m_stat.tx_rate = double(stat.tx_bytes - m_stat.tx_bytes) / d_ts;
+        if (m_stat.rx_bytes < stat.rx_bytes)
+            m_stat.rx_rate = double(stat.rx_bytes - m_stat.rx_bytes) / d_ts;
     }
+
+    m_stat.load_average = double(stat.la1) / 100.0;
+
+    m_stat.ts_sec = stat.ts_sec;
+    m_stat.ts_usec = stat.ts_usec;
+    m_stat.la1 = stat.la1;
+    m_stat.tx_bytes = stat.tx_bytes;
+    m_stat.rx_bytes = stat.rx_bytes;
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces)
+FS & Node::get_fs(uint64_t fsid)
 {
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-        const Backend & backend = it->second;
-        backend.get_items(namespaces);
+    auto it = m_filesystems.lower_bound(fsid);
+
+    if (it == m_filesystems.end() || it->first != fsid)
+        it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
+
+    return it->second;
+}
+
+void Node::handle_backend(const BackendStat & new_stat)
+{
+    auto it = m_backends.lower_bound(new_stat.backend_id);
+
+    bool found = it != m_backends.end() && it->first == int(new_stat.backend_id);
+    if (!found && !new_stat.state)
+        return;
+
+    uint64_t old_fsid = 0;
+    if (found) {
+        old_fsid = it->second.get_stat().fsid;
+        it->second.update(new_stat);
+    } else {
+        it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
+        it->second.init(new_stat);
+        m_new_backends.push_back(it->second);
     }
-}
 
-void Node::get_items(std::vector<std::reference_wrapper<Backend>> & backends)
-{
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        backends.push_back(it->second);
-}
+    Backend & backend = it->second;
 
-void Node::get_items(std::vector<std::reference_wrapper<Group>> & groups)
-{
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        it->second.get_items(groups);
-}
+    uint64_t new_fsid = backend.get_stat().fsid;
+    FS & new_fs = get_fs(new_fsid);
+    if (new_fsid != old_fsid) {
+        if (old_fsid)
+            get_fs(old_fsid).remove_backend(backend);
+        backend.set_fs(new_fs);
+        new_fs.add_backend(backend);
+    }
 
-void Node::get_items(std::vector<std::reference_wrapper<FS>> & filesystems)
-{
-    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-        filesystems.push_back(it->second);
+    backend.recalculate(m_storage.get_app().get_config().reserved_space);
+    new_fs.update(backend);
+    backend.update_status();
 }
 
 void Node::update_filesystems()
@@ -274,14 +255,38 @@ void Node::merge(const Node & other, bool & have_newer)
     Storage::merge_map(*this, m_filesystems, other.m_filesystems, have_newer);
 }
 
-FS & Node::get_fs(uint64_t fsid)
+void Node::get_items(std::vector<std::reference_wrapper<Couple>> & couples)
 {
-    auto it = m_filesystems.lower_bound(fsid);
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        const Backend & backend = it->second;
+        backend.get_items(couples);
+    }
+}
 
-    if (it == m_filesystems.end() || it->first != fsid)
-        it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
+void Node::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        const Backend & backend = it->second;
+        backend.get_items(namespaces);
+    }
+}
 
-    return it->second;
+void Node::get_items(std::vector<std::reference_wrapper<Backend>> & backends)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        backends.push_back(it->second);
+}
+
+void Node::get_items(std::vector<std::reference_wrapper<Group>> & groups)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        it->second.get_items(groups);
+}
+
+void Node::get_items(std::vector<std::reference_wrapper<FS>> & filesystems)
+{
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
+        filesystems.push_back(it->second);
 }
 
 void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

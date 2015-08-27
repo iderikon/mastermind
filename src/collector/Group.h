@@ -63,46 +63,18 @@ public:
     int get_key() const
     { return m_id; }
 
-    void add_backend(Backend & backend);
+    Status get_status() const
+    { return m_status; }
 
-    Backends & get_backends()
-    { return m_backends; }
+    bool full() const;
 
-    void metadata_download_failed(const std::string & why);
-
-    void save_metadata(const char *metadata, size_t size);
-    int parse_metadata();
-
-    bool metadata_parsed() const
-    { return m_metadata_parsed; }
+    uint64_t get_total_space() const;
 
     const std::string & get_namespace_name() const
     { return m_metadata.namespace_name; }
 
-    void set_namespace(Namespace & ns);
-
-    void update_status(bool forbidden_dht);
-
     const std::vector<int> & get_couple_group_ids() const
     { return m_metadata.couple; }
-
-    int check_metadata_equals(const Group & other);
-
-    Status get_status() const
-    { return m_status; }
-
-    void set_couple(Couple & couple);
-    bool match_couple(const Group & other) const;
-
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
-
-    bool full() const;
-    uint64_t get_total_space() const;
 
     bool get_frozen() const
     { return m_metadata.frozen; }
@@ -113,13 +85,39 @@ public:
     bool get_service_migrating() const
     { return m_metadata.service.migrating; }
 
-    uint64_t get_metadata_parse_duration() const
-    { return m_metadata_parse_duration; }
+    void add_backend(Backend & backend);
+
+    void handle_metadata_download_failed(const std::string & why);
+    void save_metadata(const char *metadata, size_t size);
+    int parse_metadata();
+
+    bool metadata_parsed() const
+    { return m_metadata_parsed; }
+
+    void set_namespace(Namespace & ns);
+
+    void update_status(bool forbidden_dht);
+
+    int check_metadata_equals(const Group & other);
+
+    void set_couple(Couple & couple);
+
+    bool match_couple(const Group & other) const;
 
     void merge(const Group & other, bool & have_newer);
 
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
+
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
+
+    uint64_t get_metadata_parse_duration() const
+    { return m_metadata_parse_duration; }
 
 private:
     int m_id;

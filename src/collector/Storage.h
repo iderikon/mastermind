@@ -24,11 +24,9 @@
 #include "Namespace.h"
 #include "Node.h"
 
-#include <cstring>
 #include <functional>
 #include <map>
-#include <memory>
-#include <utility>
+#include <string>
 #include <vector>
 
 class WorkerApplication;
@@ -76,25 +74,19 @@ public:
     // process downloaded metadata, recalculate states, etc.
     void update();
 
+    void merge(const Storage & other, bool & have_newer);
+
     // select entries matching filter
     void select(Filter & filter, Entries & entries);
-
-    void merge(const Storage & other, bool & have_newer);
 
     void print_json(uint32_t item_types, bool show_internals, std::string & str);
     void print_json(Filter & filter, bool show_internals, std::string & str);
 
 private:
-    Group & get_group(int id);
-    Namespace & get_namespace(const std::string & name);
-
     void handle_backend(Backend & backend);
 
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            Entries & entries, uint32_t item_types, bool show_internals);
-
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            uint32_t item_types, bool show_internals);
+    Group & get_group(int id);
+    Namespace & get_namespace(const std::string & name);
 
     void merge_groups(const Storage & other_storage, bool & have_newer);
     void merge_couples(const Storage & other_storage, bool & have_newer);
@@ -106,6 +98,12 @@ private:
             std::vector<std::reference_wrapper<SourceItem>> & source_items,
             std::vector<std::reference_wrapper<ResultItem>> & current_set,
             bool & first_pass);
+
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            Entries & entries, uint32_t item_types, bool show_internals);
+
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            uint32_t item_types, bool show_internals);
 
 public:
     template<typename T, typename K, typename V>

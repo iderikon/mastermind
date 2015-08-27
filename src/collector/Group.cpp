@@ -70,57 +70,6 @@ Group::Group(int id)
     m_metadata.service.migrating = false;
 }
 
-void Group::add_backend(Backend & backend)
-{
-    m_backends.insert(backend);
-}
-
-void Group::set_couple(Couple & couple)
-{
-    m_couple = &couple;
-}
-
-bool Group::match_couple(const Group & other) const
-{
-    if (m_couple == nullptr || other.m_couple == nullptr)
-        return false;
-    return m_couple == other.m_couple;
-}
-
-void Group::set_namespace(Namespace & ns)
-{
-    m_namespace = &ns;
-}
-
-void Group::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
-{
-    if (m_couple != nullptr)
-        couples.push_back(*m_couple);
-}
-
-void Group::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
-{
-    if (m_namespace != nullptr)
-        namespaces.push_back(*m_namespace);
-}
-
-void Group::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
-{
-    for (Backend & backend : m_backends)
-        backend.get_items(nodes);
-}
-
-void Group::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
-{
-    backends.insert(backends.end(), m_backends.begin(), m_backends.end());
-}
-
-void Group::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
-{
-    for (Backend & backend : m_backends)
-        backend.get_items(filesystems);
-}
-
 bool Group::full() const
 {
     for (const Backend & backend : m_backends) {
@@ -139,7 +88,12 @@ uint64_t Group::get_total_space() const
     return res;
 }
 
-void Group::metadata_download_failed(const std::string & why)
+void Group::add_backend(Backend & backend)
+{
+    m_backends.insert(backend);
+}
+
+void Group::handle_metadata_download_failed(const std::string & why)
 {
     if (m_status == INIT) {
         std::ostringstream ostr;
@@ -300,6 +254,11 @@ int Group::parse_metadata()
     return 0;
 }
 
+void Group::set_namespace(Namespace & ns)
+{
+    m_namespace = &ns;
+}
+
 void Group::update_status(bool forbidden_dht)
 {
     if (m_backends.empty()) {
@@ -373,6 +332,18 @@ int Group::check_metadata_equals(const Group & other)
     return 0;
 }
 
+void Group::set_couple(Couple & couple)
+{
+    m_couple = &couple;
+}
+
+bool Group::match_couple(const Group & other) const
+{
+    if (m_couple == nullptr || other.m_couple == nullptr)
+        return false;
+    return m_couple == other.m_couple;
+}
+
 void Group::merge(const Group & other, bool & have_newer)
 {
     if (m_metadata_download_time > other.m_metadata_download_time) {
@@ -399,6 +370,35 @@ void Group::merge(const Group & other, bool & have_newer)
 
     m_status_text = other.m_status_text;
     m_status = other.m_status;
+}
+
+void Group::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+{
+    if (m_couple != nullptr)
+        couples.push_back(*m_couple);
+}
+
+void Group::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+{
+    if (m_namespace != nullptr)
+        namespaces.push_back(*m_namespace);
+}
+
+void Group::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+{
+    for (Backend & backend : m_backends)
+        backend.get_items(nodes);
+}
+
+void Group::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+{
+    backends.insert(backends.end(), m_backends.begin(), m_backends.end());
+}
+
+void Group::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+{
+    for (Backend & backend : m_backends)
+        backend.get_items(filesystems);
 }
 
 void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

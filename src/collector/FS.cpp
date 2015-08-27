@@ -62,34 +62,6 @@ void FS::update(const Backend & backend)
     m_stat.total_space = backend.get_vfs_total_space();
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
-{
-    for (Backend & backend : m_backends)
-        backend.get_items(couples);
-}
-
-void FS::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
-{
-    for (Backend & backend : m_backends)
-        backend.get_items(namespaces);
-}
-
-void FS::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
-{
-    backends.insert(backends.end(), m_backends.begin(), m_backends.end());
-}
-
-void FS::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
-{
-    for (Backend & backend : m_backends)
-        backend.get_items(groups);
-}
-
-void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
-{
-    nodes.push_back(m_node);
-}
-
 void FS::update_status()
 {
     uint64_t total_space = 0;
@@ -125,6 +97,34 @@ void FS::merge(const FS & other, bool & have_newer)
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
+}
+
+void FS::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+{
+    for (Backend & backend : m_backends)
+        backend.get_items(couples);
+}
+
+void FS::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+{
+    for (Backend & backend : m_backends)
+        backend.get_items(namespaces);
+}
+
+void FS::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+{
+    backends.insert(backends.end(), m_backends.begin(), m_backends.end());
+}
+
+void FS::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+{
+    for (Backend & backend : m_backends)
+        backend.get_items(groups);
+}
+
+void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+{
+    nodes.push_back(m_node);
 }
 
 void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

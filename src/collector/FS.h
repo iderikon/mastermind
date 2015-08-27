@@ -70,14 +70,19 @@ public:
     const FSStat & get_stat() const
     { return m_stat; }
 
+    Status get_status() const
+    { return m_status; }
+
     void add_backend(Backend & backend)
     { m_backends.insert(backend); }
 
     void remove_backend(Backend & backend)
     { m_backends.erase(backend); }
 
-    Backends & get_backends()
-    { return m_backends; }
+    void update(const Backend & backend);
+    void update_status();
+
+    void merge(const FS & other, bool & have_newer);
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
@@ -85,14 +90,6 @@ public:
     void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
     void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
     void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
-
-    void update(const Backend & backend);
-    void update_status();
-
-    Status get_status() const
-    { return m_status; }
-
-    void merge(const FS & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;

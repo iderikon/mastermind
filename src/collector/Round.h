@@ -62,19 +62,11 @@ public:
     uint64_t get_old_storage_version() const
     { return m_old_storage_version; }
 
-    void swap_storage(std::unique_ptr<Storage> & storage)
-    { m_storage.swap(storage); }
-
-    void update_storage(Storage & storage, uint64_t version, bool & have_newer);
-
     const Storage::Entries & get_entries()
     { return m_entries; }
 
     ioremap::elliptics::session & get_session()
     { return m_session; }
-
-    void add_node(const char *host, int port, int family)
-    { m_storage->add_node(host, port, family); }
 
     Type get_type() const
     { return m_type; }
@@ -84,6 +76,14 @@ public:
 
     std::shared_ptr<on_refresh> get_on_refresh_handler()
     { return m_on_refresh_handler; }
+
+    void swap_storage(std::unique_ptr<Storage> & storage)
+    { m_storage.swap(storage); }
+
+    void update_storage(Storage & storage, uint64_t version, bool & have_newer);
+
+    void add_node(const char *host, int port, int family)
+    { m_storage->add_node(host, port, family); }
 
     void start();
 

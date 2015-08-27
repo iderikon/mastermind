@@ -60,6 +60,13 @@ public:
     const std::vector<std::reference_wrapper<Group>> & get_groups() const
     { return m_groups; }
 
+    Status get_status() const
+    { return m_status; }
+
+    void update_status(bool forbidden_unmatched_total);
+
+    void merge(const Couple & other, bool & have_newer);
+
     // NB: get_items() may return duplicates
     void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
     void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
@@ -67,18 +74,11 @@ public:
     void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
     void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
-    void update_status(bool forbidden_unmatched_total);
-
-    Status get_status() const
-    { return m_status; }
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
+            bool show_internals) const;
 
     uint64_t get_update_status_duration() const
     { return m_update_status_duration; }
-
-    void merge(const Couple & other, bool & have_newer);
-
-    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            bool show_internals) const;
 
 private:
     template <typename T, typename V>

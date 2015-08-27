@@ -57,43 +57,13 @@ void Backend::clone_from(const Backend & other)
     m_disabled = other.m_disabled;
 }
 
-void Backend::set_fs(FS & fs)
+bool Backend::full() const
 {
-    m_fs = &fs;
-}
-
-void Backend::set_group(Group & group)
-{
-    m_group = &group;
-}
-
-void Backend::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
-{
-    if (m_group != nullptr)
-        m_group->get_items(couples);
-}
-
-void Backend::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
-{
-    if (m_group != nullptr)
-        m_group->get_items(namespaces);
-}
-
-void Backend::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
-{
-    nodes.push_back(m_node);
-}
-
-void Backend::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
-{
-    if (m_group != nullptr)
-        groups.push_back(*m_group);
-}
-
-void Backend::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
-{
-    if (m_fs != nullptr)
-        filesystems.push_back(*m_fs);
+    if (m_calculated.used_space >= m_calculated.effective_space)
+        return true;
+    if (m_calculated.effective_free_space <= 0)
+        return true;
+    return false;
 }
 
 void Backend::update(const BackendStat & stat)
@@ -114,6 +84,11 @@ void Backend::update(const BackendStat & stat)
     }
 
     std::memcpy(&m_stat, &stat, sizeof(m_stat));
+}
+
+void Backend::set_fs(FS & fs)
+{
+    m_fs = &fs;
 }
 
 void Backend::recalculate(uint64_t reserved_space)
@@ -157,13 +132,9 @@ void Backend::update_status()
         m_calculated.status = OK;
 }
 
-bool Backend::full() const
+void Backend::set_group(Group & group)
 {
-    if (m_calculated.used_space >= m_calculated.effective_space)
-        return true;
-    if (m_calculated.effective_free_space <= 0)
-        return true;
-    return false;
+    m_group = &group;
 }
 
 void Backend::merge(const Backend & other, bool & have_newer)
@@ -176,6 +147,35 @@ void Backend::merge(const Backend & other, bool & have_newer)
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
+}
+
+void Backend::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+{
+    if (m_group != nullptr)
+        m_group->get_items(couples);
+}
+
+void Backend::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+{
+    if (m_group != nullptr)
+        m_group->get_items(namespaces);
+}
+
+void Backend::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+{
+    nodes.push_back(m_node);
+}
+
+void Backend::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+{
+    if (m_group != nullptr)
+        groups.push_back(*m_group);
+}
+
+void Backend::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+{
+    if (m_fs != nullptr)
+        filesystems.push_back(*m_fs);
 }
 
 void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

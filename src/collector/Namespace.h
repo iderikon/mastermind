@@ -49,11 +49,7 @@ public:
     void remove_group(Group & group)
     { m_groups.erase(group); }
 
-    Groups & get_groups()
-    { return m_groups; }
-
     // NB: get_items() may return duplicates
-
     void get_items(std::vector<std::reference_wrapper<Group>> & groups) const
     {
         groups.insert(groups.end(), m_groups.begin(), m_groups.end());

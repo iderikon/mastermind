@@ -54,6 +54,8 @@ public:
     Node(Storage & storage, const char *host, int port, int family);
     Node(Storage & storage);
 
+    static std::string key(const char *host, int port, int family);
+
     void clone_from(const Node & other);
 
     const std::string & get_host() const
@@ -71,9 +73,11 @@ public:
     const NodeStat & get_stat() const
     { return m_stat; }
 
-    void update(const NodeStat & stat);
+    std::map<int, Backend> & get_backends()
+    { return m_backends; }
 
-    void handle_backend(const BackendStat & new_stat);
+    std::map<uint64_t, FS> & get_filesystems()
+    { return m_filesystems; }
 
     void add_download_data(const char *data, size_t size)
     { m_download_data.append(data, size); }
@@ -83,15 +87,9 @@ public:
 
     static void parse_stats(void *arg);
 
-    std::map<int, Backend> & get_backends()
-    { return m_backends; }
+    void update(const NodeStat & stat);
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples);
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces);
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends);
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups);
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems);
+    void handle_backend(const BackendStat & new_stat);
 
     std::vector<std::reference_wrapper<Backend>> pick_new_backends()
     { return std::move(m_new_backends); }
@@ -100,8 +98,12 @@ public:
 
     void merge(const Node & other, bool & have_newer);
 
-    std::map<uint64_t, FS> & get_filesystems()
-    { return m_filesystems; }
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples);
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces);
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends);
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups);
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             const std::vector<std::reference_wrapper<Backend>> & backends,
@@ -109,11 +111,6 @@ public:
             bool print_backends,
             bool print_fs,
             bool show_internals) const;
-
-private:
-    FS & get_fs(uint64_t fsid);
-
-    void merge_backends(const Node & other_node, bool & have_newer);
 
 public:
     struct ClockStat
@@ -125,6 +122,11 @@ public:
 
     const ClockStat & get_clock_stat() const
     { return m_clock; }
+
+private:
+    FS & get_fs(uint64_t fsid);
+
+    void merge_backends(const Node & other_node, bool & have_newer);
 
 private:
     Storage & m_storage;

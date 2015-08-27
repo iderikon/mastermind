@@ -40,41 +40,6 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     m_groups = groups;
 }
 
-void Couple::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
-{
-    groups.insert(groups.end(), m_groups.begin(), m_groups.end());
-}
-
-void Couple::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
-{
-    if (!m_groups.empty())
-        m_groups.front().get().get_items(namespaces);
-}
-
-void Couple::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
-{
-    for (Group & group : m_groups) {
-        auto & backends = group.get_backends();
-        for (Backend & backend : backends)
-            backend.get_items(nodes);
-    }
-}
-
-void Couple::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
-{
-    for (Group & group : m_groups)
-        group.get_items(backends);
-}
-
-void Couple::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
-{
-    for (Group & group : m_groups) {
-        auto & backends = group.get_backends();
-        for (Backend & backend : backends)
-            backend.get_items(filesystems);
-    }
-}
-
 void Couple::update_status(bool forbidden_unmatched_total)
 {
     Stopwatch watch(m_update_status_duration);
@@ -176,6 +141,35 @@ void Couple::merge(const Couple & other, bool & have_newer)
     m_status = other.m_status;
     m_status_text = other.m_status_text;
     m_update_status_duration = other.m_update_status_duration;
+}
+
+void Couple::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+{
+    groups.insert(groups.end(), m_groups.begin(), m_groups.end());
+}
+
+void Couple::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+{
+    if (!m_groups.empty())
+        m_groups.front().get().get_items(namespaces);
+}
+
+void Couple::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+{
+    for (Group & group : m_groups)
+        group.get_items(nodes);
+}
+
+void Couple::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+{
+    for (Group & group : m_groups)
+        group.get_items(backends);
+}
+
+void Couple::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+{
+    for (Group & group : m_groups)
+        group.get_items(filesystems);
 }
 
 void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

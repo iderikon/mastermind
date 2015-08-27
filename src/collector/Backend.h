@@ -79,21 +79,14 @@ public:
         BROKEN
     };
 
+    static const char *status_str(Status status);
+
+public:
     Backend(Node & node);
 
     void init(const BackendStat & stat);
 
     void clone_from(const Backend & other);
-
-    void set_fs(FS & fs);
-    void set_group(Group & group);
-
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     const std::string & get_key() const
     { return m_key; }
@@ -101,9 +94,8 @@ public:
     const BackendStat & get_stat() const
     { return m_stat; }
 
-    void update(const BackendStat & stat);
-    void recalculate(uint64_t reserved_space);
-    void update_status();
+    Status get_status() const
+    { return m_calculated.status; }
 
     uint64_t get_vfs_free_space() const
     { return m_calculated.vfs_free_space; }
@@ -132,15 +124,23 @@ public:
 
     bool full() const;
 
-    Status get_status() const
-    { return m_calculated.status; }
+    void update(const BackendStat & stat);
+    void set_fs(FS & fs);
+    void recalculate(uint64_t reserved_space);
+    void update_status();
+    void set_group(Group & group);
 
     void merge(const Backend & other, bool & have_newer);
 
+    // NB: get_items() may return duplicates
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
+
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
-
-    static const char *status_str(Status status);
 
 private:
     Node & m_node;
