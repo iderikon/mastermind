@@ -56,9 +56,6 @@ public:
 
     void clone_from(const Node & other);
 
-    Storage & get_storage() const
-    { return m_storage; }
-
     const std::string & get_host() const
     { return m_host; }
 

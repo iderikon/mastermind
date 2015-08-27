@@ -52,12 +52,6 @@ void FS::clone_from(const FS & other)
     std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
     m_status = other.m_status;
     m_status_text = other.m_status_text;
-
-    if (!other.m_backends.empty()) {
-        BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
-                "Internal inconsistency detected: cloning FS '%s' from other "
-                "one with non-empty set of backends", m_key.c_str());
-    }
 }
 
 void FS::update(const Backend & backend)
@@ -98,8 +92,6 @@ void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 
 void FS::update_status()
 {
-    Status prev = m_status;
-
     uint64_t total_space = 0;
     for (Backend & backend : m_backends) {
         Backend::Status status = backend.get_status();
@@ -119,12 +111,6 @@ void FS::update_status()
              << " which is greater than " << m_stat.total_space
              << " from monitor stats";
         m_status_text = ostr.str();
-    }
-
-    if (m_status != prev) {
-        BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_INFO,
-                "FS %s status change %s -> %s",
-                m_key.c_str(), status_str(prev), status_str(m_status));
     }
 }
 
