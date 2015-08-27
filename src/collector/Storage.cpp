@@ -255,63 +255,37 @@ void Storage::update()
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }
 
-#if 0
-void Storage::update(const Entries & entries)
-{
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
-
-    for (Node *node : entries.nodes)
-        node->update_filesystems();
-
-    for (Group *group : entries.groups)
-        group->process_metadata();
-
-    for (Couple *couple : entries.couples)
-        couple->update_status();
-
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
-}
-#endif
-
-template<typename SOURCE_ITEM, typename RESULT_ITEM>
-void Storage::filter_items(std::vector<std::reference_wrapper<SOURCE_ITEM>> & source_items,
-        std::vector<std::reference_wrapper<RESULT_ITEM>> & result_items,
+template<typename SourceItem, typename ResultItem>
+void Storage::filter_related_items(
+        std::vector<std::reference_wrapper<SourceItem>> & source_items,
+        std::vector<std::reference_wrapper<ResultItem>> & current_set,
         bool & first_pass)
 {
-    if (result_items.empty() && !first_pass)
+    if (current_set.empty() && !first_pass)
         return;
 
-    std::vector<std::reference_wrapper<RESULT_ITEM>> all_items;
-    for (SOURCE_ITEM & source_item : source_items)
-        source_item.get_items(all_items);
+    std::vector<std::reference_wrapper<ResultItem>> related_items;
+    for (SourceItem & source_item : source_items)
+        source_item.get_items(related_items);
 
-    if (first_pass || all_items.empty()) {
-        result_items = all_items;
+    if (first_pass || related_items.empty()) {
+        current_set = related_items;
         first_pass = false;
         return;
     }
 
-    remove_duplicates(all_items);
+    remove_duplicates(related_items);
 
-    std::vector<RESULT_ITEM*> all_pointers;
-    std::vector<RESULT_ITEM*> current_pointers;
-    std::vector<RESULT_ITEM*> result_pointers(all_items.size());
-
-    // TODO: polish
-    all_pointers.reserve(all_items.size());
-    current_pointers.reserve(result_items.size());
-    for (RESULT_ITEM & item : all_items)
-        all_pointers.push_back(&item);
-    for (RESULT_ITEM & item : result_items)
-        current_pointers.push_back(&item);
-
-    auto it = std::set_intersection(current_pointers.begin(), current_pointers.end(),
-            all_pointers.begin(), all_pointers.end(), result_pointers.begin());
-    result_pointers.resize(it - result_pointers.begin());
-
-    result_items.clear();
-    for (RESULT_ITEM *ptr : result_pointers)
-        result_items.push_back(*ptr);
+    struct {
+        bool operator () (const std::reference_wrapper<ResultItem> & item1,
+                const std::reference_wrapper<ResultItem> & item2) const
+        { return &item1.get() < &item2.get(); }
+    } comp;
+    auto it = std::set_intersection(related_items.begin(), related_items.end(),
+            current_set.begin(), current_set.end(),
+            current_set.begin(),
+            comp);
+    current_set.erase(it, current_set.end());
 }
 
 void Storage::select(Filter & filter, Entries & entries)
@@ -388,19 +362,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Couple) && !couples.empty())
-                filter_items(couples, entries.groups, first_pass);
+                filter_related_items(couples, entries.groups, first_pass);
 
             if (!(filter.item_types & Filter::Backend) && !backends.empty())
-                filter_items(backends, entries.groups, first_pass);
+                filter_related_items(backends, entries.groups, first_pass);
 
             if (!(filter.item_types & Filter::FS) && !filesystems.empty())
-                filter_items(filesystems, entries.groups, first_pass);
+                filter_related_items(filesystems, entries.groups, first_pass);
 
             if (!(filter.item_types & Filter::Node) && !nodes.empty())
-                filter_items(nodes, entries.groups, first_pass);
+                filter_related_items(nodes, entries.groups, first_pass);
 
             if (!(filter.item_types & Filter::Namespace) && !namespaces.empty())
-                filter_items(namespaces, entries.groups, first_pass);
+                filter_related_items(namespaces, entries.groups, first_pass);
         }
     }
 
@@ -411,19 +385,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Group) && !groups.empty())
-                filter_items(groups, entries.couples, first_pass);
+                filter_related_items(groups, entries.couples, first_pass);
 
             if (!(filter.item_types & Filter::Backend) && !backends.empty())
-                filter_items(backends, entries.couples, first_pass);
+                filter_related_items(backends, entries.couples, first_pass);
 
             if (!(filter.item_types & Filter::FS) && !filesystems.empty())
-                filter_items(filesystems, entries.couples, first_pass);
+                filter_related_items(filesystems, entries.couples, first_pass);
 
             if (!(filter.item_types & Filter::Node) && !nodes.empty())
-                filter_items(nodes, entries.couples, first_pass);
+                filter_related_items(nodes, entries.couples, first_pass);
 
             if (!(filter.item_types & Filter::Namespace) && !namespaces.empty())
-                filter_items(namespaces, entries.couples, first_pass);
+                filter_related_items(namespaces, entries.couples, first_pass);
         }
     }
 
@@ -434,19 +408,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Group) && !groups.empty())
-                filter_items(groups, entries.nodes, first_pass);
+                filter_related_items(groups, entries.nodes, first_pass);
 
             if (!(filter.item_types & Filter::Backend) && !backends.empty())
-                filter_items(backends, entries.nodes, first_pass);
+                filter_related_items(backends, entries.nodes, first_pass);
 
             if (!(filter.item_types & Filter::FS) && !filesystems.empty())
-                filter_items(filesystems, entries.nodes, first_pass);
+                filter_related_items(filesystems, entries.nodes, first_pass);
 
             if (!(filter.item_types & Filter::Couple) && !couples.empty())
-                filter_items(couples, entries.nodes, first_pass);
+                filter_related_items(couples, entries.nodes, first_pass);
 
             if (!(filter.item_types & Filter::Namespace) && !namespaces.empty())
-                filter_items(namespaces, entries.nodes, first_pass);
+                filter_related_items(namespaces, entries.nodes, first_pass);
         }
     }
 
@@ -457,19 +431,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Group) && !groups.empty())
-                filter_items(groups, entries.backends, first_pass);
+                filter_related_items(groups, entries.backends, first_pass);
 
             if (!(filter.item_types & Filter::Node) && !nodes.empty())
-                filter_items(nodes, entries.backends, first_pass);
+                filter_related_items(nodes, entries.backends, first_pass);
 
             if (!(filter.item_types & Filter::FS) && !filesystems.empty())
-                filter_items(filesystems, entries.backends, first_pass);
+                filter_related_items(filesystems, entries.backends, first_pass);
 
             if (!(filter.item_types & Filter::Couple) && !couples.empty())
-                filter_items(couples, entries.backends, first_pass);
+                filter_related_items(couples, entries.backends, first_pass);
 
             if (!(filter.item_types & Filter::Namespace) && !namespaces.empty())
-                filter_items(namespaces, entries.backends, first_pass);
+                filter_related_items(namespaces, entries.backends, first_pass);
         }
     }
 
@@ -480,19 +454,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Group) && !groups.empty())
-                filter_items(groups, entries.filesystems, first_pass);
+                filter_related_items(groups, entries.filesystems, first_pass);
 
             if (!(filter.item_types & Filter::Node) && !nodes.empty())
-                filter_items(nodes, entries.filesystems, first_pass);
+                filter_related_items(nodes, entries.filesystems, first_pass);
 
             if (!(filter.item_types & Filter::Backend) && !backends.empty())
-                filter_items(backends, entries.filesystems, first_pass);
+                filter_related_items(backends, entries.filesystems, first_pass);
 
             if (!(filter.item_types & Filter::Couple) && !couples.empty())
-                filter_items(couples, entries.filesystems, first_pass);
+                filter_related_items(couples, entries.filesystems, first_pass);
 
             if (!(filter.item_types & Filter::Namespace) && !namespaces.empty())
-                filter_items(namespaces, entries.filesystems, first_pass);
+                filter_related_items(namespaces, entries.filesystems, first_pass);
         }
     }
 
@@ -503,19 +477,19 @@ void Storage::select(Filter & filter, Entries & entries)
             bool first_pass = true;
 
             if (!(filter.item_types & Filter::Group) && !groups.empty())
-                filter_items(groups, entries.namespaces, first_pass);
+                filter_related_items(groups, entries.namespaces, first_pass);
 
             if (!(filter.item_types & Filter::Node) && !nodes.empty())
-                filter_items(nodes, entries.namespaces, first_pass);
+                filter_related_items(nodes, entries.namespaces, first_pass);
 
             if (!(filter.item_types & Filter::Backend) && !backends.empty())
-                filter_items(backends, entries.namespaces, first_pass);
+                filter_related_items(backends, entries.namespaces, first_pass);
 
             if (!(filter.item_types & Filter::Couple) && !couples.empty())
-                filter_items(couples, entries.namespaces, first_pass);
+                filter_related_items(couples, entries.namespaces, first_pass);
 
             if (!(filter.item_types & Filter::FS) && !filesystems.empty())
-                filter_items(filesystems, entries.namespaces, first_pass);
+                filter_related_items(filesystems, entries.namespaces, first_pass);
         }
     }
 }

@@ -102,13 +102,16 @@ private:
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             uint32_t item_types, bool show_internals);
 
-    template<typename SOURCE_ITEM, typename RESULT_ITEM>
-    static void filter_items(std::vector<std::reference_wrapper<SOURCE_ITEM>> & source_items,
-            std::vector<std::reference_wrapper<RESULT_ITEM>> & result_items,
-            bool & first_pass);
-
     void merge_groups(const Storage & other_storage, bool & have_newer);
     void merge_couples(const Storage & other_storage, bool & have_newer);
+
+    // find an intersection of sets of ResultItem objects
+    // each of which is related to a set of SourceItem:s
+    template<typename SourceItem, typename ResultItem>
+    static void filter_related_items(
+            std::vector<std::reference_wrapper<SourceItem>> & source_items,
+            std::vector<std::reference_wrapper<ResultItem>> & current_set,
+            bool & first_pass);
 
 public:
     template<typename T, typename K, typename V>
