@@ -20,6 +20,7 @@
 #define __c065a812_f800_4562_8686_a77b1e60e201
 
 #include <cstdint>
+#include <functional>
 #include <rapidjson/writer.h>
 #include <set>
 #include <string>
@@ -47,6 +48,13 @@ public:
 
     static const char *status_str(Status status);
 
+    struct BackendLess
+    {
+        bool operator () (const Backend & b1, const Backend & b2) const
+        { return &b1 < &b2; }
+    };
+    typedef std::set<std::reference_wrapper<Backend>, BackendLess> Backends;
+
 public:
     FS(Node & node, uint64_t fsid);
     FS(Node & node);
@@ -69,20 +77,20 @@ public:
     { return m_stat; }
 
     void add_backend(Backend & backend)
-    { m_backends.insert(&backend); }
+    { m_backends.insert(backend); }
 
     void remove_backend(Backend & backend)
-    { m_backends.erase(&backend); }
+    { m_backends.erase(backend); }
 
-    std::set<Backend*> & get_backends()
+    Backends & get_backends()
     { return m_backends; }
 
     // NB: get_items() may return duplicates
-    void get_items(std::vector<Couple*> & couples) const;
-    void get_items(std::vector<Namespace*> & namespaces) const;
-    void get_items(std::vector<Backend*> & backends) const;
-    void get_items(std::vector<Group*> & groups) const;
-    void get_items(std::vector<Node*> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
 
     void update(const Backend & backend);
     void update_status();
@@ -103,7 +111,7 @@ private:
     uint64_t m_fsid;
     std::string m_key;
 
-    std::set<Backend*> m_backends;
+    Backends m_backends;
 
     FSStat m_stat;
     Status m_status;

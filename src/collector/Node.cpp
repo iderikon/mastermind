@@ -126,7 +126,7 @@ void Node::handle_backend(const BackendStat & new_stat)
         it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
         backend = &it->second;
         backend->init(new_stat);
-        m_new_backends.push_back(backend);
+        m_new_backends.push_back(*backend);
     }
 
     check_fs_change(*backend, new_stat.fsid);
@@ -188,7 +188,7 @@ bool Node::get_backend(int id, Backend *& backend)
     return false;
 }
 
-void Node::get_items(std::vector<Couple*> & couples)
+void Node::get_items(std::vector<std::reference_wrapper<Couple>> & couples)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         const Backend & backend = it->second;
@@ -196,7 +196,7 @@ void Node::get_items(std::vector<Couple*> & couples)
     }
 }
 
-void Node::get_items(std::vector<Namespace*> & namespaces)
+void Node::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         const Backend & backend = it->second;
@@ -204,25 +204,25 @@ void Node::get_items(std::vector<Namespace*> & namespaces)
     }
 }
 
-void Node::get_items(std::vector<Backend*> & backends)
+void Node::get_items(std::vector<std::reference_wrapper<Backend>> & backends)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        backends.push_back(&it->second);
+        backends.push_back(it->second);
 }
 
-void Node::get_items(std::vector<Group*> & groups)
+void Node::get_items(std::vector<std::reference_wrapper<Group>> & groups)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         Group *group = it->second.get_group();
         if (group != nullptr)
-            groups.push_back(group);
+            groups.push_back(*group);
     }
 }
 
-void Node::get_items(std::vector<FS*> & filesystems)
+void Node::get_items(std::vector<std::reference_wrapper<FS>> & filesystems)
 {
     for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-        filesystems.push_back(&it->second);
+        filesystems.push_back(it->second);
 }
 
 void Node::update_filesystems()
@@ -253,7 +253,7 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
 
             my_backend.clone_from(other->second);
             check_fs_change(my_backend, my_backend.get_stat().fsid);
-            m_new_backends.push_back(&my_backend);
+            m_new_backends.push_back(my_backend);
         }
         ++other;
     }
@@ -298,8 +298,8 @@ FS & Node::get_fs(uint64_t fsid)
 }
 
 void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-        const std::vector<Backend*> & backends,
-        const std::vector<FS*> & filesystems,
+        const std::vector<std::reference_wrapper<Backend>> & backends,
+        const std::vector<std::reference_wrapper<FS>> & filesystems,
         bool print_backends,
         bool print_fs,
         bool show_internals) const
@@ -355,8 +355,12 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("backends");
         writer.StartArray();
         for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+            struct {
+                bool operator () (const Backend & b1, const Backend & b2) const
+                { return &b1 < &b2; }
+            } comp;
             if (backends.empty() || std::binary_search(backends.begin(),
-                        backends.end(), &it->second))
+                        backends.end(), it->second, comp))
                 it->second.print_json(writer, show_internals);
         }
         writer.EndArray();
@@ -366,8 +370,12 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("filesystems");
         writer.StartArray();
         for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+            struct {
+                bool operator () (const FS & fs1, const FS & fs2) const
+                { return &fs1 < &fs2; }
+            } comp;
             if (filesystems.empty() || std::binary_search(filesystems.begin(),
-                        filesystems.end(), &it->second))
+                        filesystems.end(), it->second, comp))
                 it->second.print_json(writer, show_internals);
         }
         writer.EndArray();

@@ -26,11 +26,25 @@
 
 namespace {
 
-template<typename T>
-void remove_duplicates(std::vector<T> & v)
+template <typename T>
+struct RefLess
 {
-    std::sort(v.begin(), v.end());
-    auto it = std::unique(v.begin(), v.end());
+    bool operator () (const T & a, const T & b) const
+    { return &a < &b; }
+};
+
+template <typename T>
+struct RefEq
+{
+    bool operator () (const T & a, const T & b) const
+    { return &a == &b; }
+};
+
+template<typename T>
+void remove_duplicates(std::vector<std::reference_wrapper<T>> & v)
+{
+    std::sort(v.begin(), v.end(), RefLess<T>());
+    auto it = std::unique(v.begin(), v.end(), RefEq<T>());
     v.erase(it, v.end());
 }
 
@@ -63,11 +77,11 @@ private:
 
 void Storage::Entries::sort()
 {
-    std::sort(couples.begin(), couples.end());
-    std::sort(groups.begin(), groups.end());
-    std::sort(backends.begin(), backends.end());
-    std::sort(nodes.begin(), nodes.end());
-    std::sort(filesystems.begin(), filesystems.end());
+    std::sort(couples.begin(), couples.end(), RefLess<Couple>());
+    std::sort(groups.begin(), groups.end(), RefLess<Group>());
+    std::sort(backends.begin(), backends.end(), RefLess<Backend>());
+    std::sort(nodes.begin(), nodes.end(), RefLess<Node>());
+    std::sort(filesystems.begin(), filesystems.end(), RefLess<FS>());
 }
 
 Storage::Storage(WorkerApplication & app)
@@ -162,16 +176,6 @@ Namespace & Storage::get_namespace(const std::string & name)
     return it->second;
 }
 
-bool Storage::get_namespace(const std::string & name, Namespace *& ns)
-{
-    auto it = m_namespaces.find(name);
-    if (it != m_namespaces.end()) {
-        ns = &it->second;
-        return true;
-    }
-    return false;
-}
-
 void Storage::update()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
@@ -204,20 +208,20 @@ void Storage::update()
         if (group_ids.empty())
             continue;
 
-        std::vector<Group*> groups(group_ids.size());
-        for (size_t i = 0; i < group_ids.size(); ++i) {
-            int id = group_ids[i];
+        std::vector<std::reference_wrapper<Group>> groups;
+        groups.reserve(group_ids.size());
+        for (int id : group_ids) {
             if (id == it->first)
-                groups[i] = &group;
+                groups.push_back(group);
             else
-                groups[i] = &get_group(id);
+                groups.push_back(get_group(id));
         }
 
-        Couple *couple0 = groups[0]->get_couple();
+        Couple *couple0 = groups[0].get().get_couple();
         if (couple0 != nullptr) {
             bool equal = true;
             for (size_t i = 1; i < groups.size(); ++i) {
-                if (groups[i]->get_couple() != couple0) {
+                if (groups[i].get().get_couple() != couple0) {
                     equal = false;
                     break;
                 }
@@ -228,7 +232,7 @@ void Storage::update()
 
         bool md_ok = true;
         for (size_t i = 1; i < groups.size(); ++i) {
-            if (groups[0]->check_metadata_equals(*groups[i]) != 0) {
+            if (groups[0].get().check_metadata_equals(groups[i]) != 0) {
                 md_ok = false;
                 break;
             }
@@ -240,8 +244,8 @@ void Storage::update()
         auto it = m_couples.lower_bound(key);
         if (it == m_couples.end() || it->first != key) {
             it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
-            for (Group *group : groups)
-                group->set_couple(&it->second);
+            for (Group & group : groups)
+                group.set_couple(&it->second);
         }
     }
 
@@ -270,31 +274,44 @@ void Storage::update(const Entries & entries)
 #endif
 
 template<typename SOURCE_ITEM, typename RESULT_ITEM>
-void Storage::filter_items(std::vector<SOURCE_ITEM*> & source_items,
-        std::vector<RESULT_ITEM*> & result_items,
+void Storage::filter_items(std::vector<std::reference_wrapper<SOURCE_ITEM>> & source_items,
+        std::vector<std::reference_wrapper<RESULT_ITEM>> & result_items,
         bool & first_pass)
 {
     if (result_items.empty() && !first_pass)
         return;
 
-    std::vector<RESULT_ITEM*> all_items;
-    for (SOURCE_ITEM *source_item : source_items)
-        source_item->get_items(all_items);
+    std::vector<std::reference_wrapper<RESULT_ITEM>> all_items;
+    for (SOURCE_ITEM & source_item : source_items)
+        source_item.get_items(all_items);
 
-    if (first_pass) {
+    if (first_pass || all_items.empty()) {
         result_items = all_items;
         first_pass = false;
         return;
     }
 
     remove_duplicates(all_items);
-    std::vector<RESULT_ITEM*> result_tmp(all_items.size());
 
-    auto it = std::set_intersection(result_items.begin(), result_items.end(),
-            all_items.begin(), all_items.end(), result_tmp.begin());
-    result_tmp.resize(it - result_tmp.begin());
+    std::vector<RESULT_ITEM*> all_pointers;
+    std::vector<RESULT_ITEM*> current_pointers;
+    std::vector<RESULT_ITEM*> result_pointers(all_items.size());
 
-    result_items = result_tmp;
+    // TODO: polish
+    all_pointers.reserve(all_items.size());
+    current_pointers.reserve(result_items.size());
+    for (RESULT_ITEM & item : all_items)
+        all_pointers.push_back(&item);
+    for (RESULT_ITEM & item : result_items)
+        current_pointers.push_back(&item);
+
+    auto it = std::set_intersection(current_pointers.begin(), current_pointers.end(),
+            all_pointers.begin(), all_pointers.end(), result_pointers.begin());
+    result_pointers.resize(it - result_pointers.begin());
+
+    result_items.clear();
+    for (RESULT_ITEM *ptr : result_pointers)
+        result_items.push_back(*ptr);
 }
 
 void Storage::select(Filter & filter, Entries & entries)
@@ -316,51 +333,52 @@ void Storage::select(Filter & filter, Entries & entries)
             node_item_ids[node].second.push_back(fsid);
     }
 
-    std::vector<Backend*> backends;
-    std::vector<FS*> filesystems;
+    std::vector<std::reference_wrapper<Backend>> backends;
+    std::vector<std::reference_wrapper<FS>> filesystems;
     for (auto nit = node_item_ids.begin(); nit != node_item_ids.end(); ++nit) {
-        Node *node = nullptr;
-        if (!get_node(nit->first, node) || node == nullptr)
+        auto it = m_nodes.find(nit->first);
+        if (it == m_nodes.end())
             continue;
+        Node & node = it->second;
 
         const std::vector<uint64_t> & backend_ids = nit->second.first;
         const std::vector<uint64_t> & fs_ids = nit->second.second;
         for (uint64_t backend_id : backend_ids) {
             Backend *backend = nullptr;
-            if (node->get_backend(backend_id, backend) && backend != nullptr)
-                backends.push_back(backend);
+            if (node.get_backend(backend_id, backend) && backend != nullptr)
+                backends.push_back(*backend);
         }
         for (uint64_t fsid : fs_ids) {
             FS *fs = nullptr;
-            if (node->get_fs(fsid, fs) && fs != nullptr)
-                filesystems.push_back(fs);
+            if (node.get_fs(fsid, fs) && fs != nullptr)
+                filesystems.push_back(*fs);
         }
     }
 
-    std::vector<Namespace*> namespaces;
-    std::vector<Couple*> couples;
-    std::vector<Group*> groups;
-    std::vector<Node*> nodes;
+    std::vector<std::reference_wrapper<Namespace>> namespaces;
+    std::vector<std::reference_wrapper<Couple>> couples;
+    std::vector<std::reference_wrapper<Group>> groups;
+    std::vector<std::reference_wrapper<Node>> nodes;
 
     for (const std::string & name : filter.namespaces) {
-        Namespace *ns = nullptr;
-        if (get_namespace(name, ns) && ns != nullptr)
-            namespaces.push_back(ns);
+        auto it = m_namespaces.find(name);
+        if (it != m_namespaces.end())
+            namespaces.push_back(it->second);
     }
     for (const std::string & key : filter.couples) {
         Couple *couple = nullptr;
         if (get_couple(key, couple) && couple != nullptr)
-            couples.push_back(couple);
+            couples.push_back(*couple);
     }
     for (int id : filter.groups) {
         Group *group = nullptr;
         if (get_group(id, group) && group != nullptr)
-            groups.push_back(group);
+            groups.push_back(*group);
     }
     for (const std::string & key : filter.nodes) {
         Node *node = nullptr;
         if (get_node(key, node) && node != nullptr)
-            nodes.push_back(node);
+            nodes.push_back(*node);
     }
 
     if (filter.item_types & Filter::Group) {
@@ -539,8 +557,8 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (!entries.nodes.empty()) {
         writer.Key("nodes");
         writer.StartArray();
-        for (Node *node : entries.nodes)
-            node->print_json(writer, entries.backends, entries.filesystems,
+        for (Node & node : entries.nodes)
+            node.print_json(writer, entries.backends, entries.filesystems,
                     !!(item_types & Filter::Backend), !!(item_types & Filter::FS), show_internals);
         writer.EndArray();
     }
@@ -548,24 +566,24 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (!entries.groups.empty()) {
         writer.Key("groups");
         writer.StartArray();
-        for (Group *group : entries.groups)
-            group->print_json(writer, show_internals);
+        for (Group & group : entries.groups)
+            group.print_json(writer, show_internals);
         writer.EndArray();
     }
 
     if (!entries.couples.empty()) {
         writer.Key("couples");
         writer.StartArray();
-        for (Couple *couple : entries.couples)
-            couple->print_json(writer, show_internals);
+        for (Couple & couple : entries.couples)
+            couple.print_json(writer, show_internals);
         writer.EndArray();
     }
 
     if (!entries.namespaces.empty()) {
         writer.Key("namespaces");
         writer.StartArray();
-        for (Namespace *ns : entries.namespaces)
-            writer.String(ns->get_name().c_str());
+        for (Namespace & ns : entries.namespaces)
+            writer.String(ns.get_name().c_str());
         writer.EndArray();
     }
 }
@@ -577,7 +595,9 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("nodes");
         writer.StartArray();
         for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
-            it->second.print_json(writer, std::vector<Backend*>(), std::vector<FS*>(),
+            it->second.print_json(writer,
+                    std::vector<std::reference_wrapper<Backend>>(),
+                    std::vector<std::reference_wrapper<FS>>(),
                     !!(item_types & Filter::Backend), !!(item_types & Filter::FS), show_internals);
         }
         writer.EndArray();
@@ -614,9 +634,9 @@ void Storage::update_group_structure()
 
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
         Node & node = it->second;
-        std::vector<Backend*> backends = node.pick_new_backends();
-        for (Backend *backend : backends)
-            handle_backend(*backend);
+        std::vector<std::reference_wrapper<Backend>> backends = node.pick_new_backends();
+        for (Backend & backend : backends)
+            handle_backend(backend);
     }
 }
 
@@ -655,17 +675,17 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
             my->second.merge(other->second, have_newer);
         } else {
             const Couple & other_couple = other->second;
-            const std::vector<Group*> & other_groups = other_couple.get_groups();
+            const auto & other_groups = other_couple.get_groups();
 
-            std::vector<Group*> my_groups;
+            std::vector<std::reference_wrapper<Group>> my_groups;
             my_groups.reserve(other_groups.size());
 
             for (size_t i = 0; i < other_groups.size(); ++i) {
-                int id = other_groups[i]->get_id();
+                int id = other_groups[i].get().get_id();
                 auto gr = m_groups.find(id);
 
                 if (gr != m_groups.end()) {
-                    my_groups.push_back(&gr->second);
+                    my_groups.push_back(gr->second);
                 } else {
                     BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
                             "Merge storage: internal inconsistency: have no group %d for couple", id);
@@ -675,8 +695,8 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
             my = m_couples.insert(my, std::make_pair(other_couple.get_key(), Couple(my_groups)));
             Couple & my_couple = my->second;
 
-            for (Group *group : my_groups)
-                group->set_couple(&my_couple);
+            for (Group & group : my_groups)
+                group.set_couple(&my_couple);
 
             my_couple.merge(other_couple, have_newer);
         }

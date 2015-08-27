@@ -145,7 +145,7 @@ private:
 
     Storage::Entries m_entries;
 
-    std::vector<Group*> m_groups_to_read;
+    std::vector<std::reference_wrapper<Group>> m_groups_to_read;
     std::vector<ioremap::elliptics::session> m_group_read_sessions;
 
     dispatch_queue_t m_queue;

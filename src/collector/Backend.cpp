@@ -57,33 +57,33 @@ void Backend::clone_from(const Backend & other)
     m_disabled = other.m_disabled;
 }
 
-void Backend::get_items(std::vector<Couple*> & couples) const
+void Backend::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     if (m_group != nullptr)
         m_group->get_items(couples);
 }
 
-void Backend::get_items(std::vector<Namespace*> & namespaces) const
+void Backend::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     if (m_group != nullptr)
         m_group->get_items(namespaces);
 }
 
-void Backend::get_items(std::vector<Node*> & nodes) const
+void Backend::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
-    nodes.push_back(&m_node);
+    nodes.push_back(m_node);
 }
 
-void Backend::get_items(std::vector<Group*> & groups) const
+void Backend::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
     if (m_group != nullptr)
-        groups.push_back(m_group);
+        groups.push_back(*m_group);
 }
 
-void Backend::get_items(std::vector<FS*> & filesystems) const
+void Backend::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
 {
     if (m_fs != nullptr)
-        filesystems.push_back(m_fs);
+        filesystems.push_back(*m_fs);
 }
 
 void Backend::update(const BackendStat & stat)

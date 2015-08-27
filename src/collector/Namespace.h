@@ -28,6 +28,14 @@ class Group;
 class Namespace
 {
 public:
+    struct GroupLess
+    {
+        bool operator () (const Group & a, const Group & b) const
+        { return &a < &b; }
+    };
+    typedef std::set<std::reference_wrapper<Group>, GroupLess> Groups;
+
+public:
     Namespace(const std::string & name)
         : m_name(name)
     {}
@@ -36,48 +44,48 @@ public:
     { return m_name; }
 
     void add_group(Group & group)
-    { m_groups.insert(&group); }
+    { m_groups.insert(group); }
 
     void remove_group(Group & group)
-    { m_groups.erase(&group); }
+    { m_groups.erase(group); }
 
-    std::set<Group*> & get_groups()
+    Groups & get_groups()
     { return m_groups; }
 
     // NB: get_items() may return duplicates
 
-    void get_items(std::vector<Group*> & groups) const
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const
     {
         groups.insert(groups.end(), m_groups.begin(), m_groups.end());
     }
 
-    void get_items(std::vector<Node*> & nodes) const
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
     {
-        for (Group *group : m_groups)
-            group->get_items(nodes);
+        for (Group & group : m_groups)
+            group.get_items(nodes);
     }
 
-    void get_items(std::vector<Backend*> & backends) const
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
     {
-        for (Group *group : m_groups)
-            group->get_items(backends);
+        for (Group & group : m_groups)
+            group.get_items(backends);
     }
 
-    void get_items(std::vector<FS*> & filesystems) const
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
     {
-        for (Group *group : m_groups)
-            group->get_items(filesystems);
+        for (Group & group : m_groups)
+            group.get_items(filesystems);
     }
 
-    void get_items(std::vector<Couple*> & couples) const
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
     {
-        for (Group *group : m_groups)
-            group->get_items(couples);
+        for (Group & group : m_groups)
+            group.get_items(couples);
     }
 
 private:
     const std::string m_name;
-    std::set<Group*> m_groups;
+    Groups m_groups;
 };
 
 #endif

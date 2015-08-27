@@ -72,45 +72,45 @@ Group::Group(int id)
 
 void Group::add_backend(Backend & backend)
 {
-    m_backends.insert(&backend);
+    m_backends.insert(backend);
 }
 
-void Group::get_items(std::vector<Couple*> & couples) const
+void Group::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     if (m_couple != nullptr)
-        couples.push_back(m_couple);
+        couples.push_back(*m_couple);
 }
 
-void Group::get_items(std::vector<Namespace*> & namespaces) const
+void Group::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     if (m_namespace != nullptr)
-        namespaces.push_back(m_namespace);
+        namespaces.push_back(*m_namespace);
 }
 
-void Group::get_items(std::vector<Node*> & nodes) const
+void Group::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
-    for (Backend *backend : m_backends)
-        nodes.push_back(&backend->get_node());
+    for (Backend & backend : m_backends)
+        nodes.push_back(backend.get_node());
 }
 
-void Group::get_items(std::vector<Backend*> & backends) const
+void Group::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
 {
     backends.insert(backends.end(), m_backends.begin(), m_backends.end());
 }
 
-void Group::get_items(std::vector<FS*> & filesystems) const
+void Group::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
 {
-    for (Backend *backend : m_backends) {
-        FS *fs = backend->get_fs();
+    for (Backend & backend : m_backends) {
+        FS *fs = backend.get_fs();
         if (fs != nullptr)
-            filesystems.push_back(fs);
+            filesystems.push_back(*fs);
     }
 }
 
 bool Group::full() const
 {
-    for (const Backend *backend : m_backends) {
-        if (!backend->full())
+    for (const Backend & backend : m_backends) {
+        if (!backend.full())
             return false;
     }
     return true;
@@ -120,8 +120,8 @@ uint64_t Group::get_total_space() const
 {
     uint64_t res = 0;
 
-    for (const Backend *backend : m_backends)
-        res += backend->get_total_space();
+    for (const Backend & backend : m_backends)
+        res += backend.get_total_space();
     return res;
 }
 
@@ -303,8 +303,8 @@ void Group::update_status(bool forbidden_dht)
         bool have_ro = false;
         bool have_other = false;
 
-        for (Backend *backend : m_backends) {
-            Backend::Status b_status = backend->get_status();
+        for (Backend & backend : m_backends) {
+            Backend::Status b_status = backend.get_status();
             if (b_status == Backend::BAD) {
                 have_bad = true;
                 break;
@@ -402,8 +402,8 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
 
     writer.Key("backends");
     writer.StartArray();
-    for (Backend *backend : m_backends)
-        writer.String(backend->get_key().c_str());
+    for (Backend & backend : m_backends)
+        writer.String(backend.get_key().c_str());
     writer.EndArray();
 
     writer.Key("status_text");

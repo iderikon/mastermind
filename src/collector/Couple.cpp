@@ -26,54 +26,54 @@
 
 #include <algorithm>
 
-Couple::Couple(const std::vector<Group*> & groups)
+Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     :
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
 {
     for (size_t i = 0; i < groups.size(); ++i) {
-        m_key += std::to_string(groups[i]->get_id());
+        m_key += std::to_string(groups[i].get().get_id());
         if (i != (m_groups.size() - 1))
             m_key += ':';
     }
     m_groups = groups;
 }
 
-void Couple::get_items(std::vector<Group*> & groups) const
+void Couple::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
     groups.insert(groups.end(), m_groups.begin(), m_groups.end());
 }
 
-void Couple::get_items(std::vector<Namespace*> & namespaces) const
+void Couple::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     if (!m_groups.empty()) {
-        Namespace *ns = m_groups.front()->get_namespace();
-        namespaces.push_back(ns);
+        Namespace *ns = m_groups.front().get().get_namespace();
+        namespaces.push_back(*ns);
     }
 }
 
-void Couple::get_items(std::vector<Node*> & nodes) const
+void Couple::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
-    for (Group *group : m_groups) {
-        std::set<Backend*> & backends = group->get_backends();
-        for (Backend *backend : backends)
-            nodes.push_back(&backend->get_node());
+    for (Group & group : m_groups) {
+        auto & backends = group.get_backends();
+        for (Backend & backend : backends)
+            nodes.push_back(backend.get_node());
     }
 }
 
-void Couple::get_items(std::vector<Backend*> & backends) const
+void Couple::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
 {
-    for (Group *group : m_groups)
-        group->get_items(backends);
+    for (Group & group : m_groups)
+        group.get_items(backends);
 }
 
-void Couple::get_items(std::vector<FS*> & filesystems) const
+void Couple::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
 {
-    for (Group *group : m_groups) {
-        std::set<Backend*> & backends = group->get_backends();
-        for (Backend *backend : backends)
-            backend->get_items(filesystems);
+    for (Group & group : m_groups) {
+        auto & backends = group.get_backends();
+        for (Backend & backend : backends)
+            backend.get_items(filesystems);
     }
 }
 
@@ -89,20 +89,20 @@ void Couple::update_status(bool forbidden_unmatched_total)
 
     std::vector<Group::Status> statuses;
 
-    Group *g = m_groups[0];
-    statuses.push_back(g->get_status());
+    Group & g = m_groups[0];
+    statuses.push_back(g.get_status());
 
-    bool have_frozen = g->get_frozen();
+    bool have_frozen = g.get_frozen();
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
-        if (g->check_metadata_equals(*m_groups[i]) != 0) {
+        if (g.check_metadata_equals(m_groups[i]) != 0) {
             modify(m_status, BAD);
             modify(m_status_text, "Groups have different metadata");
             return;
         }
 
-        statuses.push_back(m_groups[i]->get_status());
-        if (m_groups[i]->get_frozen())
+        statuses.push_back(m_groups[i].get().get_status());
+        if (m_groups[i].get().get_frozen())
             have_frozen = true;
     }
 
@@ -115,7 +115,7 @@ void Couple::update_status(bool forbidden_unmatched_total)
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
         if (forbidden_unmatched_total) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
-                if (m_groups[i]->get_total_space() != m_groups[0]->get_total_space()) {
+                if (m_groups[i].get().get_total_space() != m_groups[0].get().get_total_space()) {
                     modify(m_status, BROKEN);
                     modify(m_status_text, "Couple has unequal total space in groups");
                     return;
@@ -124,8 +124,8 @@ void Couple::update_status(bool forbidden_unmatched_total)
         }
 
         bool full = false;
-        for (Group *group : m_groups) {
-            if (group->full()) {
+        for (Group & group : m_groups) {
+            if (group.full()) {
                 full = true;
                 break;
             }
@@ -187,8 +187,8 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
 
     writer.Key("groups");
     writer.StartArray();
-    for (Group *group : m_groups)
-        writer.Uint64(group->get_id());
+    for (Group & group : m_groups)
+        writer.Uint64(group.get_id());
     writer.EndArray();
 
     writer.Key("status");

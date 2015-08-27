@@ -25,6 +25,7 @@
 #include "Node.h"
 
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
 #include <utility>
@@ -37,12 +38,12 @@ class Storage
 public:
     struct Entries
     {
-        std::vector<Couple*> couples;
-        std::vector<Group*> groups;
-        std::vector<Backend*> backends;
-        std::vector<Node*> nodes;
-        std::vector<FS*> filesystems;
-        std::vector<Namespace*> namespaces;
+        std::vector<std::reference_wrapper<Couple>> couples;
+        std::vector<std::reference_wrapper<Group>> groups;
+        std::vector<std::reference_wrapper<Backend>> backends;
+        std::vector<std::reference_wrapper<Node>> nodes;
+        std::vector<std::reference_wrapper<FS>> filesystems;
+        std::vector<std::reference_wrapper<Namespace>> namespaces;
 
         void sort();
     };
@@ -69,8 +70,6 @@ public:
     std::map<std::string, Couple> & get_couples()
     { return m_couples; }
 
-    Namespace & get_namespace(const std::string & name);
-    bool get_namespace(const std::string & name, Namespace *& ns);
     std::map<std::string, Namespace> & get_namespaces()
     { return m_namespaces; }
 
@@ -93,6 +92,8 @@ public:
     void print_json(Filter & filter, bool show_internals, std::string & str);
 
 private:
+    Namespace & get_namespace(const std::string & name);
+
     void handle_backend(Backend & backend);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -102,8 +103,8 @@ private:
             uint32_t item_types, bool show_internals);
 
     template<typename SOURCE_ITEM, typename RESULT_ITEM>
-    static void filter_items(std::vector<SOURCE_ITEM*> & source_items,
-            std::vector<RESULT_ITEM*> & result_items,
+    static void filter_items(std::vector<std::reference_wrapper<SOURCE_ITEM>> & source_items,
+            std::vector<std::reference_wrapper<RESULT_ITEM>> & result_items,
             bool & first_pass);
 
     void merge_groups(const Storage & other_storage, bool & have_newer);

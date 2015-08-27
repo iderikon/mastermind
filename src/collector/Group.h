@@ -19,6 +19,7 @@
 #ifndef __046c58ff_e6c4_49a6_a920_eee87b111685
 #define __046c58ff_e6c4_49a6_a920_eee87b111685
 
+#include <functional>
 #include <iostream>
 #include <rapidjson/writer.h>
 #include <set>
@@ -45,6 +46,13 @@ public:
 
     static const char *status_str(Status status);
 
+    struct BackendLess
+    {
+        bool operator () (const Backend & b1, const Backend & b2) const
+        { return &b1 < &b2; }
+    };
+    typedef std::set<std::reference_wrapper<Backend>, BackendLess> Backends;
+
 public:
     Group(int id);
     Group();
@@ -57,7 +65,7 @@ public:
 
     void add_backend(Backend & backend);
 
-    std::set<Backend*> & get_backends()
+    Backends & get_backends()
     { return m_backends; }
 
     void metadata_download_failed(const std::string & why);
@@ -94,11 +102,11 @@ public:
     { return m_couple; }
 
     // NB: get_items() may return duplicates
-    void get_items(std::vector<Couple*> & couples) const;
-    void get_items(std::vector<Namespace*> & namespaces) const;
-    void get_items(std::vector<Node*> & nodes) const;
-    void get_items(std::vector<Backend*> & backends) const;
-    void get_items(std::vector<FS*> & filesystems) const;
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     bool full() const;
     uint64_t get_total_space() const;
@@ -122,7 +130,8 @@ public:
 
 private:
     int m_id;
-    std::set<Backend*> m_backends;
+
+    Backends m_backends;
 
     bool m_clean;
     std::vector<char> m_metadata_file;

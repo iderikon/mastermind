@@ -65,35 +65,35 @@ void FS::update(const Backend & backend)
     m_stat.total_space = backend.get_vfs_total_space();
 }
 
-void FS::get_items(std::vector<Couple*> & couples) const
+void FS::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
-    for (Backend *backend : m_backends)
-        backend->get_items(couples);
+    for (Backend & backend : m_backends)
+        backend.get_items(couples);
 }
 
-void FS::get_items(std::vector<Namespace*> & namespaces) const
+void FS::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    for (Backend *backend : m_backends)
-        backend->get_items(namespaces);
+    for (Backend & backend : m_backends)
+        backend.get_items(namespaces);
 }
 
-void FS::get_items(std::vector<Backend*> & backends) const
+void FS::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
 {
     backends.insert(backends.end(), m_backends.begin(), m_backends.end());
 }
 
-void FS::get_items(std::vector<Group*> & groups) const
+void FS::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
-    for (Backend *backend : m_backends) {
-        Group *group = backend->get_group();
+    for (Backend & backend : m_backends) {
+        Group *group = backend.get_group();
         if (group != nullptr)
-            groups.push_back(group);
+            groups.push_back(*group);
     }
 }
 
-void FS::get_items(std::vector<Node*> & nodes) const
+void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
-    nodes.push_back(&m_node);
+    nodes.push_back(m_node);
 }
 
 void FS::update_status()
@@ -101,11 +101,11 @@ void FS::update_status()
     Status prev = m_status;
 
     uint64_t total_space = 0;
-    for (Backend *backend : m_backends) {
-        Backend::Status status = backend->get_status();
+    for (Backend & backend : m_backends) {
+        Backend::Status status = backend.get_status();
         if (status != Backend::OK && status != Backend::BROKEN)
             continue;
-        total_space += backend->get_total_space();
+        total_space += backend.get_total_space();
     }
 
     m_status = (total_space <= m_stat.total_space) ? OK : BROKEN;

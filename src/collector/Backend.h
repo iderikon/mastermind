@@ -99,11 +99,11 @@ public:
     { return m_group; }
 
     // NB: get_items() may return duplicates
-    void get_items(std::vector<Couple*> & couples) const;
-    void get_items(std::vector<Namespace*> & namespaces) const;
-    void get_items(std::vector<Node*> & nodes) const;
-    void get_items(std::vector<Group*> & groups) const;
-    void get_items(std::vector<FS*> & filesystems) const;
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     const std::string & get_key() const
     { return m_key; }

@@ -52,20 +52,20 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Couple(const std::vector<Group*> & groups);
+    Couple(const std::vector<std::reference_wrapper<Group>> & groups);
 
     const std::string & get_key() const
     { return m_key; }
 
-    const std::vector<Group*> & get_groups() const
+    const std::vector<std::reference_wrapper<Group>> & get_groups() const
     { return m_groups; }
 
     // NB: get_items() may return duplicates
-    void get_items(std::vector<Group*> & groups) const;
-    void get_items(std::vector<Namespace*> & namespaces) const;
-    void get_items(std::vector<Node*> & nodes) const;
-    void get_items(std::vector<Backend*> & backends) const;
-    void get_items(std::vector<FS*> & filesystems) const;
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     void update_status(bool forbidden_unmatched_total);
 
@@ -92,7 +92,7 @@ private:
 
 private:
     std::string m_key;
-    std::vector<Group*> m_groups;
+    std::vector<std::reference_wrapper<Group>> m_groups;
 
     Status m_status;
     std::string m_status_text;

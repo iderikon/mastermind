@@ -190,9 +190,9 @@ void Round::step3_prepare_metadata_download(void *arg)
     if (self.m_type != FORCED_PARTIAL) {
         std::map<int, Group> & groups = self.m_storage->get_groups();
         for (auto it = groups.begin(); it != groups.end(); ++it)
-            self.m_groups_to_read.push_back(&it->second);
+            self.m_groups_to_read.push_back(it->second);
     } else {
-        for (Group * group : self.m_entries.groups)
+        for (Group & group : self.m_entries.groups)
             self.m_groups_to_read.push_back(group);
     }
 
@@ -232,7 +232,7 @@ void Round::request_group_metadata(void *arg, size_t idx)
 {
     Round & self = *static_cast<Round*>(arg);
 
-    std::vector<int> group_id(1, self.m_groups_to_read[idx]->get_id());
+    std::vector<int> group_id(1, self.m_groups_to_read[idx].get().get_id());
     static const elliptics::key key("symmetric_groups");
 
     elliptics::session & session = self.m_group_read_sessions[idx];
@@ -274,8 +274,8 @@ int Round::perform_download()
     }
 
     if (m_type == FORCED_PARTIAL) {
-        for (Node *node : m_entries.nodes)
-            add_download(*node);
+        for (Node & node : m_entries.nodes)
+            add_download(node);
     } else {
         std::map<std::string, Node> & storage_nodes = m_storage->get_nodes();
         for (auto it = storage_nodes.begin(); it != storage_nodes.end(); ++it)
@@ -439,13 +439,13 @@ size_t Round::write_func(char *ptr, size_t size, size_t nmemb, void *userdata)
 void Round::result(size_t group_idx, const elliptics::read_result_entry & entry)
 {
     elliptics::data_pointer file = entry.file();
-    m_groups_to_read[group_idx]->save_metadata((const char *) file.data(), file.size());
+    m_groups_to_read[group_idx].get().save_metadata((const char *) file.data(), file.size());
 }
 
 void Round::final(size_t group_idx, const elliptics::error_info & error)
 {
     if (error)
-        m_groups_to_read[group_idx]->metadata_download_failed(error.message());
+        m_groups_to_read[group_idx].get().metadata_download_failed(error.message());
 
     if (! --m_nr_groups) {
         BH_LOG(get_app().get_logger(), DNET_LOG_INFO, "Group metadata download completed");

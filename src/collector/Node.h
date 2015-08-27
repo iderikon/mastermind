@@ -21,6 +21,7 @@
 
 #include "Backend.h"
 
+#include <functional>
 #include <iostream>
 #include <map>
 #include <rapidjson/writer.h>
@@ -90,13 +91,13 @@ public:
     bool get_backend(int id, Backend *& backend);
 
     // NB: get_items() may return duplicates
-    void get_items(std::vector<Couple*> & couples);
-    void get_items(std::vector<Namespace*> & namespaces);
-    void get_items(std::vector<Backend*> & backends);
-    void get_items(std::vector<Group*> & groups);
-    void get_items(std::vector<FS*> & filesystems);
+    void get_items(std::vector<std::reference_wrapper<Couple>> & couples);
+    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces);
+    void get_items(std::vector<std::reference_wrapper<Backend>> & backends);
+    void get_items(std::vector<std::reference_wrapper<Group>> & groups);
+    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems);
 
-    std::vector<Backend*> pick_new_backends()
+    std::vector<std::reference_wrapper<Backend>> pick_new_backends()
     { return std::move(m_new_backends); }
 
     void update_filesystems();
@@ -109,8 +110,8 @@ public:
     { return m_filesystems; }
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-            const std::vector<Backend*> & backends,
-            const std::vector<FS*> & filesystems,
+            const std::vector<std::reference_wrapper<Backend>> & backends,
+            const std::vector<std::reference_wrapper<FS>> & filesystems,
             bool print_backends,
             bool print_fs,
             bool show_internals) const;
@@ -149,7 +150,7 @@ private:
     std::map<int, Backend> m_backends;
     std::map<uint64_t, FS> m_filesystems;
 
-    std::vector<Backend*> m_new_backends;
+    std::vector<std::reference_wrapper<Backend>> m_new_backends;
 
     ClockStat m_clock;
 };
