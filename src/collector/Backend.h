@@ -35,6 +35,9 @@ struct BackendStat
 {
     BackendStat();
 
+    uint64_t get_timestamp() const
+    { return ts_sec * 1000000UL + ts_usec; }
+
     uint64_t ts_sec;
     uint64_t ts_usec;
     uint64_t backend_id;
@@ -82,21 +85,8 @@ public:
 
     void clone_from(const Backend & other);
 
-    Node & get_node()
-    { return m_node; }
-    const Node & get_node() const
-    { return m_node; }
-
-    void set_fs(FS *fs)
-    { m_fs = fs; }
-
-    FS *get_fs() const
-    { return m_fs; }
-
-    void set_group(Group *group)
-    { m_group = group; }
-    Group *get_group() const
-    { return m_group; }
+    void set_fs(FS & fs);
+    void set_group(Group & group);
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
@@ -112,8 +102,8 @@ public:
     { return m_stat; }
 
     void update(const BackendStat & stat);
-
     void recalculate(uint64_t reserved_space);
+    void update_status();
 
     uint64_t get_vfs_free_space() const
     { return m_calculated.vfs_free_space; }
@@ -154,6 +144,7 @@ public:
 
 private:
     Node & m_node;
+
     FS *m_fs;
     Group *m_group;
 

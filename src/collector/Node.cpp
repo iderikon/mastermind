@@ -98,18 +98,6 @@ void Node::update(const NodeStat & stat)
     m_stat.rx_bytes = stat.rx_bytes;
 }
 
-void Node::check_fs_change(Backend & backend, uint64_t new_fsid)
-{
-    FS *old_fs = backend.get_fs();
-    if (old_fs == nullptr || old_fs->get_fsid() != new_fsid) {
-        FS & new_fs = get_fs(new_fsid);
-        new_fs.add_backend(backend);
-        if (old_fs != nullptr)
-            old_fs->remove_backend(backend);
-        backend.set_fs(&new_fs);
-    }
-}
-
 void Node::handle_backend(const BackendStat & new_stat)
 {
     auto it = m_backends.lower_bound(new_stat.backend_id);
@@ -118,19 +106,30 @@ void Node::handle_backend(const BackendStat & new_stat)
     if (!found && !new_stat.state)
         return;
 
-    Backend *backend;
+    uint64_t old_fsid = 0;
     if (found) {
-        backend = &it->second;
-        backend->update(new_stat);
+        old_fsid = it->second.get_stat().fsid;
+        it->second.update(new_stat);
     } else {
         it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
-        backend = &it->second;
-        backend->init(new_stat);
-        m_new_backends.push_back(*backend);
+        it->second.init(new_stat);
+        m_new_backends.push_back(it->second);
     }
 
-    check_fs_change(*backend, new_stat.fsid);
-    backend->recalculate(m_storage.get_app().get_config().reserved_space);
+    Backend & backend = it->second;
+
+    uint64_t new_fsid = backend.get_stat().fsid;
+    FS & new_fs = get_fs(new_fsid);
+    if (new_fsid != old_fsid) {
+        if (old_fsid)
+            get_fs(old_fsid).remove_backend(backend);
+        backend.set_fs(new_fs);
+        new_fs.add_backend(backend);
+    }
+
+    backend.recalculate(m_storage.get_app().get_config().reserved_space);
+    new_fs.update(backend);
+    backend.update_status();
 }
 
 void Node::parse_stats(void *arg)
@@ -178,16 +177,6 @@ void Node::parse_stats(void *arg)
     }
 }
 
-bool Node::get_backend(int id, Backend *& backend)
-{
-    auto it = m_backends.find(id);
-    if (it != m_backends.end()) {
-        backend = &it->second;
-        return true;
-    }
-    return false;
-}
-
 void Node::get_items(std::vector<std::reference_wrapper<Couple>> & couples)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
@@ -212,11 +201,8 @@ void Node::get_items(std::vector<std::reference_wrapper<Backend>> & backends)
 
 void Node::get_items(std::vector<std::reference_wrapper<Group>> & groups)
 {
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
-        Group *group = it->second.get_group();
-        if (group != nullptr)
-            groups.push_back(*group);
-    }
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        it->second.get_items(groups);
 }
 
 void Node::get_items(std::vector<std::reference_wrapper<FS>> & filesystems)
@@ -245,14 +231,25 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
             Backend & my_backend = my->second;
             const Backend & other_backend = other->second;
 
+            if (my_backend.get_stat().get_timestamp() < other_backend.get_stat().get_timestamp()) {
+                uint64_t old_fsid = my_backend.get_stat().fsid;
+                uint64_t new_fsid = other_backend.get_stat().fsid;
+
+                if (old_fsid != new_fsid) {
+                    if (old_fsid)
+                        get_fs(old_fsid).remove_backend(my_backend);
+                    FS & new_fs = get_fs(new_fsid);
+                    my_backend.set_fs(new_fs);
+                    new_fs.add_backend(my_backend);
+                }
+            }
             my_backend.merge(other_backend, have_newer);
-            check_fs_change(my_backend, my_backend.get_stat().fsid);
         } else {
             my = m_backends.insert(my, std::make_pair(other->first, Backend(*this)));
             Backend & my_backend = my->second;
 
             my_backend.clone_from(other->second);
-            check_fs_change(my_backend, my_backend.get_stat().fsid);
+            get_fs(my_backend.get_stat().fsid).add_backend(my_backend);
             m_new_backends.push_back(my_backend);
         }
         ++other;
@@ -264,8 +261,8 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
 
 void Node::merge(const Node & other, bool & have_newer)
 {
-    uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
-    uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
+    uint64_t my_ts = m_stat.ts_sec * 1000000UL + m_stat.ts_usec;
+    uint64_t other_ts = other.m_stat.ts_sec * 1000000UL + other.m_stat.ts_usec;
     if (my_ts < other_ts) {
         std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
         std::memcpy(&m_clock, &other.m_clock, sizeof(m_clock));
@@ -275,16 +272,6 @@ void Node::merge(const Node & other, bool & have_newer)
 
     merge_backends(other, have_newer);
     Storage::merge_map(*this, m_filesystems, other.m_filesystems, have_newer);
-}
-
-bool Node::get_fs(uint64_t fsid, FS *& fs)
-{
-    auto it = m_filesystems.find(fsid);
-    if (it != m_filesystems.end()) {
-        fs = &it->second;
-        return true;
-    }
-    return false;
 }
 
 FS & Node::get_fs(uint64_t fsid)

@@ -88,7 +88,6 @@ public:
 
     std::map<int, Backend> & get_backends()
     { return m_backends; }
-    bool get_backend(int id, Backend *& backend);
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<std::reference_wrapper<Couple>> & couples);
@@ -104,8 +103,6 @@ public:
 
     void merge(const Node & other, bool & have_newer);
 
-    bool get_fs(uint64_t fsid, FS *& fs);
-
     std::map<uint64_t, FS> & get_filesystems()
     { return m_filesystems; }
 
@@ -117,8 +114,6 @@ public:
             bool show_internals) const;
 
 private:
-    void check_fs_change(Backend & backend, uint64_t new_fsid);
-
     FS & get_fs(uint64_t fsid);
 
     void merge_backends(const Node & other_node, bool & have_newer);

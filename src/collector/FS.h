@@ -61,12 +61,6 @@ public:
 
     void clone_from(const FS & other);
 
-    Node & get_node()
-    { return m_node; }
-
-    const Node & get_node() const
-    { return m_node; }
-
     uint64_t get_fsid() const
     { return m_fsid; }
 
@@ -98,9 +92,6 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void set_status(Status status)
-    { m_status = status; }
-
     void merge(const FS & other, bool & have_newer);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -114,7 +105,9 @@ private:
     Backends m_backends;
 
     FSStat m_stat;
+
     Status m_status;
+    std::string m_status_text;
 };
 
 #endif

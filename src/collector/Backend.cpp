@@ -57,6 +57,16 @@ void Backend::clone_from(const Backend & other)
     m_disabled = other.m_disabled;
 }
 
+void Backend::set_fs(FS & fs)
+{
+    m_fs = &fs;
+}
+
+void Backend::set_group(Group & group)
+{
+    m_group = &group;
+}
+
 void Backend::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     if (m_group != nullptr)
@@ -88,8 +98,8 @@ void Backend::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) c
 
 void Backend::update(const BackendStat & stat)
 {
-    double ts1 = double(m_stat.ts_sec) + double(m_stat.ts_usec) / 1000000.0;
-    double ts2 = double(stat.ts_sec) + double(stat.ts_usec) / 1000000.0;
+    double ts1 = double(m_stat.get_timestamp()) / 1000000.0;
+    double ts2 = double(stat.get_timestamp()) / 1000000.0;
     double d_ts = ts2 - ts1;
 
     if (d_ts > 1.0) {
@@ -133,10 +143,10 @@ void Backend::recalculate(uint64_t reserved_space)
 
     m_calculated.effective_free_space =
         std::max(m_calculated.free_space - (m_calculated.total_space - m_calculated.effective_space), 0L);
+}
 
-    if (m_fs != nullptr)
-        m_fs->update(*this);
-
+void Backend::update_status()
+{
     if (m_stat.error || m_disabled || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
@@ -158,8 +168,8 @@ bool Backend::full() const
 
 void Backend::merge(const Backend & other, bool & have_newer)
 {
-    uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
-    uint64_t other_ts = other.m_stat.ts_sec * 1000000 + other.m_stat.ts_usec;
+    uint64_t my_ts = m_stat.get_timestamp();
+    uint64_t other_ts = other.m_stat.get_timestamp();
     if (my_ts < other_ts) {
         std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
         std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));

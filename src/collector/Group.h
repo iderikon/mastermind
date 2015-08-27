@@ -79,11 +79,7 @@ public:
     const std::string & get_namespace_name() const
     { return m_metadata.namespace_name; }
 
-    void set_namespace(Namespace *ns)
-    { m_namespace = ns; }
-
-    Namespace *get_namespace()
-    { return m_namespace; }
+    void set_namespace(Namespace & ns);
 
     void update_status(bool forbidden_dht);
 
@@ -95,11 +91,8 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void set_couple(Couple *couple)
-    { m_couple = couple; }
-
-    Couple *get_couple()
-    { return m_couple; }
+    void set_couple(Couple & couple);
+    bool match_couple(const Group & other) const;
 
     // NB: get_items() may return duplicates
     void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;

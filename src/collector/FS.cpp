@@ -28,7 +28,8 @@ FS::FS(Node & node, uint64_t fsid)
     :
     m_node(node),
     m_fsid(fsid),
-    m_status(OK)
+    m_status(OK),
+    m_status_text("No updates yet")
 {
     std::memset(&m_stat, 0, sizeof(m_stat));
     m_key = node.get_key() + "/" + std::to_string(fsid);
@@ -38,7 +39,8 @@ FS::FS(Node & node)
     :
     m_node(node),
     m_fsid(0),
-    m_status(OK)
+    m_status(OK),
+    m_status_text("No updates yet")
 {
     std::memset(&m_stat, 0, sizeof(m_stat));
 }
@@ -49,6 +51,7 @@ void FS::clone_from(const FS & other)
     m_key = other.m_key;
     std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
     m_status = other.m_status;
+    m_status_text = other.m_status_text;
 
     if (!other.m_backends.empty()) {
         BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR,
@@ -84,11 +87,8 @@ void FS::get_items(std::vector<std::reference_wrapper<Backend>> & backends) cons
 
 void FS::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
-    for (Backend & backend : m_backends) {
-        Group *group = backend.get_group();
-        if (group != nullptr)
-            groups.push_back(*group);
-    }
+    for (Backend & backend : m_backends)
+        backend.get_items(groups);
 }
 
 void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
@@ -108,10 +108,24 @@ void FS::update_status()
         total_space += backend.get_total_space();
     }
 
-    m_status = (total_space <= m_stat.total_space) ? OK : BROKEN;
-    if (m_status != prev)
+    if (total_space <= m_stat.total_space) {
+        m_status = OK;
+        m_status_text = "Filesystem is OK";
+    } else {
+        m_status = BROKEN;
+
+        std::ostringstream ostr;
+        ostr << "Total space calculated from backends is " << total_space
+             << " which is greater than " << m_stat.total_space
+             << " from monitor stats";
+        m_status_text = ostr.str();
+    }
+
+    if (m_status != prev) {
         BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_INFO,
-                "FS %s status change %d -> %d", m_key.c_str(), int(prev), int(m_status));
+                "FS %s status change %s -> %s",
+                m_key.c_str(), status_str(prev), status_str(m_status));
+    }
 }
 
 void FS::merge(const FS & other, bool & have_newer)
@@ -121,6 +135,7 @@ void FS::merge(const FS & other, bool & have_newer)
     if (my_ts < other_ts) {
         std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
         m_status = other.m_status;
+        m_status_text = other.m_status_text;
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
@@ -151,6 +166,8 @@ void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_stat.total_space);
     writer.Key("status");
     writer.String(status_str(m_status));
+    writer.Key("status_text");
+    writer.String(m_status_text.c_str());
 
     writer.EndObject();
 }

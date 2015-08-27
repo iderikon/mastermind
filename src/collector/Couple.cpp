@@ -47,10 +47,8 @@ void Couple::get_items(std::vector<std::reference_wrapper<Group>> & groups) cons
 
 void Couple::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    if (!m_groups.empty()) {
-        Namespace *ns = m_groups.front().get().get_namespace();
-        namespaces.push_back(*ns);
-    }
+    if (!m_groups.empty())
+        m_groups.front().get().get_items(namespaces);
 }
 
 void Couple::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
@@ -58,7 +56,7 @@ void Couple::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
     for (Group & group : m_groups) {
         auto & backends = group.get_backends();
         for (Backend & backend : backends)
-            nodes.push_back(backend.get_node());
+            backend.get_items(nodes);
     }
 }
 

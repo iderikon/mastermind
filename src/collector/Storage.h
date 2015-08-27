@@ -56,17 +56,14 @@ public:
     WorkerApplication & get_app()
     { return m_app; }
 
-    bool add_node(const char *host, int port, int family);
-    bool get_node(const std::string & key, Node *& node);
+    void add_node(const char *host, int port, int family);
+
     std::map<std::string, Node> & get_nodes()
     { return m_nodes; }
 
-    bool get_group(int id, Group *& group);
-    Group & get_group(int id);
     std::map<int, Group> & get_groups()
     { return m_groups; }
 
-    bool get_couple(const std::string & key, Couple *& couple);
     std::map<std::string, Couple> & get_couples()
     { return m_couples; }
 
@@ -78,10 +75,6 @@ public:
 
     // process downloaded metadata, recalculate states, etc.
     void update();
-    // void update(const Entries & entries);
-
-    // group_ids must be sorted
-    void create_couple(const std::vector<int> & groups_ids, Group *group);
 
     // select entries matching filter
     void select(Filter & filter, Entries & entries);
@@ -92,6 +85,7 @@ public:
     void print_json(Filter & filter, bool show_internals, std::string & str);
 
 private:
+    Group & get_group(int id);
     Namespace & get_namespace(const std::string & name);
 
     void handle_backend(Backend & backend);

@@ -221,6 +221,7 @@ void Collector::execute_summary(void *arg)
     std::map<int, Group> & groups = self.m_storage->get_groups();
     std::map<std::string, Couple> & couples = self.m_storage->get_couples();
 
+    std::map<Backend::Status, int> backend_status;
     std::map<Group::Status, int> group_status;
     std::map<Couple::Status, int> couple_status;
     std::map<FS::Status, int> fs_status;
@@ -235,7 +236,11 @@ void Collector::execute_summary(void *arg)
 
     for (auto nit = nodes.begin(); nit != nodes.end(); ++nit) {
         Node & node = nit->second;
+
+        const std::map<int, Backend> & backends = node.get_backends();
         nr_backends += node.get_backends().size();
+        for (auto bit = backends.begin(); bit != backends.end(); ++bit)
+            ++backend_status[bit->second.get_status()];
 
         const std::map<uint64_t, FS> & fs = node.get_filesystems();
         nr_filesystems += fs.size();
@@ -252,9 +257,11 @@ void Collector::execute_summary(void *arg)
     for (auto it = fs_status.begin(); it != fs_status.end(); ++it)
         ostr << it->second << ' ' << FS::status_str(it->first) << ' ';
 
-    ostr << ")\n" << nr_backends << " backends\n";
+    ostr << ")\n" << nr_backends << " backends\n  ( ";
+    for (auto it = backend_status.begin(); it != backend_status.end(); ++it)
+        ostr << it->second << ' ' << Backend::status_str(it->first) << ' ';
 
-    ostr << groups.size() << " groups\n  ( ";
+    ostr << ")\n" << groups.size() << " groups\n  ( ";
     for (auto it = group_status.begin(); it != group_status.end(); ++it)
         ostr << it->second << ' ' << Group::status_str(it->first) << ' ';
 

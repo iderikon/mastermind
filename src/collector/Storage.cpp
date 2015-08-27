@@ -99,7 +99,7 @@ Storage::Storage(const Storage & other)
 Storage::~Storage()
 {}
 
-bool Storage::add_node(const char *host, int port, int family)
+void Storage::add_node(const char *host, int port, int family)
 {
     std::ostringstream node_id;
     node_id << host << ':' << port << ':' << family;
@@ -108,22 +108,11 @@ bool Storage::add_node(const char *host, int port, int family)
     auto it = m_nodes.lower_bound(node_id.str());
     if (it != m_nodes.end() && it->first == node_id.str()) {
         BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", node_id_str);
-        return false;
+        return;
     }
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", node_id_str);
     m_nodes.insert(it, std::make_pair(node_id.str(), Node(*this, host, port, family)));
-    return true;
-}
-
-bool Storage::get_node(const std::string & key, Node *& node)
-{
-    auto it = m_nodes.find(key);
-    if (it != m_nodes.end()) {
-        node = &it->second;
-        return true;
-    }
-    return false;
 }
 
 void Storage::handle_backend(Backend & backend)
@@ -137,17 +126,7 @@ void Storage::handle_backend(Backend & backend)
         it->second.add_backend(backend);
     }
 
-    backend.set_group(&it->second);
-}
-
-bool Storage::get_group(int id, Group *& group)
-{
-    auto it = m_groups.find(id);
-    if (it != m_groups.end()) {
-        group = &it->second;
-        return true;
-    }
-    return false;
+    backend.set_group(it->second);
 }
 
 Group & Storage::get_group(int id)
@@ -156,16 +135,6 @@ Group & Storage::get_group(int id)
     if (it == m_groups.end() || it->first != id)
         it = m_groups.insert(it, std::make_pair(id, Group(id)));
     return it->second;
-}
-
-bool Storage::get_couple(const std::string & key, Couple *& couple)
-{
-    auto it = m_couples.find(key);
-    if (it != m_couples.end()) {
-        couple = &it->second;
-        return true;
-    }
-    return false;
 }
 
 Namespace & Storage::get_namespace(const std::string & name)
@@ -185,15 +154,19 @@ void Storage::update()
 
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
+        std::string old_namespace_name = group.get_namespace_name();
+
         if (group.parse_metadata() != 0)
             continue;
 
-        const std::string & metadata_ns = group.get_namespace_name();
-        Namespace *ns = group.get_namespace();
-        if (ns == nullptr || ns->get_name() != metadata_ns) {
-            ns = &get_namespace(metadata_ns);
-            group.set_namespace(ns);
-            ns->add_group(group);
+        const std::string & new_namespace_name = group.get_namespace_name();
+        if (old_namespace_name != new_namespace_name) {
+            if (!old_namespace_name.empty())
+                get_namespace(old_namespace_name).remove_group(group);
+
+            Namespace & new_ns = get_namespace(new_namespace_name);
+            new_ns.add_group(group);
+            group.set_namespace(new_ns);
         }
 
         group.update_status(m_app.get_config().forbidden_dht_groups);
@@ -217,18 +190,16 @@ void Storage::update()
                 groups.push_back(get_group(id));
         }
 
-        Couple *couple0 = groups[0].get().get_couple();
-        if (couple0 != nullptr) {
-            bool equal = true;
-            for (size_t i = 1; i < groups.size(); ++i) {
-                if (groups[i].get().get_couple() != couple0) {
-                    equal = false;
-                    break;
-                }
+        // check if groups are associated with the same existing couple
+        bool have_same_couples = true;
+        for (size_t i = 1; i < groups.size(); ++i) {
+            if (!groups[i].get().match_couple(groups[0])) {
+                have_same_couples = false;
+                break;
             }
-            if (equal)
-                continue;
         }
+        if (have_same_couples)
+            continue;
 
         bool md_ok = true;
         for (size_t i = 1; i < groups.size(); ++i) {
@@ -245,7 +216,7 @@ void Storage::update()
         if (it == m_couples.end() || it->first != key) {
             it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
             for (Group & group : groups)
-                group.set_couple(&it->second);
+                group.set_couple(it->second);
         }
     }
 
@@ -318,14 +289,16 @@ void Storage::select(Filter & filter, Entries & entries)
         const std::vector<uint64_t> & backend_ids = nit->second.first;
         const std::vector<uint64_t> & fs_ids = nit->second.second;
         for (uint64_t backend_id : backend_ids) {
-            Backend *backend = nullptr;
-            if (node.get_backend(backend_id, backend) && backend != nullptr)
-                backends.push_back(*backend);
+            auto & node_backends = node.get_backends();
+            auto it = node_backends.find(backend_id);
+            if (it != node_backends.end())
+                backends.push_back(it->second);
         }
         for (uint64_t fsid : fs_ids) {
-            FS *fs = nullptr;
-            if (node.get_fs(fsid, fs) && fs != nullptr)
-                filesystems.push_back(*fs);
+            auto & node_filesystems = node.get_filesystems();
+            auto it = node_filesystems.find(fsid);
+            if (it != node_filesystems.end())
+                filesystems.push_back(it->second);
         }
     }
 
@@ -340,19 +313,19 @@ void Storage::select(Filter & filter, Entries & entries)
             namespaces.push_back(it->second);
     }
     for (const std::string & key : filter.couples) {
-        Couple *couple = nullptr;
-        if (get_couple(key, couple) && couple != nullptr)
-            couples.push_back(*couple);
+        auto it = m_couples.find(key);
+        if (it != m_couples.end())
+            couples.push_back(it->second);
     }
     for (int id : filter.groups) {
-        Group *group = nullptr;
-        if (get_group(id, group) && group != nullptr)
-            groups.push_back(*group);
+        auto it = m_groups.find(id);
+        if (it != m_groups.end())
+            groups.push_back(it->second);
     }
     for (const std::string & key : filter.nodes) {
-        Node *node = nullptr;
-        if (get_node(key, node) && node != nullptr)
-            nodes.push_back(*node);
+        auto it = m_nodes.find(key);
+        if (it != m_nodes.end())
+            nodes.push_back(it->second);
     }
 
     if (filter.item_types & Filter::Group) {
@@ -670,7 +643,7 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
             Couple & my_couple = my->second;
 
             for (Group & group : my_groups)
-                group.set_couple(&my_couple);
+                group.set_couple(my_couple);
 
             my_couple.merge(other_couple, have_newer);
         }
