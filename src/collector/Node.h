@@ -102,8 +102,8 @@ public:
 
     void merge(const Node & other, bool & have_newer);
 
-    FS *get_fs(uint64_t fsid);
     bool get_fs(uint64_t fsid, FS *& fs);
+
     std::map<uint64_t, FS> & get_filesystems()
     { return m_filesystems; }
 
@@ -113,6 +113,13 @@ public:
             bool print_backends,
             bool print_fs,
             bool show_internals) const;
+
+private:
+    void check_fs_change(Backend & backend, uint64_t new_fsid);
+
+    FS & get_fs(uint64_t fsid);
+
+    void merge_backends(const Node & other_node, bool & have_newer);
 
 public:
     struct ClockStat

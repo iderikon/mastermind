@@ -98,6 +98,18 @@ void Node::update(const NodeStat & stat)
     m_stat.rx_bytes = stat.rx_bytes;
 }
 
+void Node::check_fs_change(Backend & backend, uint64_t new_fsid)
+{
+    FS *old_fs = backend.get_fs();
+    if (old_fs == nullptr || old_fs->get_fsid() != new_fsid) {
+        FS & new_fs = get_fs(new_fsid);
+        new_fs.add_backend(backend);
+        if (old_fs != nullptr)
+            old_fs->remove_backend(backend);
+        backend.set_fs(&new_fs);
+    }
+}
+
 void Node::handle_backend(const BackendStat & new_stat)
 {
     auto it = m_backends.lower_bound(new_stat.backend_id);
@@ -106,14 +118,19 @@ void Node::handle_backend(const BackendStat & new_stat)
     if (!found && !new_stat.state)
         return;
 
+    Backend *backend;
     if (found) {
-        it->second.update(new_stat);
+        backend = &it->second;
+        backend->update(new_stat);
     } else {
         it = m_backends.insert(it, std::make_pair(new_stat.backend_id, Backend(*this)));
-        it->second.init(new_stat);
+        backend = &it->second;
+        backend->init(new_stat);
+        m_new_backends.push_back(backend);
     }
 
-    m_new_backends.push_back(&it->second);
+    check_fs_change(*backend, new_stat.fsid);
+    backend->recalculate(m_storage.get_app().get_config().reserved_space);
 }
 
 void Node::parse_stats(void *arg)
@@ -222,6 +239,35 @@ void Node::update_filesystems()
         it->second.update_status();
 }
 
+void Node::merge_backends(const Node & other_node, bool & have_newer)
+{
+    auto my = m_backends.begin();
+    auto other = other_node.m_backends.begin();
+
+    while (other != other_node.m_backends.end()) {
+        while (my != m_backends.end() && my->first < other->first)
+            ++my;
+        if (my != m_backends.end() && my->first == other->first) {
+            Backend & my_backend = my->second;
+            const Backend & other_backend = other->second;
+
+            my_backend.merge(other_backend, have_newer);
+            check_fs_change(my_backend, my_backend.get_stat().fsid);
+        } else {
+            my = m_backends.insert(my, std::make_pair(other->first, Backend(*this)));
+            Backend & my_backend = my->second;
+
+            my_backend.clone_from(other->second);
+            check_fs_change(my_backend, my_backend.get_stat().fsid);
+            m_new_backends.push_back(&my_backend);
+        }
+        ++other;
+    }
+
+    if (m_backends.size() > other_node.m_backends.size())
+        have_newer = true;
+}
+
 void Node::merge(const Node & other, bool & have_newer)
 {
     uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
@@ -233,18 +279,8 @@ void Node::merge(const Node & other, bool & have_newer)
         have_newer = true;
     }
 
-    Storage::merge_map(*this, m_backends, other.m_backends, have_newer);
+    merge_backends(other, have_newer);
     Storage::merge_map(*this, m_filesystems, other.m_filesystems, have_newer);
-}
-
-FS *Node::get_fs(uint64_t fsid)
-{
-    auto it = m_filesystems.lower_bound(fsid);
-
-    if (it == m_filesystems.end() || it->first != fsid)
-        it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
-
-    return &it->second;
 }
 
 bool Node::get_fs(uint64_t fsid, FS *& fs)
@@ -255,6 +291,16 @@ bool Node::get_fs(uint64_t fsid, FS *& fs)
         return true;
     }
     return false;
+}
+
+FS & Node::get_fs(uint64_t fsid)
+{
+    auto it = m_filesystems.lower_bound(fsid);
+
+    if (it == m_filesystems.end() || it->first != fsid)
+        it = m_filesystems.insert(it, std::make_pair(fsid, FS(*this, fsid)));
+
+    return it->second;
 }
 
 void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

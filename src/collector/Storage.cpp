@@ -623,6 +623,8 @@ void Storage::update_group_structure()
 
 void Storage::merge_groups(const Storage & other_storage, bool & have_newer)
 {
+    update_group_structure();
+
     auto my = m_groups.begin();
     auto other = other_storage.m_groups.begin();
 
@@ -679,6 +681,7 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
 
             my_couple.merge(other_couple, have_newer);
         }
+        ++other;
     }
     if (m_couples.size() > other_storage.m_couples.size())
         have_newer = true;

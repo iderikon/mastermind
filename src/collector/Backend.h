@@ -87,6 +87,9 @@ public:
     const Node & get_node() const
     { return m_node; }
 
+    void set_fs(FS *fs)
+    { m_fs = fs; }
+
     FS *get_fs() const
     { return m_fs; }
 
@@ -110,7 +113,7 @@ public:
 
     void update(const BackendStat & stat);
 
-    void recalculate();
+    void recalculate(uint64_t reserved_space);
 
     uint64_t get_vfs_free_space() const
     { return m_calculated.vfs_free_space; }

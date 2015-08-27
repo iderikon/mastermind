@@ -43,10 +43,7 @@ Backend::Backend(Node & node)
 void Backend::init(const BackendStat & stat)
 {
     memcpy(&m_stat, &stat, sizeof(m_stat));
-    m_fs = m_node.get_fs(stat.fsid);
-    m_fs->add_backend(*this);
     m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
-    recalculate();
 }
 
 void Backend::clone_from(const Backend & other)
@@ -58,11 +55,6 @@ void Backend::clone_from(const Backend & other)
 
     m_read_only = other.m_read_only;
     m_disabled = other.m_disabled;
-
-    m_fs = m_node.get_fs(m_stat.fsid);
-    m_fs->add_backend(*this);
-    m_group = &m_node.get_storage().get_group(m_stat.group);
-    m_group->add_backend(*this);
 }
 
 void Backend::get_items(std::vector<Couple*> & couples) const
@@ -111,17 +103,10 @@ void Backend::update(const BackendStat & stat)
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
     }
 
-    if (m_stat.fsid != stat.fsid) {
-        m_fs->remove_backend(*this);
-        m_fs = m_node.get_fs(stat.fsid);
-        m_fs->add_backend(*this);
-    }
-
     std::memcpy(&m_stat, &stat, sizeof(m_stat));
-    recalculate();
 }
 
-void Backend::recalculate()
+void Backend::recalculate(uint64_t reserved_space)
 {
     m_calculated.vfs_total_space = m_stat.vfs_blocks * m_stat.vfs_bsize;
     m_calculated.vfs_free_space = m_stat.vfs_bavail * m_stat.vfs_bsize;
@@ -143,16 +128,16 @@ void Backend::recalculate()
     }
 
     double share = double(m_calculated.total_space) / double(m_calculated.vfs_total_space);
-    int64_t free_space_req_share =
-        std::ceil(double(m_node.get_storage().get_app().get_config().reserved_space) * share);
+    int64_t free_space_req_share = std::ceil(double(reserved_space) * share);
     m_calculated.effective_space = std::max(0L, m_calculated.total_space - free_space_req_share);
 
     m_calculated.effective_free_space =
         std::max(m_calculated.free_space - (m_calculated.total_space - m_calculated.effective_space), 0L);
 
-    m_fs->update(*this);
+    if (m_fs != nullptr)
+        m_fs->update(*this);
 
-    if (m_stat.error || m_disabled)
+    if (m_stat.error || m_disabled || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
