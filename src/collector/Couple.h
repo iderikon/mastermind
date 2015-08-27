@@ -60,14 +60,6 @@ public:
     const std::vector<Group*> & get_groups() const
     { return m_groups; }
 
-    /////TODO!!!
-    bool check(const std::vector<int> & groups) const;
-
-    /////TODO!!!
-    void bind_groups();
-
-    void get_group_ids(std::vector<int> & groups) const;
-
     // NB: get_items() may return duplicates
     void get_items(std::vector<Group*> & groups) const;
     void get_items(std::vector<Namespace*> & namespaces) const;

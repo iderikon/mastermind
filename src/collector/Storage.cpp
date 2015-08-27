@@ -614,8 +614,7 @@ void Storage::update_group_structure()
 
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
         Node & node = it->second;
-        std::vector<Backend*> backends;
-        node.pick_new_backends(backends);
+        std::vector<Backend*> backends = node.pick_new_backends();
         for (Backend *backend : backends)
             handle_backend(*backend);
     }

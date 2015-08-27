@@ -40,17 +40,6 @@ Couple::Couple(const std::vector<Group*> & groups)
     m_groups = groups;
 }
 
-bool Couple::check(const std::vector<int> & groups) const
-{
-    if (m_groups.size() != groups.size())
-        return false;
-    for (size_t i = 0; i < m_groups.size(); ++i)
-        if (m_groups[i]->get_id() != groups[i])
-            return false;
-
-    return true;
-}
-
 void Couple::get_items(std::vector<Group*> & groups) const
 {
     groups.insert(groups.end(), m_groups.begin(), m_groups.end());

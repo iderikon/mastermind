@@ -70,12 +70,6 @@ Group::Group(int id)
     m_metadata.service.migrating = false;
 }
 
-bool Group::has_backend(Backend & backend) const
-{
-    auto it = m_backends.find(&backend);
-    return (it != m_backends.end());
-}
-
 void Group::add_backend(Backend & backend)
 {
     m_backends.insert(&backend);

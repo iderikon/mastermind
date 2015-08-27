@@ -49,15 +49,12 @@ public:
     Group(int id);
     Group();
 
-    void clone_from(const Group & other);
-
     int get_id() const
     { return m_id; }
 
     int get_key() const
     { return m_id; }
 
-    bool has_backend(Backend & backend) const;
     void add_backend(Backend & backend);
 
     std::set<Backend*> & get_backends()

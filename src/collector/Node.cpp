@@ -225,12 +225,6 @@ void Node::get_items(std::vector<FS*> & filesystems)
         filesystems.push_back(&it->second);
 }
 
-void Node::pick_new_backends(std::vector<Backend*> & backends)
-{
-    backends.clear();
-    m_new_backends.swap(backends);
-}
-
 void Node::update_filesystems()
 {
     Stopwatch watch(m_clock.update_fs);
