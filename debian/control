@@ -28,7 +28,7 @@ Description: Common components and a client library for Mastermind
 
 Package: mastermind-collector
 Architecture: amd64
-Build-Depends: librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev
+Build-Depends: librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev, yandex-libdispatch0
 Depends: ${shlibs:Depends}, ${misc:Depends}, cocaine-tools (<< 0.12), cocaine-runtime (<< 0.12), libcurl3
 Description: Elliptics storage statistics collector
 
