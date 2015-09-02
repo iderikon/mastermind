@@ -2,7 +2,8 @@ Source: mastermind
 Section: net
 Priority: extra
 Maintainer: Andrey Godin <agodin@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0), cdbs, python, python-central
+Build-Depends: debhelper (>= 8.0.0), cdbs, python, python-central, cmake, pkg-config, libc6-dev,
+        librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev, yandex-libdispatch0
 Standards-Version: 3.9.2
 Homepage: https://github.com/toshic/mastermind
 Vcs-Git: git://github.com/toshic/mastermind.git
@@ -28,7 +29,6 @@ Description: Common components and a client library for Mastermind
 
 Package: mastermind-collector
 Architecture: amd64
-Build-Depends: cmake, pkg-config, libc6-dev, librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev, yandex-libdispatch0
 Depends: ${shlibs:Depends}, ${misc:Depends}, cocaine-tools (<< 0.12), cocaine-runtime (<< 0.12), libcurl3, yandex-libdispatch0
 Description: Elliptics storage statistics collector
 
