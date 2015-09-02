@@ -3,7 +3,7 @@ Section: net
 Priority: extra
 Maintainer: Andrey Godin <agodin@yandex-team.ru>
 Build-Depends: debhelper (>= 8.0.0), cdbs, python, python-central, cmake, pkg-config, libc6-dev,
-        librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev, yandex-libdispatch0
+        librapidjson1, libcurl4-openssl-dev | libcurl4-gnutls-dev | libcurl4-nss-dev, yandex-libdispatch0, elliptics-dev
 Standards-Version: 3.9.2
 Homepage: https://github.com/toshic/mastermind
 Vcs-Git: git://github.com/toshic/mastermind.git
