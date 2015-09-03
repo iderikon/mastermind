@@ -1,3 +1,9 @@
+mastermind (2.25.34-col) trusty; urgency=medium
+
+  * Bugfixing
+
+ -- Vladimir Nikulichev <saturnus@yandex-team.ru>  Thu, 03 Sep 2015 17:37:07 +0300
+
 mastermind (2.25.33-col) trusty; urgency=medium
 
   * Separate collector of monitor stats and couple info
