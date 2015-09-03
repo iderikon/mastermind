@@ -20,6 +20,7 @@
 #define __106a1cb9_f3de_4358_86b0_b357cbd4855c
 
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,23 @@ struct Config
     uint64_t io_thread_num;
     uint64_t nonblocking_io_thread_num;
     std::vector<NodeInfo> nodes;
+
+    void print(std::ostringstream & ostr) const
+    {
+        ostr <<
+            "monitor_port: "                          << monitor_port << "\n"
+            "wait_timeout: "                          << wait_timeout << "\n"
+            "forbidden_dht_groups: "                  << forbidden_dht_groups << "\n"
+            "forbidden_unmatched_group_total_space: " << forbidden_unmatched_group_total_space << "\n"
+            "reserved_space: "                        << reserved_space << "\n"
+            "dnet_log_mask: "                         << dnet_log_mask << "\n"
+            "net_thread_num: "                        << net_thread_num << "\n"
+            "io_thread_num: "                         << io_thread_num << "\n"
+            "nonblocking_io_thread_num: "             << nonblocking_io_thread_num << "\n"
+            "nodes:\n";
+        for (const NodeInfo & node : nodes)
+            ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';
+    }
 
     constexpr static const char *config_file        = "/etc/elliptics/mastermind.conf";
     constexpr static const char *log_file           = "/var/log/mastermind/mastermind-collector.log";
