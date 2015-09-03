@@ -191,14 +191,14 @@ void Storage::update()
             if (id == it->first) {
                 groups.push_back(group);
             } else {
-                auto it = m_groups.lower_bound(id);
-                if (it == m_groups.end() || it->first != id) {
-                    it = m_groups.insert(it, std::make_pair(id, Group(id)));
+                auto git = m_groups.lower_bound(id);
+                if (git == m_groups.end() || git->first != id) {
+                    git = m_groups.insert(git, std::make_pair(id, Group(id)));
 
                     // result must be status=INIT, status_text="No node backends"
-                    it->second.update_status(m_app.get_config().forbidden_dht_groups);
+                    git->second.update_status(m_app.get_config().forbidden_dht_groups);
                 }
-                groups.push_back(it->second);
+                groups.push_back(git->second);
             }
         }
 
