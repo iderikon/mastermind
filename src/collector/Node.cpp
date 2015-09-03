@@ -181,6 +181,12 @@ void Node::handle_backend(const BackendStat & new_stat)
     uint64_t new_fsid = backend.get_stat().fsid;
     FS & new_fs = get_fs(new_fsid);
     if (new_fsid != old_fsid) {
+        if (found) {
+            BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
+                    "Updating backend %s: FS changed from %lu to %lu",
+                    backend.get_key().c_str(), old_fsid, new_fsid);
+        }
+
         if (old_fsid)
             get_fs(old_fsid).remove_backend(backend);
         backend.set_fs(new_fs);
@@ -217,6 +223,10 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
                 uint64_t new_fsid = other_backend.get_stat().fsid;
 
                 if (old_fsid != new_fsid) {
+                    BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
+                            "Merging backend %s: FS changed from %lu to %lu",
+                            my_backend.get_key().c_str(), old_fsid, new_fsid);
+
                     if (old_fsid)
                         get_fs(old_fsid).remove_backend(my_backend);
                     FS & new_fs = get_fs(new_fsid);
@@ -230,7 +240,9 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
             Backend & my_backend = my->second;
 
             my_backend.clone_from(other->second);
-            get_fs(my_backend.get_stat().fsid).add_backend(my_backend);
+            FS & fs = get_fs(my_backend.get_stat().fsid);
+            fs.add_backend(my_backend);
+            my_backend.set_fs(fs);
             m_new_backends.push_back(my_backend);
         }
         ++other;
