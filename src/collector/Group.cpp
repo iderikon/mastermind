@@ -307,7 +307,7 @@ void Group::update_status(bool forbidden_dht)
             m_status = BAD;
             m_status_text = "Group is in state BAD because some of "
                 "backends are not in state OK";
-        } else {
+        } else if (m_metadata_parsed) {
             m_status = COUPLED;
             m_status_text = "Group is OK";
         }
