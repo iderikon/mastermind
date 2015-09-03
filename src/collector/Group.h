@@ -98,6 +98,7 @@ public:
 
     void update_status(bool forbidden_dht);
 
+    int check_couple_equals(const Group & other);
     int check_metadata_equals(const Group & other);
 
     void set_couple(Couple & couple);

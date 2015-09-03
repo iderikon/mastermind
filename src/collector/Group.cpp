@@ -314,6 +314,22 @@ void Group::update_status(bool forbidden_dht)
     }
 }
 
+int Group::check_couple_equals(const Group & other)
+{
+    if (m_status == INIT || other.m_status == INIT)
+        return 0;
+
+    if (m_metadata.couple != other.m_metadata.couple) {
+        std::ostringstream ostr;
+        ostr << "Groups " << m_id << " and " << other.m_id << " have inconsistent couple info";
+        m_status_text = ostr.str();
+        m_status = BAD;
+        return -1;
+    }
+
+    return 0;
+}
+
 int Group::check_metadata_equals(const Group & other)
 {
     if (m_status == INIT || other.m_status == INIT)

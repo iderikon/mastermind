@@ -215,7 +215,7 @@ void Storage::update()
 
         bool md_ok = true;
         for (size_t i = 1; i < groups.size(); ++i) {
-            if (groups[0].get().check_metadata_equals(groups[i]) != 0) {
+            if (groups[0].get().check_couple_equals(groups[i]) != 0) {
                 md_ok = false;
                 break;
             }
