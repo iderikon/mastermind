@@ -141,14 +141,6 @@ void Storage::update_group_structure()
     }
 }
 
-Group & Storage::get_group(int id)
-{
-    auto it = m_groups.lower_bound(id);
-    if (it == m_groups.end() || it->first != id)
-        it = m_groups.insert(it, std::make_pair(id, Group(id)));
-    return it->second;
-}
-
 Namespace & Storage::get_namespace(const std::string & name)
 {
     auto it = m_namespaces.lower_bound(name);
@@ -196,10 +188,18 @@ void Storage::update()
         std::vector<std::reference_wrapper<Group>> groups;
         groups.reserve(group_ids.size());
         for (int id : group_ids) {
-            if (id == it->first)
+            if (id == it->first) {
                 groups.push_back(group);
-            else
-                groups.push_back(get_group(id));
+            } else {
+                auto it = m_groups.lower_bound(id);
+                if (it == m_groups.end() || it->first != id) {
+                    it = m_groups.insert(it, std::make_pair(id, Group(id)));
+
+                    // result must be status=INIT, status_text="No node backends"
+                    it->second.update_status(m_app.get_config().forbidden_dht_groups);
+                }
+                groups.push_back(it->second);
+            }
         }
 
         // check if groups are associated with the same existing couple

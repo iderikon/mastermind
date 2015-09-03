@@ -28,16 +28,16 @@
 
 Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     :
+    m_groups(groups),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
 {
     for (size_t i = 0; i < groups.size(); ++i) {
         m_key += std::to_string(groups[i].get().get_id());
-        if (i != (m_groups.size() - 1))
+        if (i != (groups.size() - 1))
             m_key += ':';
     }
-    m_groups = groups;
 }
 
 void Couple::update_status(bool forbidden_unmatched_total)

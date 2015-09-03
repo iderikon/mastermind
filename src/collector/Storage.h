@@ -85,7 +85,6 @@ public:
 private:
     void handle_backend(Backend & backend);
 
-    Group & get_group(int id);
     Namespace & get_namespace(const std::string & name);
 
     void merge_groups(const Storage & other_storage, bool & have_newer);
