@@ -58,7 +58,7 @@ Group::Group(int id)
     :
     m_id(id),
     m_clean(true),
-    m_metadata_download_time(0),
+    m_update_time(0),
     m_metadata_parsed(false),
     m_metadata_parse_duration(0),
     m_couple(nullptr),
@@ -108,7 +108,7 @@ void Group::save_metadata(const char *metadata, size_t size)
             !std::memcmp(&m_metadata_file[0], metadata, size))
         return;
 
-    clock_get(m_metadata_download_time);
+    clock_get(m_update_time);
     m_metadata_file.assign(metadata, metadata + size);
     m_clean = false;
 }
@@ -308,8 +308,24 @@ void Group::update_status(bool forbidden_dht)
             m_status_text = "Group is in state BAD because some of "
                 "backends are not in state OK";
         } else if (m_metadata_parsed) {
-            m_status = COUPLED;
             m_status_text = "Group is OK";
+            if (!m_metadata.couple.empty())
+                m_status = COUPLED;
+            else
+                m_status = INIT;
+        }
+    }
+}
+
+void Group::set_coupled_status(bool ok)
+{
+    Status new_status = ok ? COUPLED : BAD;
+    if (m_status != new_status) {
+        if (m_status == INIT || m_status == COUPLED || m_status == BAD) {
+            clock_get(m_update_time);
+            m_status = new_status;
+            m_status_text = (ok ? "Group is OK"
+                                : "Group is in state BAD because couple check fails");
         }
     }
 }
@@ -362,17 +378,17 @@ bool Group::match_couple(const Group & other) const
 
 void Group::merge(const Group & other, bool & have_newer)
 {
-    if (m_metadata_download_time > other.m_metadata_download_time) {
+    if (m_update_time > other.m_update_time) {
         have_newer = true;
         return;
     }
 
-    if (m_metadata_download_time == other.m_metadata_download_time)
+    if (m_update_time == other.m_update_time)
         return;
 
     m_clean = other.m_clean;
     m_metadata_file = other.m_metadata_file;
-    m_metadata_download_time = other.m_metadata_download_time;
+    m_update_time = other.m_update_time;
 
     m_metadata.version = other.m_metadata.version;
     m_metadata.frozen = other.m_metadata.frozen;
@@ -462,8 +478,8 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (show_internals) {
         writer.Key("clean");
         writer.Bool(m_clean);
-        writer.Key("metadata_download_time");
-        writer.Uint64(m_metadata_download_time);
+        writer.Key("update_time");
+        writer.Uint64(m_update_time);
         writer.Key("metadata_parsed");
         writer.Bool(m_metadata_parsed);
         writer.Key("metadata_parse_duration");

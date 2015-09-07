@@ -97,6 +97,7 @@ public:
     void set_namespace(Namespace & ns);
 
     void update_status(bool forbidden_dht);
+    void set_coupled_status(bool ok);
 
     int check_couple_equals(const Group & other);
     int check_metadata_equals(const Group & other);
@@ -127,7 +128,8 @@ private:
 
     bool m_clean;
     std::vector<char> m_metadata_file;
-    uint64_t m_metadata_download_time;
+
+    uint64_t m_update_time;
 
     // values extracted from file
     struct {

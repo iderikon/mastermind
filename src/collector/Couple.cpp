@@ -61,6 +61,8 @@ void Couple::update_status(bool forbidden_unmatched_total)
         if (g.check_metadata_equals(m_groups[i]) != 0) {
             modify(m_status, BAD);
             modify(m_status_text, "Groups have different metadata");
+            for (Group & group : m_groups)
+                group.set_coupled_status(false);
             return;
         }
 
@@ -72,6 +74,8 @@ void Couple::update_status(bool forbidden_unmatched_total)
     if (have_frozen) {
         modify(m_status, FROZEN);
         modify(m_status_text, "Some groups are frozen");
+        for (Group & group : m_groups)
+            group.set_coupled_status(true);
         return;
     }
 
@@ -81,6 +85,8 @@ void Couple::update_status(bool forbidden_unmatched_total)
                 if (m_groups[i].get().get_total_space() != m_groups[0].get().get_total_space()) {
                     modify(m_status, BROKEN);
                     modify(m_status_text, "Couple has unequal total space in groups");
+                    for (Group & group : m_groups)
+                        group.set_coupled_status(false);
                     return;
                 }
             }
@@ -101,28 +107,41 @@ void Couple::update_status(bool forbidden_unmatched_total)
             modify(m_status, OK);
             modify(m_status_text, "Couple is OK");
         }
+
+        for (Group & group : m_groups)
+            group.set_coupled_status(true);
+
         return;
     }
 
-    for (size_t i = 0; i < statuses.size(); ++i) {
+    size_t i = 0;
+    for (; i < statuses.size(); ++i) {
         Group::Status status = statuses[i];
         if (status == Group::INIT) {
-            modify(m_status, INIT);
+            modify(m_status, BAD);
             modify(m_status_text, "Some groups are uninitialized");
-            return;
+            break;
         } else if (status == Group::BAD) {
             modify(m_status, BAD);
             modify(m_status_text, "Some groups are in state BAD");
-            return;
+            break;
         } else if (status == Group::BROKEN) {
             modify(m_status, BROKEN);
             modify(m_status_text, "Some groups are in state BROKEN");
-            return;
+            break;
         } else if (status == Group::RO || status == Group::MIGRATING) {
             modify(m_status, BAD);
             modify(m_status_text, "Some groups are read-only");
-            return;
+            break;
         }
+    }
+
+    if (i < statuses.size()) {
+        for (size_t j = 0; j < m_groups.size(); ++j) {
+            if (j != i)
+                m_groups[j].get().set_coupled_status(false);
+        }
+        return;
     }
 
     modify(m_status, BAD);
