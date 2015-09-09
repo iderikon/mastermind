@@ -132,12 +132,15 @@ public:
 
     void merge(const Backend & other, bool & have_newer);
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
+    // Obtain a list of items of certain types related to this backend,
+    // e.g. filesystem it's stored on, group's couple.
+    // References to objects will be pushed into specified vector.
+    // Note that some items may be duplicated.
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void push_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
@@ -145,6 +148,9 @@ public:
 private:
     Node & m_node;
 
+    // Pointers to a filesystem and a group. If the objects are not created yet,
+    // the values are nullptr. These objects shouldn't be modified directly but
+    // only used for status checks and by push_items().
     FS *m_fs;
     Group *m_group;
 

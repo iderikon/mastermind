@@ -160,6 +160,7 @@ FS & Node::get_fs(uint64_t fsid)
 
 void Node::handle_backend(const BackendStat & new_stat)
 {
+    // iterator will be used below as insertion hint
     auto it = m_backends.lower_bound(new_stat.backend_id);
 
     bool found = it != m_backends.end() && it->first == int(new_stat.backend_id);
@@ -267,35 +268,35 @@ void Node::merge(const Node & other, bool & have_newer)
     Storage::merge_map(*this, m_filesystems, other.m_filesystems, have_newer);
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Couple>> & couples)
+void Node::push_items(std::vector<std::reference_wrapper<Couple>> & couples)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         const Backend & backend = it->second;
-        backend.get_items(couples);
+        backend.push_items(couples);
     }
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces)
+void Node::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         const Backend & backend = it->second;
-        backend.get_items(namespaces);
+        backend.push_items(namespaces);
     }
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Backend>> & backends)
+void Node::push_items(std::vector<std::reference_wrapper<Backend>> & backends)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
         backends.push_back(it->second);
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<Group>> & groups)
+void Node::push_items(std::vector<std::reference_wrapper<Group>> & groups)
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        it->second.get_items(groups);
+        it->second.push_items(groups);
 }
 
-void Node::get_items(std::vector<std::reference_wrapper<FS>> & filesystems)
+void Node::push_items(std::vector<std::reference_wrapper<FS>> & filesystems)
 {
     for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
         filesystems.push_back(it->second);

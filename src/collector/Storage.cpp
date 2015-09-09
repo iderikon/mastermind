@@ -318,12 +318,18 @@ void Storage::filter_related_items(
         std::vector<std::reference_wrapper<ResultItem>> & current_set,
         bool & first_pass)
 {
+    // Intersection with empty set.
     if (current_set.empty() && !first_pass)
         return;
 
+    // Obtain a set of related objects using overloaded method push_items().
+    // For example, if we need to get all backends stored on a set of
+    // nodes, SourceItem == Node, and ResultItem == Backend, so the method
+    // Node::push_items(std::vector<std::reference_wrapper<Backend>>&)
+    // will be called for each node.
     std::vector<std::reference_wrapper<ResultItem>> related_items;
     for (SourceItem & source_item : source_items)
-        source_item.get_items(related_items);
+        source_item.push_items(related_items);
 
     if (first_pass || related_items.empty()) {
         current_set = related_items;
@@ -331,8 +337,10 @@ void Storage::filter_related_items(
         return;
     }
 
+    // push_items() may return duplicates.
     remove_duplicates(related_items);
 
+    // Intersect the set of newly found items with the result of previous passes.
     struct {
         bool operator () (const std::reference_wrapper<ResultItem> & item1,
                 const std::reference_wrapper<ResultItem> & item2) const

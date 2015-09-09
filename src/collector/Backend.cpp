@@ -149,30 +149,30 @@ void Backend::merge(const Backend & other, bool & have_newer)
     }
 }
 
-void Backend::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+void Backend::push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     if (m_group != nullptr)
-        m_group->get_items(couples);
+        m_group->push_items(couples);
 }
 
-void Backend::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+void Backend::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     if (m_group != nullptr)
-        m_group->get_items(namespaces);
+        m_group->push_items(namespaces);
 }
 
-void Backend::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+void Backend::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
     nodes.push_back(m_node);
 }
 
-void Backend::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+void Backend::push_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
     if (m_group != nullptr)
         groups.push_back(*m_group);
 }
 
-void Backend::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+void Backend::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
 {
     if (m_fs != nullptr)
         filesystems.push_back(*m_fs);

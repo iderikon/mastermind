@@ -84,12 +84,15 @@ public:
 
     void merge(const FS & other, bool & have_newer);
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const;
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    // Obtain a list of items of certain types related to this filesystem,
+    // e.g. backends stored on it, groups served by these backends.
+    // References to objects will be pushed into specified vector.
+    // Note that some items may be duplicated.
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void push_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void push_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
@@ -99,6 +102,9 @@ private:
     uint64_t m_fsid;
     std::string m_key;
 
+    // Set of references to backends stored on this filesystem. They shouldn't be
+    // modified directly but only used to obtain related items and calculate the
+    // state of the backend.
     Backends m_backends;
 
     FSStat m_stat;

@@ -404,33 +404,33 @@ void Group::merge(const Group & other, bool & have_newer)
     m_status = other.m_status;
 }
 
-void Group::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+void Group::push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     if (m_couple != nullptr)
         couples.push_back(*m_couple);
 }
 
-void Group::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+void Group::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     if (m_namespace != nullptr)
         namespaces.push_back(*m_namespace);
 }
 
-void Group::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+void Group::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
     for (Backend & backend : m_backends)
-        backend.get_items(nodes);
+        backend.push_items(nodes);
 }
 
-void Group::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+void Group::push_items(std::vector<std::reference_wrapper<Backend>> & backends) const
 {
     backends.insert(backends.end(), m_backends.begin(), m_backends.end());
 }
 
-void Group::get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+void Group::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
 {
     for (Backend & backend : m_backends)
-        backend.get_items(filesystems);
+        backend.push_items(filesystems);
 }
 
 void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,

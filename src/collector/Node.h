@@ -98,12 +98,15 @@ public:
 
     void merge(const Node & other, bool & have_newer);
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples);
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces);
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends);
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups);
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems);
+    // Obtain a list of items of certain types related to this node,
+    // e.g. existing filesystems, backends, groups stored on them.
+    // References to objects will be pushed into specified vector.
+    // Note that some items may be duplicated.
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples);
+    void push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces);
+    void push_items(std::vector<std::reference_wrapper<Backend>> & backends);
+    void push_items(std::vector<std::reference_wrapper<Group>> & groups);
+    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems);
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             const std::vector<std::reference_wrapper<Backend>> & backends,
@@ -137,6 +140,7 @@ private:
 
     std::string m_key;
 
+    // backend and procfs statistics downloaded using HTTP
     std::string m_download_data;
 
     NodeStat m_stat;
@@ -144,6 +148,8 @@ private:
     std::map<int, Backend> m_backends;
     std::map<uint64_t, FS> m_filesystems;
 
+    // References to newly coming backends are stored here. Storage picks
+    // them up using pick_new_backends() and creates/updates groups.
     std::vector<std::reference_wrapper<Backend>> m_new_backends;
 
     ClockStat m_clock;

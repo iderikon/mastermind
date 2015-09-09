@@ -49,38 +49,44 @@ public:
     void remove_group(Group & group)
     { m_groups.erase(group); }
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+    // Obtain a list of items of certain types related to this namespace,
+    // e.g. couples, their groups. References to objects will be pushed
+    // into specified vector.
+    // Note that some items may be duplicated.
+    void push_items(std::vector<std::reference_wrapper<Group>> & groups) const
     {
         groups.insert(groups.end(), m_groups.begin(), m_groups.end());
     }
 
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
     {
         for (Group & group : m_groups)
-            group.get_items(nodes);
+            group.push_items(nodes);
     }
 
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+    void push_items(std::vector<std::reference_wrapper<Backend>> & backends) const
     {
         for (Group & group : m_groups)
-            group.get_items(backends);
+            group.push_items(backends);
     }
 
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
+    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
     {
         for (Group & group : m_groups)
-            group.get_items(filesystems);
+            group.push_items(filesystems);
     }
 
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
     {
         for (Group & group : m_groups)
-            group.get_items(couples);
+            group.push_items(couples);
     }
 
 private:
     const std::string m_name;
+
+    // Set of references to groups in this namespace. The objects shouldn't be
+    // modified directly but only used by push_items().
     Groups m_groups;
 };
 

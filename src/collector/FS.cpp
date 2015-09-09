@@ -99,30 +99,30 @@ void FS::merge(const FS & other, bool & have_newer)
     }
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Couple>> & couples) const
+void FS::push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
 {
     for (Backend & backend : m_backends)
-        backend.get_items(couples);
+        backend.push_items(couples);
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
+void FS::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
     for (Backend & backend : m_backends)
-        backend.get_items(namespaces);
+        backend.push_items(namespaces);
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Backend>> & backends) const
+void FS::push_items(std::vector<std::reference_wrapper<Backend>> & backends) const
 {
     backends.insert(backends.end(), m_backends.begin(), m_backends.end());
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Group>> & groups) const
+void FS::push_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
     for (Backend & backend : m_backends)
-        backend.get_items(groups);
+        backend.push_items(groups);
 }
 
-void FS::get_items(std::vector<std::reference_wrapper<Node>> & nodes) const
+void FS::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 {
     nodes.push_back(m_node);
 }

@@ -108,12 +108,15 @@ public:
 
     void merge(const Group & other, bool & have_newer);
 
-    // NB: get_items() may return duplicates
-    void get_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
-    void get_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
-    void get_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
-    void get_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
-    void get_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
+    // Obtain a list of items of certain types related to this group,
+    // e.g. couple it belongs to, backends serving it.
+    // References to objects will be pushed into specified vector.
+    // Note that some items may be duplicated.
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
+    void push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const;
+    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void push_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
@@ -124,6 +127,9 @@ public:
 private:
     int m_id;
 
+    // Set of references to backends serving this group. They shouldn't be
+    // modified directly but only used to obtain related items and calculate the
+    // state of the group.
     Backends m_backends;
 
     bool m_clean;
@@ -146,6 +152,10 @@ private:
     bool m_metadata_parsed;
     uint64_t m_metadata_parse_duration;
 
+    // Pointers to a couple and a namespace of this group. If the information is
+    // unknown, e.g. metadata was not loaded, the values are set to nullptr.
+    // These objects shouldn't be modified directly but only used for status
+    // checks and by push_items().
     Couple *m_couple;
     Namespace *m_namespace;
 
