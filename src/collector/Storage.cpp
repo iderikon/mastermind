@@ -224,11 +224,11 @@ void Storage::update()
             continue;
 
         std::string key = CoupleKey(group_ids);
-        auto it = m_couples.lower_bound(key);
-        if (it == m_couples.end() || it->first != key) {
-            it = m_couples.insert(it, std::make_pair(key, Couple(groups)));
+        auto cit = m_couples.lower_bound(key);
+        if (cit == m_couples.end() || cit->first != key) {
+            cit = m_couples.insert(cit, std::make_pair(key, Couple(groups)));
             for (Group & group : groups)
-                group.set_couple(it->second);
+                group.set_couple(cit->second);
         }
     }
 
