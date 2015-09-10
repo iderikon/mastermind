@@ -34,6 +34,26 @@ class Storage;
 
 class Group
 {
+    enum InternalStatus {
+        INIT_Init,
+        INIT_NoBackends,
+        INIT_MetadataFailed,
+        INIT_Uncoupled,
+        BROKEN_DHTForbidden,
+        BROKEN_HaveBADBackends,
+        BAD_HaveOther,
+        BAD_ParseFailed,
+        BAD_InconsistentCouple,
+        BAD_DifferentMetadata,
+        BAD_CoupleBAD,
+        MIGRATING_ServiceMigrating,
+        RO_HaveROBackends,
+        COUPLED_MetadataOK,
+        COUPLED_Coupled
+    };
+
+    static const char *internal_status_str(InternalStatus status);
+
 public:
     enum Status {
         INIT,
@@ -88,16 +108,22 @@ public:
     void add_backend(Backend & backend);
 
     void handle_metadata_download_failed(const std::string & why);
-    void save_metadata(const char *metadata, size_t size);
+    void save_metadata(const char *metadata, size_t size, uint64_t timestamp);
     int parse_metadata();
 
     bool metadata_parsed() const
     { return m_metadata_parsed; }
 
+    uint64_t get_update_time() const
+    { return m_update_time; }
+
+    // the most recently updated backend
+    uint64_t get_backend_update_time() const;
+
     void set_namespace(Namespace & ns);
 
     void update_status(bool forbidden_dht);
-    void set_coupled_status(bool ok);
+    void set_coupled_status(bool ok, uint64_t timestamp);
 
     int check_couple_equals(const Group & other);
     int check_metadata_equals(const Group & other);
@@ -135,6 +161,7 @@ private:
     bool m_clean;
     std::vector<char> m_metadata_file;
 
+    // timestamp of the most recently modified group in the couple
     uint64_t m_update_time;
 
     // values extracted from file
@@ -161,6 +188,7 @@ private:
 
     std::string m_status_text;
     Status m_status;
+    InternalStatus m_internal_status;
 };
 
 #endif

@@ -35,6 +35,23 @@ class Storage;
 
 class Couple
 {
+    enum InternalStatus {
+        INIT_Init,
+        BAD_NoGroups,
+        BAD_DifferentMetadata,
+        BAD_GroupUninitialized,
+        BAD_GroupBAD,
+        BAD_ReadOnly,
+        BAD_Unknown,
+        BROKEN_UnequalTotalSpace,
+        BROKEN_GroupBROKEN,
+        FROZEN_Frozen,
+        FULL_Full,
+        OK_OK
+    };
+
+    static const char *internal_status_str(InternalStatus status);
+
 public:
     enum Status {
         INIT,
@@ -84,19 +101,10 @@ public:
     { return m_update_status_duration; }
 
 private:
-    template <typename T, typename V>
-    void modify(T & member, const V & value)
-    {
-        if (member != value) {
-            member = value;
-            clock_get(m_modified_time);
-        }
-    }
-
-private:
     std::string m_key;
     std::vector<std::reference_wrapper<Group>> m_groups;
 
+    InternalStatus m_internal_status;
     Status m_status;
     std::string m_status_text;
 

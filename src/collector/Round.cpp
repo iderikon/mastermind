@@ -432,8 +432,11 @@ size_t Round::write_func(char *ptr, size_t size, size_t nmemb, void *userdata)
 
 void Round::result(size_t group_idx, const elliptics::read_result_entry & entry)
 {
+    const struct dnet_time & ts = entry.io_attribute()->timestamp;
+    uint64_t timestamp_ns = ts.tsec * 1000000000ULL + ts.tnsec;
+
     elliptics::data_pointer file = entry.file();
-    m_groups_to_read[group_idx].get().save_metadata((const char *) file.data(), file.size());
+    m_groups_to_read[group_idx].get().save_metadata((const char *) file.data(), file.size(), timestamp_ns);
 }
 
 void Round::final(size_t group_idx, const elliptics::error_info & error)

@@ -63,7 +63,8 @@ Group::Group(int id)
     m_metadata_parse_duration(0),
     m_couple(nullptr),
     m_namespace(nullptr),
-    m_status(INIT)
+    m_status(INIT),
+    m_internal_status(INIT_Init)
 {
     m_metadata.version = 0;
     m_metadata.frozen = false;
@@ -95,15 +96,20 @@ void Group::add_backend(Backend & backend)
 
 void Group::handle_metadata_download_failed(const std::string & why)
 {
-    if (m_status == INIT) {
+    if (m_internal_status == INIT_Init) {
+        m_internal_status = INIT_MetadataFailed;
+
         std::ostringstream ostr;
         ostr << "Metadata download failed: " << why;
         m_status_text = ostr.str();
     }
 }
 
-void Group::save_metadata(const char *metadata, size_t size)
+void Group::save_metadata(const char *metadata, size_t size, uint64_t timestamp)
 {
+    if (timestamp > m_update_time)
+        m_update_time = timestamp;
+
     if (m_clean && !m_metadata_file.empty() && m_metadata_file.size() == size &&
             !std::memcmp(&m_metadata_file[0], metadata, size))
         return;
@@ -140,6 +146,7 @@ int Group::parse_metadata()
 
     if (!ostr.str().empty()) {
         m_status_text = ostr.str();
+        m_internal_status = BAD_ParseFailed;
         m_status = BAD;
         return -1;
     }
@@ -239,6 +246,7 @@ int Group::parse_metadata()
 
     if (!ostr.str().empty()) {
         m_status_text = ostr.str();
+        m_internal_status = BAD_ParseFailed;
         m_status = BAD;
         return -1;
     }
@@ -254,6 +262,17 @@ int Group::parse_metadata()
     return 0;
 }
 
+uint64_t Group::get_backend_update_time() const
+{
+    uint64_t res = 0;
+    for (Backend & backend : m_backends) {
+        uint64_t cur = backend.get_stat().get_timestamp() * 1000ULL;
+        if (cur > res)
+            res = cur;
+    }
+    return res;
+}
+
 void Group::set_namespace(Namespace & ns)
 {
     m_namespace = &ns;
@@ -262,22 +281,37 @@ void Group::set_namespace(Namespace & ns)
 void Group::update_status(bool forbidden_dht)
 {
     if (m_backends.empty()) {
-        m_status = INIT;
-        m_status_text = "No node backends";
+        if (m_internal_status != INIT_NoBackends) {
+            m_internal_status = INIT_NoBackends;
+            m_status = INIT;
+            m_status_text = "No node backends";
+        }
     } else if (m_backends.size() > 1 && forbidden_dht) {
-        m_status = BROKEN;
+        if (m_internal_status != BROKEN_DHTForbidden) {
+            m_internal_status = BROKEN_DHTForbidden;
+            m_status = BROKEN;
 
-        std::ostringstream ostr;
-        ostr << "DHT groups are forbidden but the group has " << m_backends.size() << " backends";
-        m_status_text = ostr.str();
-        return;
+            std::ostringstream ostr;
+            ostr << "DHT groups are forbidden but the group has " << m_backends.size() << " backends";
+            m_status_text = ostr.str();
+
+            uint64_t backend_ts = get_backend_update_time();
+            if (m_update_time < backend_ts)
+                m_update_time = backend_ts;
+        }
     } else {
         bool have_bad = false;
         bool have_ro = false;
         bool have_other = false;
+        uint64_t backend_ts = 0;
 
         for (Backend & backend : m_backends) {
             Backend::Status b_status = backend.get_status();
+
+            uint64_t cur_ts = backend.get_stat().get_timestamp() * 1000ULL;
+            if (backend_ts < cur_ts)
+                backend_ts = cur_ts;
+
             if (b_status == Backend::BAD) {
                 have_bad = true;
                 break;
@@ -289,10 +323,17 @@ void Group::update_status(bool forbidden_dht)
         }
 
         if (have_bad) {
-            m_status = BROKEN;
-            m_status_text = "Some of backends are in state BROKEN";
+            if (m_internal_status != BROKEN_HaveBADBackends) {
+                if (m_update_time < backend_ts)
+                    m_update_time = backend_ts;
+
+                m_internal_status = BROKEN_HaveBADBackends;
+                m_status = BROKEN;
+                m_status_text = "Some of backends are in state BAD";
+            }
         } else if (have_ro) {
             if (m_metadata.service.migrating) {
+                m_internal_status = MIGRATING_ServiceMigrating;
                 m_status = MIGRATING;
 
                 std::ostringstream ostr;
@@ -300,46 +341,81 @@ void Group::update_status(bool forbidden_dht)
                 m_status_text = ostr.str();
                 // TODO: check whether the job was initiated
             } else {
-                m_status = RO;
-                m_status_text = "Group is read-only because it has read-only backends";
+                if (m_internal_status != RO_HaveROBackends) {
+                    if (m_update_time < backend_ts)
+                        m_update_time = backend_ts;
+
+                    m_internal_status = RO_HaveROBackends;
+                    m_status = RO;
+                    m_status_text = "Group is read-only because it has read-only backends";
+                }
             }
         } else if (have_other) {
-            m_status = BAD;
-            m_status_text = "Group is in state BAD because some of "
-                "backends are not in state OK";
+            if (m_internal_status != BAD_HaveOther) {
+                if (m_update_time < backend_ts)
+                    m_update_time = backend_ts;
+
+                m_internal_status = BAD_HaveOther;
+                m_status = BAD;
+                m_status_text = "Group is in state BAD because some of backends are not in state OK";
+            }
         } else if (m_metadata_parsed) {
             m_status_text = "Group is OK";
-            if (!m_metadata.couple.empty())
+            if (!m_metadata.couple.empty()) {
+                m_internal_status = COUPLED_MetadataOK;
                 m_status = COUPLED;
-            else
+            } else {
+                m_internal_status = INIT_Uncoupled;
                 m_status = INIT;
+            }
         }
     }
 }
 
-void Group::set_coupled_status(bool ok)
+void Group::set_coupled_status(bool ok, uint64_t timestamp)
 {
-    Status new_status = ok ? COUPLED : BAD;
-    if (m_status != new_status) {
-        if (m_status == INIT || m_status == COUPLED || m_status == BAD) {
-            clock_get(m_update_time);
-            m_status = new_status;
-            m_status_text = (ok ? "Group is OK"
-                                : "Group is in state BAD because couple check fails");
-        }
+    assert(timestamp >= m_update_time);
+
+    if (m_internal_status == BROKEN_DHTForbidden ||
+            m_internal_status == BROKEN_HaveBADBackends ||
+            m_internal_status == BAD_HaveOther ||
+            m_internal_status == BAD_ParseFailed ||
+            m_internal_status == BAD_InconsistentCouple ||
+            m_internal_status == BAD_DifferentMetadata ||
+            m_internal_status == MIGRATING_ServiceMigrating ||
+            RO_HaveROBackends)
+        return;
+
+    InternalStatus new_internal_status = ok ? COUPLED_Coupled : BAD_CoupleBAD;
+
+    if (m_internal_status != new_internal_status) {
+        m_update_time = timestamp;
+        m_internal_status = new_internal_status;
+        m_status = ok ? COUPLED : BAD;
+        m_status_text = (ok ? "Group is OK"
+                            : "Group is in state BAD because couple check fails");
     }
 }
 
 int Group::check_couple_equals(const Group & other)
 {
-    if (m_status == INIT || other.m_status == INIT)
+    if (m_internal_status == INIT_Init ||
+            other.m_internal_status == INIT_Init ||
+            m_internal_status == INIT_MetadataFailed ||
+            other.m_internal_status == INIT_MetadataFailed)
         return 0;
 
     if (m_metadata.couple != other.m_metadata.couple) {
-        std::ostringstream ostr;
-        ostr << "Groups " << m_id << " and " << other.m_id << " have inconsistent couple info";
-        m_status_text = ostr.str();
-        m_status = BAD;
+        if (m_internal_status != BAD_InconsistentCouple) {
+            if (m_update_time < other.m_update_time)
+                m_update_time = other.m_update_time;
+
+            std::ostringstream ostr;
+            ostr << "Groups " << m_id << " and " << other.m_id << " have inconsistent couple info";
+            m_status_text = ostr.str();
+            m_internal_status = BAD_InconsistentCouple;
+            m_status = BAD;
+        }
         return -1;
     }
 
@@ -348,16 +424,25 @@ int Group::check_couple_equals(const Group & other)
 
 int Group::check_metadata_equals(const Group & other)
 {
-    if (m_status == INIT || other.m_status == INIT)
+    if (m_internal_status == INIT_Init ||
+            other.m_internal_status == INIT_Init ||
+            m_internal_status == INIT_MetadataFailed ||
+            other.m_internal_status == INIT_MetadataFailed)
         return 0;
 
     if (m_metadata.frozen != other.m_metadata.frozen ||
             m_metadata.couple != other.m_metadata.couple ||
             m_metadata.namespace_name != other.m_metadata.namespace_name) {
-        std::ostringstream ostr;
-        ostr << "Groups " << m_id << " and " << other.m_id << " have different metadata";
-        m_status_text = ostr.str();
-        m_status = BAD;
+        if (m_internal_status != BAD_DifferentMetadata) {
+            if (m_update_time < other.m_update_time)
+                m_update_time = other.m_update_time;
+
+            std::ostringstream ostr;
+            ostr << "Groups " << m_id << " and " << other.m_id << " have different metadata";
+            m_status_text = ostr.str();
+            m_internal_status = BAD_DifferentMetadata;
+            m_status = BAD;
+        }
         return -1;
     }
 
@@ -402,6 +487,7 @@ void Group::merge(const Group & other, bool & have_newer)
 
     m_status_text = other.m_status_text;
     m_status = other.m_status;
+    m_internal_status = other.m_internal_status;
 }
 
 void Group::push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
@@ -484,6 +570,8 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Bool(m_metadata_parsed);
         writer.Key("metadata_parse_duration");
         writer.Uint64(m_metadata_parse_duration);
+        writer.Key("internal_status");
+        writer.String(internal_status_str(m_internal_status));
 
         writer.Key("metadata_internal");
         writer.StartObject();
@@ -509,6 +597,47 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
 
     writer.EndObject();
+}
+
+    enum InternalStatus {
+    };
+
+const char *Group::internal_status_str(InternalStatus status)
+{
+    switch (status)
+    {
+    case INIT_Init:
+        return "INIT_Init";
+    case INIT_NoBackends:
+        return "INIT_NoBackends";
+    case INIT_MetadataFailed:
+        return "INIT_MetadataFailed";
+    case INIT_Uncoupled:
+        return "INIT_Uncoupled";
+    case BROKEN_DHTForbidden:
+        return "BROKEN_DHTForbidden";
+    case BROKEN_HaveBADBackends:
+        return "BROKEN_HaveBADBackends";
+    case BAD_HaveOther:
+        return "BAD_HaveOther";
+    case BAD_ParseFailed:
+        return "BAD_ParseFailed";
+    case BAD_InconsistentCouple:
+        return "BAD_InconsistentCouple";
+    case BAD_DifferentMetadata:
+        return "BAD_DifferentMetadata";
+    case BAD_CoupleBAD:
+        return "BAD_CoupleBAD";
+    case MIGRATING_ServiceMigrating:
+        return "MIGRATING_ServiceMigrating";
+    case RO_HaveROBackends:
+        return "RO_HaveROBackends";
+    case COUPLED_MetadataOK:
+        return "COUPLED_MetadataOK";
+    case COUPLED_Coupled:
+        return "COUPLED_Coupled";
+    }
+    return "UNKNOWN";
 }
 
 const char *Group::status_str(Status status)

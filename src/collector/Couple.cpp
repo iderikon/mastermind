@@ -29,6 +29,7 @@
 Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     :
     m_groups(groups),
+    m_internal_status(INIT_Init),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
@@ -45,8 +46,11 @@ void Couple::update_status(bool forbidden_unmatched_total)
     Stopwatch watch(m_update_status_duration);
 
     if (m_groups.empty()) {
-        modify(m_status, BAD);
-        modify(m_status_text, "Couple has no groups");
+        if (m_internal_status != BAD_NoGroups) {
+            m_internal_status = BAD_NoGroups;
+            m_status = BAD;
+            m_status_text = "Couple has no groups";
+        }
         return;
     }
 
@@ -56,13 +60,25 @@ void Couple::update_status(bool forbidden_unmatched_total)
     statuses.push_back(g.get_status());
 
     bool have_frozen = g.get_frozen();
+    uint64_t most_recent = g.get_update_time();
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
+        uint64_t cur_update_time = m_groups[i].get().get_update_time();
+        if (cur_update_time > most_recent)
+            most_recent = cur_update_time;
+
         if (g.check_metadata_equals(m_groups[i]) != 0) {
-            modify(m_status, BAD);
-            modify(m_status_text, "Groups have different metadata");
-            for (Group & group : m_groups)
-                group.set_coupled_status(false);
+            if (m_internal_status != BAD_DifferentMetadata) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = BAD_DifferentMetadata;
+                m_status = BAD;
+                m_status_text = "Groups have different metadata";
+
+                for (Group & group : m_groups)
+                    group.set_coupled_status(false, m_modified_time);
+            }
             return;
         }
 
@@ -72,10 +88,17 @@ void Couple::update_status(bool forbidden_unmatched_total)
     }
 
     if (have_frozen) {
-        modify(m_status, FROZEN);
-        modify(m_status_text, "Some groups are frozen");
-        for (Group & group : m_groups)
-            group.set_coupled_status(true);
+        if (m_internal_status != FROZEN_Frozen) {
+            if (m_modified_time < most_recent)
+                m_modified_time = most_recent;
+
+            m_internal_status = FROZEN_Frozen;
+            m_status = FROZEN;
+            m_status_text = "Some groups are frozen";
+
+            for (Group & group : m_groups)
+                group.set_coupled_status(true, m_modified_time);
+        }
         return;
     }
 
@@ -83,33 +106,52 @@ void Couple::update_status(bool forbidden_unmatched_total)
         if (forbidden_unmatched_total) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i].get().get_total_space() != m_groups[0].get().get_total_space()) {
-                    modify(m_status, BROKEN);
-                    modify(m_status_text, "Couple has unequal total space in groups");
-                    for (Group & group : m_groups)
-                        group.set_coupled_status(false);
+                    if (m_internal_status != BROKEN_UnequalTotalSpace) {
+                        if (m_modified_time < most_recent)
+                            m_modified_time = most_recent;
+
+                        m_internal_status = BROKEN_UnequalTotalSpace;
+                        m_status = BROKEN;
+                        m_status_text = "Couple has unequal total space in groups";
+
+                        for (Group & group : m_groups)
+                            group.set_coupled_status(false, m_modified_time);
+                    }
                     return;
                 }
             }
         }
 
+        uint64_t backend_update = 0;
         bool full = false;
         for (Group & group : m_groups) {
             if (group.full()) {
                 full = true;
+                backend_update = group.get_backend_update_time();
                 break;
             }
         }
 
         if (full) {
-            modify(m_status, FULL);
-            modify(m_status_text, "Couple is FULL");
+            if (m_internal_status != FULL_Full) {
+                m_modified_time = std::max(backend_update, std::max(most_recent, m_modified_time));
+                m_internal_status = FULL_Full;
+                m_status = FULL;
+                m_status_text = "Couple is FULL";
+            }
         } else {
-            modify(m_status, OK);
-            modify(m_status_text, "Couple is OK");
+            if (m_internal_status != OK_OK) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = OK_OK;
+                m_status = OK;
+                m_status_text = "Couple is OK";
+            }
         }
 
         for (Group & group : m_groups)
-            group.set_coupled_status(true);
+            group.set_coupled_status(true, m_modified_time);
 
         return;
     }
@@ -118,34 +160,64 @@ void Couple::update_status(bool forbidden_unmatched_total)
     for (; i < statuses.size(); ++i) {
         Group::Status status = statuses[i];
         if (status == Group::INIT) {
-            modify(m_status, BAD);
-            modify(m_status_text, "Some groups are uninitialized");
+            if (m_internal_status != BAD_GroupUninitialized) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = BAD_GroupUninitialized;
+                m_status = BAD;
+                m_status_text = "Some groups are uninitialized";
+            }
             break;
         } else if (status == Group::BAD) {
-            modify(m_status, BAD);
-            modify(m_status_text, "Some groups are in state BAD");
+            if (m_internal_status != BAD_GroupBAD) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = BAD_GroupBAD;
+                m_status = BAD;
+                m_status_text = "Some groups are in state BAD";
+            }
             break;
         } else if (status == Group::BROKEN) {
-            modify(m_status, BROKEN);
-            modify(m_status_text, "Some groups are in state BROKEN");
+            if (m_internal_status != BROKEN_GroupBROKEN) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = BROKEN_GroupBROKEN;
+                m_status = BROKEN;
+                m_status_text = "Some groups are in state BROKEN";
+            }
             break;
         } else if (status == Group::RO || status == Group::MIGRATING) {
-            modify(m_status, BAD);
-            modify(m_status_text, "Some groups are read-only");
+            if (m_internal_status != BAD_ReadOnly) {
+                if (m_modified_time < most_recent)
+                    m_modified_time = most_recent;
+
+                m_internal_status = BAD_ReadOnly;
+                m_status = BAD;
+                m_status_text = "Some groups are read-only";
+            }
             break;
         }
+    }
+
+    if (m_internal_status != BAD_Unknown) {
+        if (m_modified_time < most_recent)
+            m_modified_time = most_recent;
+
+        m_internal_status = BAD_Unknown;
+        m_status = BAD;
+        m_status_text = "Couple is BAD for unknown reason";
     }
 
     if (i < statuses.size()) {
         for (size_t j = 0; j < m_groups.size(); ++j) {
             if (j != i)
-                m_groups[j].get().set_coupled_status(false);
+                m_groups[j].get().set_coupled_status(false, m_modified_time);
         }
         return;
     }
-
-    modify(m_status, BAD);
-    modify(m_status_text, "Couple is BAD for unknown reason");
 
     // TODO: account job
 }
@@ -157,6 +229,7 @@ void Couple::merge(const Couple & other, bool & have_newer)
         return;
     }
 
+    m_internal_status = other.m_internal_status;
     m_status = other.m_status;
     m_status_text = other.m_status_text;
     m_update_status_duration = other.m_update_status_duration;
@@ -190,9 +263,7 @@ void Couple::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) c
     for (Group & group : m_groups)
         group.push_items(filesystems);
 }
-
-void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
-        bool show_internals) const
+void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, bool show_internals) const
 {
     writer.StartObject();
 
@@ -210,9 +281,44 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (show_internals) {
         writer.Key("update_status_duration");
         writer.Uint64(m_update_status_duration);
+        writer.Key("modified_time");
+        writer.Uint64(m_modified_time);
+        writer.Key("internal_status");
+        writer.String(internal_status_str(m_internal_status));
     }
 
     writer.EndObject();
+}
+
+const char *Couple::internal_status_str(InternalStatus status)
+{
+    switch (status) {
+    case INIT_Init:
+        return "INIT_Init";
+    case BAD_NoGroups:
+        return "BAD_NoGroups";
+    case BAD_DifferentMetadata:
+        return "BAD_DifferentMetadata";
+    case BAD_GroupUninitialized:
+        return "BAD_GroupUninitialized";
+    case BAD_GroupBAD:
+        return "BAD_GroupBAD";
+    case BAD_ReadOnly:
+        return "BAD_ReadOnly";
+    case BAD_Unknown:
+        return "BAD_Unknown";
+    case BROKEN_GroupBROKEN:
+        return "BROKEN_GroupBROKEN";
+    case BROKEN_UnequalTotalSpace:
+        return "BROKEN_UnequalTotalSpace";
+    case FROZEN_Frozen:
+        return "FROZEN_Frozen";
+    case FULL_Full:
+        return "FULL_Full";
+    case OK_OK:
+        return "OK_OK";
+    }
+    return "UNKNOWN";
 }
 
 const char *Couple::status_str(Status status)
