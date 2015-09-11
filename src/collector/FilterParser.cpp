@@ -20,6 +20,8 @@
 
 #include <cstddef>
 
+namespace {
+
 enum FilterKey
 {
     FilterSec     = 2,
@@ -34,14 +36,14 @@ enum FilterKey
     ShowInternals = 0x400
 };
 
-static const Parser::Folder filter_1[] = {
+Parser::Folder filter_1[] = {
     { "filter",     0, FilterSec },
     { "item_types", 0, ItemTypes },
     { "options",    0, Options   },
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder filter_2[] = {
+Parser::Folder filter_2[] = {
     { "namespaces",     FilterSec, Namespaces    },
     { "couples",        FilterSec, Couples       },
     { "groups",         FilterSec, Groups        },
@@ -52,15 +54,17 @@ static const Parser::Folder filter_2[] = {
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder * const filter_folders[] = {
+Parser::Folder *filter_folders[] = {
     filter_1,
     filter_2
 };
 
-static const Parser::UIntInfo filter_uint_info[] = {
+Parser::UIntInfo filter_uint_info[] = {
     { Options|ShowInternals, SET, offsetof(Filter, show_internals) },
     { 0, 0, 0 }
 };
+
+} // unnamed namespace
 
 FilterParser::FilterParser(Filter & filter)
     :

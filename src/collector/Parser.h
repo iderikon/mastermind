@@ -391,16 +391,7 @@ public:
     };
 
 public:
-    Parser(const Folder * const *fold, int max_depth,
-            const UIntInfo *info, uint8_t *dest)
-        :
-        m_keys(1),
-        m_depth(0),
-        m_max_depth(max_depth),
-        m_fold(fold),
-        m_uint_info(info),
-        m_dest(dest)
-    {}
+    Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest);
 
     virtual ~Parser()
     {}
@@ -470,8 +461,10 @@ protected:
     int m_max_depth;
 
 private:
-    const Folder * const *m_fold;
-    const UIntInfo *m_uint_info;
+    Folder **m_fold;
+    std::vector<size_t> m_fold_size;
+    UIntInfo *m_uint_info;
+    uint64_t m_uint_info_size;
     uint8_t *m_dest;
 };
 

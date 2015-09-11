@@ -18,41 +18,129 @@
 
 #include "Parser.h"
 
-#include <iostream>
+#include <algorithm>
+
+namespace {
+
+struct FolderLess
+{
+    bool operator () (const Parser::Folder & f1, const Parser::Folder & f2) const
+    {
+        if (f1.keys != f2.keys)
+            return f1.keys < f2.keys;
+        return std::strcmp(f1.str, f2.str) < 0;
+    }
+};
+
+struct FolderSearch
+{
+    FolderSearch(uint32_t k, const char *s)
+        :
+        found_eq(false),
+        keys(k),
+        str(s)
+    {}
+
+    mutable bool found_eq;
+    uint32_t keys;
+    const char *str;
+};
+
+struct FolderSearchLess
+{
+    bool operator () (const Parser::Folder & f1, const FolderSearch & search) const
+    {
+        if (f1.keys != search.keys)
+            return f1.keys < search.keys;
+
+        if (f1.str[0] == *MATCH_ANY) {
+            search.found_eq = true;
+            return false;
+        }
+
+        if (f1.str[0] == *NOT_MATCH) {
+            if (!std::strcmp(f1.str + 1, search.str))
+                return true;
+
+            search.found_eq = true;
+            return false;
+        }
+
+        int res = std::strcmp(f1.str, search.str);
+        if (!res) {
+            search.found_eq = true;
+            return false;
+        }
+        return res < 0;
+    }
+};
+
+struct UIntInfoLess
+{
+    bool operator () (const Parser::UIntInfo & i1, const Parser::UIntInfo & i2) const
+    {
+        return i1.keys < i2.keys;
+    }
+
+    bool operator () (const Parser::UIntInfo & info, uint32_t keys) const
+    {
+        return info.keys < keys;
+    }
+};
+
+} // unnamed namespace
+
+Parser::Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest)
+    :
+    m_keys(1),
+    m_depth(0),
+    m_max_depth(max_depth),
+    m_fold(fold),
+    m_uint_info(info),
+    m_dest(dest)
+{
+    m_fold_size.resize(max_depth);
+
+    for (int i = 0; i < max_depth; ++i) {
+        size_t & folder_size = m_fold_size[i];
+        for (folder_size = 0; m_fold[i][folder_size].str != nullptr; ++folder_size);
+        std::sort(m_fold[i], m_fold[i] + folder_size, FolderLess());
+    }
+
+    for (m_uint_info_size = 0; m_uint_info[m_uint_info_size].keys; ++m_uint_info_size);
+    std::sort(m_uint_info, m_uint_info + m_uint_info_size, UIntInfoLess());
+}
 
 bool Parser::UInteger(uint64_t val)
 {
     if (key_depth() != (m_depth + 1))
         return true;
 
-    const UIntInfo *info = m_uint_info;
-    while (info->keys) {
-        if (info->keys == (m_keys - 1)) {
-            uint64_t *dst_val = (uint64_t *) (m_dest + info->off);
-            switch (info->action)
-            {
-            case SET:
-                *dst_val = val;
-                break;
-
-            case SUM:
-                *dst_val += val;
-                break;
-
-            case MAX:
-                if (*dst_val < val)
-                    *dst_val = val;
-                break;
-            }
-
-            clear_key();
-            return true;
-        }
-        ++info;
-    }
+    auto info = std::lower_bound(m_uint_info, m_uint_info + m_uint_info_size, m_keys - 1, UIntInfoLess());
 
     // if we haven't found the UIntInfo, something is wrong
-    return false;
+    if (info == (m_uint_info + m_uint_info_size) || info->keys != (m_keys - 1))
+        return false;
+
+    uint64_t *dst_val = (uint64_t *) (m_dest + info->off);
+    switch (info->action)
+    {
+    case SET:
+        *dst_val = val;
+        break;
+
+    case SUM:
+        *dst_val += val;
+        break;
+
+    case MAX:
+        if (*dst_val < val)
+            *dst_val = val;
+        break;
+    }
+
+    clear_key();
+    return true;
 }
 
 bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
@@ -65,30 +153,13 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
     if (kdepth > m_max_depth)
         return false;
 
-    const Folder *fold = m_fold[m_depth - 1];
-    while (fold->str != NULL) {
-        if (fold->keys == (m_keys - 1)) {
-            switch (fold->str[0]) {
-            case NOT_MATCH[0]:
-                if (std::strcmp(fold->str + 1, str)) {
-                    m_keys |= fold->token;
-                    return true;
-                }
-                break;
+    FolderSearch search(m_keys - 1, str);
+    int idx = m_depth - 1;
+    size_t size = m_fold_size[idx];
+    auto fold = std::lower_bound(m_fold[idx], m_fold[idx] + size, search, FolderSearchLess());
 
-            case MATCH_ANY[0]:
-                m_keys |= fold->token;
-                return true;
-
-            default:
-                if (!std::strcmp(fold->str, str)) {
-                    m_keys |= fold->token;
-                    return true;
-                }
-            }
-        }
-        ++fold;
-    }
+    if (search.found_eq)
+        m_keys |= fold->token;
 
     return true;
 }

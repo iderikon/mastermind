@@ -20,6 +20,8 @@
 
 #include <cstddef>
 
+namespace {
+
 enum ConfigKey
 {
     Elliptics                         = 2,
@@ -35,7 +37,7 @@ enum ConfigKey
     WaitTimeout                       = 0x800
 };
 
-static const Parser::Folder config_1[] = {
+Parser::Folder config_1[] = {
     { "elliptics",                             0, Elliptics                         },
     { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
     { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
@@ -47,19 +49,19 @@ static const Parser::Folder config_1[] = {
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder config_2[] = {
+Parser::Folder config_2[] = {
     { "nodes",        Elliptics, Nodes       },
     { "monitor_port", Elliptics, MonitorPort },
     { "wait_timeout", Elliptics, WaitTimeout },
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder * const config_folders[] = {
+Parser::Folder *config_folders[] = {
     config_1,
     config_2
 };
 
-static const Parser::UIntInfo config_uint_info[] = {
+Parser::UIntInfo config_uint_info[] = {
     { Elliptics|MonitorPort,             SET, offsetof(Config, monitor_port)                          },
     { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
@@ -71,6 +73,8 @@ static const Parser::UIntInfo config_uint_info[] = {
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
     { 0, 0, 0 }
 };
+
+} // unnamed namespace
 
 ConfigParser::ConfigParser(Config & config)
     :

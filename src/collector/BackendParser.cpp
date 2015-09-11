@@ -20,6 +20,8 @@
 
 #include <cstddef>
 
+namespace {
+
 enum BackendKey
 {
     Backends           = 2,
@@ -53,19 +55,19 @@ enum BackendKey
     Group              = 0x20000000
 };
 
-static const Parser::Folder backend_1[] = {
+Parser::Folder backend_1[] = {
     { "backends", 0, Backends },
 
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder backend_2[] = {
+Parser::Folder backend_2[] = {
     { MATCH_ANY, Backends, BackendFolder },
 
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder backend_3[] = {
+Parser::Folder backend_3[] = {
     { "backend",    Backends|BackendFolder, Backend   },
     { "backend_id", Backends|BackendFolder, BackendId },
     { "status",     Backends|BackendFolder, Status    },
@@ -73,7 +75,7 @@ static const Parser::Folder backend_3[] = {
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder backend_4[] = {
+Parser::Folder backend_4[] = {
     { "dstat",         Backends|BackendFolder|Backend, Dstat        },
     { "vfs",           Backends|BackendFolder|Backend, Vfs          },
     { "summary_stats", Backends|BackendFolder|Backend, SummaryStats },
@@ -86,7 +88,7 @@ static const Parser::Folder backend_4[] = {
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder backend_5[] = {
+Parser::Folder backend_5[] = {
     { "read_ios",             Backends|BackendFolder|Backend|Dstat,        ReadIos            },
     { "write_ios",            Backends|BackendFolder|Backend|Dstat,        WriteIos           },
     { "error",                Backends|BackendFolder|Backend|Dstat,        Error              },
@@ -111,13 +113,13 @@ static const Parser::Folder backend_5[] = {
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder backend_6[] = {
+Parser::Folder backend_6[] = {
     { "base_size", Backends|BackendFolder|Backend|BaseStats|BlobFilename, BlobBaseSize },
 
     { NULL, 0, 0 }
 };
 
-static const Parser::Folder *backend_folders[] = {
+Parser::Folder *backend_folders[] = {
     backend_1,
     backend_2,
     backend_3,
@@ -128,7 +130,7 @@ static const Parser::Folder *backend_folders[] = {
 
 #define OFF(field) offsetof(BackendStat, field)
 
-static const Parser::UIntInfo backend_uint_info[] = {
+Parser::UIntInfo backend_uint_info[] = {
     { Backends|BackendFolder|BackendId,                                   SET, OFF(backend_id)           },
     { Backends|BackendFolder|Backend|Dstat|ReadIos,                       SET, OFF(read_ios)             },
     { Backends|BackendFolder|Backend|Dstat|WriteIos,                      SET, OFF(write_ios)            },
@@ -150,6 +152,8 @@ static const Parser::UIntInfo backend_uint_info[] = {
     { Backends|BackendFolder|Status|State,                                SET, OFF(state)                },
     { 0, 0, 0 }
 };
+
+} // unnamed namespace
 
 BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, std::function<void(BackendStat&)> callback)
     :
