@@ -51,6 +51,7 @@ bool Parser::UInteger(uint64_t val)
         ++info;
     }
 
+    // if we haven't found the UIntInfo, something is wrong
     return false;
 }
 
