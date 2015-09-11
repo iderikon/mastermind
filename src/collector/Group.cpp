@@ -374,8 +374,6 @@ void Group::update_status(bool forbidden_dht)
 
 void Group::set_coupled_status(bool ok, uint64_t timestamp)
 {
-    assert(timestamp >= m_update_time);
-
     if (m_internal_status == BROKEN_DHTForbidden ||
             m_internal_status == BROKEN_HaveBADBackends ||
             m_internal_status == BAD_HaveOther ||
@@ -389,7 +387,8 @@ void Group::set_coupled_status(bool ok, uint64_t timestamp)
     InternalStatus new_internal_status = ok ? COUPLED_Coupled : BAD_CoupleBAD;
 
     if (m_internal_status != new_internal_status) {
-        m_update_time = timestamp;
+        if (m_update_time < timestamp)
+            m_update_time = timestamp;
         m_internal_status = new_internal_status;
         m_status = ok ? COUPLED : BAD;
         m_status_text = (ok ? "Group is OK"
