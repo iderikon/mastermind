@@ -323,12 +323,12 @@ void Group::update_status(bool forbidden_dht)
         }
 
         if (have_bad) {
-            if (m_internal_status != BROKEN_HaveBADBackends) {
+            if (m_internal_status != BAD_HaveBADBackends) {
                 if (m_update_time < backend_ts)
                     m_update_time = backend_ts;
 
-                m_internal_status = BROKEN_HaveBADBackends;
-                m_status = BROKEN;
+                m_internal_status = BAD_HaveBADBackends;
+                m_status = BAD;
                 m_status_text = "Some of backends are in state BAD";
             }
         } else if (have_ro) {
@@ -375,7 +375,7 @@ void Group::update_status(bool forbidden_dht)
 void Group::set_coupled_status(bool ok, uint64_t timestamp)
 {
     if (m_internal_status == BROKEN_DHTForbidden ||
-            m_internal_status == BROKEN_HaveBADBackends ||
+            m_internal_status == BAD_HaveBADBackends ||
             m_internal_status == BAD_HaveOther ||
             m_internal_status == BAD_ParseFailed ||
             m_internal_status == BAD_InconsistentCouple ||
@@ -615,8 +615,8 @@ const char *Group::internal_status_str(InternalStatus status)
         return "INIT_Uncoupled";
     case BROKEN_DHTForbidden:
         return "BROKEN_DHTForbidden";
-    case BROKEN_HaveBADBackends:
-        return "BROKEN_HaveBADBackends";
+    case BAD_HaveBADBackends:
+        return "BAD_HaveBADBackends";
     case BAD_HaveOther:
         return "BAD_HaveOther";
     case BAD_ParseFailed:
