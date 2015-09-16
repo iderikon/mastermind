@@ -19,6 +19,7 @@
 #include "Parser.h"
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -88,15 +89,32 @@ struct UIntInfoLess
     }
 };
 
+struct StringInfoLess
+{
+    bool operator () (const Parser::StringInfo & i1, const Parser::StringInfo & i2) const
+    {
+        return i1.keys < i2.keys;
+    }
+
+    bool operator () (const Parser::StringInfo & info, uint32_t keys) const
+    {
+        return info.keys < keys;
+    }
+};
+
 } // unnamed namespace
 
-Parser::Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest)
+Parser::Parser(Folder **fold, int max_depth, UIntInfo *uint_info,
+        StringInfo *string_info, uint8_t *dest)
     :
     m_keys(1),
     m_depth(0),
     m_max_depth(max_depth),
     m_fold(fold),
-    m_uint_info(info),
+    m_uint_info(uint_info),
+    m_uint_info_size(0),
+    m_string_info(string_info),
+    m_string_info_size(0),
     m_dest(dest)
 {
     m_fold_size.resize(max_depth);
@@ -107,12 +125,22 @@ Parser::Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest)
         std::sort(m_fold[i], m_fold[i] + folder_size, FolderLess());
     }
 
-    for (m_uint_info_size = 0; m_uint_info[m_uint_info_size].keys; ++m_uint_info_size);
-    std::sort(m_uint_info, m_uint_info + m_uint_info_size, UIntInfoLess());
+    if (m_uint_info != nullptr) {
+        for (; m_uint_info[m_uint_info_size].keys; ++m_uint_info_size);
+        std::sort(m_uint_info, m_uint_info + m_uint_info_size, UIntInfoLess());
+    }
+
+    if (m_string_info != nullptr) {
+        for (; m_string_info[m_string_info_size].keys; ++m_string_info_size);
+        std::sort(m_string_info, m_string_info + m_string_info_size, StringInfoLess());
+    }
 }
 
 bool Parser::UInteger(uint64_t val)
 {
+    if (m_uint_info == nullptr)
+        return true;
+
     if (key_depth() != (m_depth + 1))
         return true;
 
@@ -138,6 +166,28 @@ bool Parser::UInteger(uint64_t val)
             *dst_val = val;
         break;
     }
+
+    clear_key();
+    return true;
+}
+
+bool Parser::String(const char* str, rapidjson::SizeType length, bool copy)
+{
+    if (m_string_info == nullptr)
+        return true;
+
+    if (key_depth() != (m_depth + 1))
+        return true;
+
+    auto info = std::lower_bound(m_string_info, m_string_info + m_string_info_size,
+            m_keys - 1, StringInfoLess());
+
+    // if we haven't found the StringInfo, something is wrong
+    if (info == (m_string_info + m_string_info_size) || info->keys != (m_keys - 1))
+        return false;
+
+    std::string & dst_val = *(std::string *) (m_dest + info->off);
+    dst_val.assign(str, length);
 
     clear_key();
     return true;

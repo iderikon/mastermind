@@ -31,7 +31,8 @@ struct Filter
         Namespace = 4,
         Node      = 8,
         Backend   = 0x10,
-        FS        = 0x20
+        FS        = 0x20,
+        Job       = 0x40
     };
 
     Filter()

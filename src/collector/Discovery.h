@@ -34,6 +34,7 @@ public:
 
     int init_curl();
     int init_elliptics();
+    int init_mongo();
 
     ioremap::elliptics::session & get_session()
     { return *m_session; }

@@ -34,7 +34,13 @@ enum ConfigKey
     NonblockingIoThreadNum            = 0x100,
     Nodes                             = 0x200,
     MonitorPort                       = 0x400,
-    WaitTimeout                       = 0x800
+    WaitTimeout                       = 0x800,
+    Metadata                          = 0x1000,
+    Url                               = 0x2000,
+    Jobs                              = 0x4000,
+    Db                                = 0x8000,
+    Options                           = 0x10000,
+    ConnectTimeoutMS                  = 0x20000
 };
 
 Parser::Folder config_1[] = {
@@ -46,6 +52,7 @@ Parser::Folder config_1[] = {
     { "net_thread_num",                        0, NetThreadNum                      },
     { "io_thread_num",                         0, IoThreadNum                       },
     { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
+    { "metadata",                              0, Metadata                          },
     { NULL, 0, 0 }
 };
 
@@ -53,12 +60,22 @@ Parser::Folder config_2[] = {
     { "nodes",        Elliptics, Nodes       },
     { "monitor_port", Elliptics, MonitorPort },
     { "wait_timeout", Elliptics, WaitTimeout },
+    { "url",          Metadata,  Url         },
+    { "jobs",         Metadata,  Jobs        },
+    { "options",      Metadata,  Options     },
+    { NULL, 0, 0 }
+};
+
+Parser::Folder config_3[] = {
+    { "db",               Metadata|Jobs,    Db               },
+    { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS },
     { NULL, 0, 0 }
 };
 
 Parser::Folder *config_folders[] = {
     config_1,
-    config_2
+    config_2,
+    config_3
 };
 
 Parser::UIntInfo config_uint_info[] = {
@@ -71,7 +88,14 @@ Parser::UIntInfo config_uint_info[] = {
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
+    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           },
     { 0, 0, 0 }
+};
+
+Parser::StringInfo config_string_info[] = {
+    { Metadata|Url,     offsetof(Config, metadata_url) },
+    { Metadata|Jobs|Db, offsetof(Config, jobs_db)      },
+    { 0, 0 }
 };
 
 } // unnamed namespace
@@ -79,7 +103,7 @@ Parser::UIntInfo config_uint_info[] = {
 ConfigParser::ConfigParser(Config & config)
     :
     super(config_folders, sizeof(config_folders)/sizeof(config_folders[0]),
-            config_uint_info, (uint8_t *) &config),
+            config_uint_info, config_string_info, (uint8_t *) &config),
     m_array_depth(0),
     m_config(config)
 {
@@ -89,9 +113,12 @@ ConfigParser::ConfigParser(Config & config)
 
 bool ConfigParser::String(const char* str, rapidjson::SizeType length, bool copy)
 {
-    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2)
+    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2) {
         m_current_node.host = std::string(str, length);
-    return true;
+        return true;
+    }
+
+    return super::String(str, length, copy);
 }
 
 bool ConfigParser::StartArray()

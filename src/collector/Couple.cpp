@@ -79,6 +79,7 @@ void Couple::update_status(bool forbidden_unmatched_total)
                 for (Group & group : m_groups)
                     group.set_coupled_status(false, m_modified_time);
             }
+            account_job_in_status();
             return;
         }
 
@@ -211,6 +212,8 @@ void Couple::update_status(bool forbidden_unmatched_total)
         m_status_text = "Couple is BAD for unknown reason";
     }
 
+    account_job_in_status();
+
     if (i < statuses.size()) {
         for (size_t j = 0; j < m_groups.size(); ++j) {
             if (j != i)
@@ -218,8 +221,6 @@ void Couple::update_status(bool forbidden_unmatched_total)
         }
         return;
     }
-
-    // TODO: account job
 }
 
 void Couple::merge(const Couple & other, bool & have_newer)
@@ -263,6 +264,43 @@ void Couple::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) c
     for (Group & group : m_groups)
         group.push_items(filesystems);
 }
+
+void Couple::account_job_in_status()
+{
+    if (m_status != BAD)
+        return;
+
+    for (Group & group : m_groups) {
+        if (group.has_active_job()) {
+            const Job & job = group.get_active_job();
+            Job::Type type = job.get_type();
+            Job::Status status = job.get_status();
+
+            if (type != Job::MOVE_JOB && type != Job::RESTORE_GROUP_JOB)
+                return;
+
+            if (status == Job::NEW || status == Job::EXECUTING) {
+                m_internal_status = SERVICE_ACTIVE_ServiceActive;
+                m_status = SERVICE_ACTIVE;
+
+                m_status_text = "Couple has active job ";
+                m_status_text += job.get_id();
+            } else {
+                m_internal_status = SERVICE_STALLED_ServiceStalled;
+                m_status = SERVICE_STALLED;
+
+                m_status_text = "Couple has stalled job ";
+                m_status_text += job.get_id();
+            }
+
+            if (m_modified_time < group.get_update_time())
+                m_modified_time = group.get_update_time();
+
+            break;
+        }
+    }
+}
+
 void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, bool show_internals) const
 {
     writer.StartObject();
@@ -315,6 +353,10 @@ const char *Couple::internal_status_str(InternalStatus status)
         return "FROZEN_Frozen";
     case FULL_Full:
         return "FULL_Full";
+    case SERVICE_ACTIVE_ServiceActive:
+        return "SERVICE_ACTIVE_ServiceActive";
+    case SERVICE_STALLED_ServiceStalled:
+        return "SERVICE_STALLED_ServiceStalled";
     case OK_OK:
         return "OK_OK";
     }

@@ -16,10 +16,11 @@
    License along with Mastermind.
 */
 
-#include "Storage.h"
 #include "CocaineHandlers.h"
 #include "ConfigParser.h"
 #include "WorkerApplication.h"
+
+#include "Storage.h"
 
 #include <elliptics/logger.hpp>
 #include <rapidjson/reader.h>

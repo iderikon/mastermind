@@ -43,7 +43,8 @@ struct Config
         dnet_log_mask(3),
         net_thread_num(3),
         io_thread_num(3),
-        nonblocking_io_thread_num(3)
+        nonblocking_io_thread_num(3),
+        metadata_connect_timeout_ms(5000)
     {}
 
     uint64_t monitor_port;
@@ -56,6 +57,9 @@ struct Config
     uint64_t io_thread_num;
     uint64_t nonblocking_io_thread_num;
     std::vector<NodeInfo> nodes;
+    std::string metadata_url;
+    uint64_t metadata_connect_timeout_ms;
+    std::string jobs_db;
 
     void print(std::ostringstream & ostr) const
     {
@@ -69,6 +73,9 @@ struct Config
             "net_thread_num: "                        << net_thread_num << "\n"
             "io_thread_num: "                         << io_thread_num << "\n"
             "nonblocking_io_thread_num: "             << nonblocking_io_thread_num << "\n"
+            "metadata_url: "                          << metadata_url << "\n"
+            "metadata_connect_timeout_ms: "           << metadata_connect_timeout_ms << "\n"
+            "jobs_db: "                               << jobs_db << "\n"
             "nodes:\n";
         for (const NodeInfo & node : nodes)
             ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';

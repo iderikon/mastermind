@@ -21,10 +21,11 @@
 #include "Round.h"
 #include "WorkerApplication.h"
 
-#include <set>
-
 #include <curl/curl.h>
+#include <mongo/client/dbclient.h>
+
 #include <cstring>
+#include <set>
 
 using namespace ioremap;
 
@@ -91,6 +92,19 @@ int Discovery::init_elliptics()
 
     m_session.reset(new elliptics::session(*m_node));
     m_session->set_cflags(DNET_FLAGS_NOLOCK);
+
+    return 0;
+}
+
+int Discovery::init_mongo()
+{
+    mongo::client::Options options;
+    options.setIPv6Enabled(true);
+
+    if (!mongo::client::initialize(options).isOK()) {
+        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to initialize mongo client");
+        return -1;
+    }
 
     return 0;
 }

@@ -4,13 +4,13 @@ add_executable(mastermind-collector
     Storage.cpp Group.cpp Couple.cpp
     ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp
     FS.cpp FilterParser.cpp Backend.cpp
-    Filter.cpp Round.cpp Collector.cpp main.cpp)
+    Filter.cpp Round.cpp Collector.cpp Job.cpp main.cpp)
 
 target_link_libraries(mastermind-collector
     ${elliptics_cpp_LIBRARY} ${elliptics_client_LIBRARY}
     ${CocaineNative_LIBRARIES} ${Cocaine_LIBRARY}
     ${CURL_LIBRARIES} boost_system boost_thread msgpack rt
-     dispatch pthread_workqueue kqueue ev)
+     dispatch pthread_workqueue kqueue ev mongoclient)
 
 add_custom_target(tarball ALL
     COMMAND tar czf mastermind-collector.tar.gz mastermind-collector

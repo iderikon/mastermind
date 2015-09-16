@@ -232,6 +232,16 @@
        { 0, 0, 0 }
    }
 
+   StringInfo is used for string values in the same way. Offset of a field of
+   type std::string is specified in 'off'. There is no 'action' field in
+   StringInfo, only SET method is supported.
+
+   struct StringInfo
+   {
+       uint32_t keys;
+       size_t off;
+   };
+
    Initially, m_keys is set to 1 (note that the least significant bit is not set
    in the array of Folder objects). Let's consider how the state is changed
    throughout the document scan.
@@ -390,8 +400,15 @@ public:
         size_t off;
     };
 
+    struct StringInfo
+    {
+        uint32_t keys;
+        size_t off;
+    };
+
 public:
-    Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest);
+    Parser(Folder **fold, int max_depth, UIntInfo *uint_info,
+            StringInfo *string_info, uint8_t *dest);
 
     virtual ~Parser()
     {}
@@ -406,8 +423,6 @@ public:
     { return true; }
     virtual bool Double(double d)
     { return true; }
-    virtual bool String(const char* str, rapidjson::SizeType length, bool copy)
-    { return true; }
     virtual bool StartArray()
     { return true; }
     virtual bool EndArray(rapidjson::SizeType nr_elements)
@@ -419,6 +434,8 @@ public:
     { return UInteger(u); }
 
     virtual bool Key(const char* str, rapidjson::SizeType length, bool copy);
+
+    virtual bool String(const char* str, rapidjson::SizeType length, bool copy);
 
     virtual bool StartObject()
     {
@@ -465,6 +482,8 @@ private:
     std::vector<size_t> m_fold_size;
     UIntInfo *m_uint_info;
     uint64_t m_uint_info_size;
+    StringInfo *m_string_info;
+    uint64_t m_string_info_size;
     uint8_t *m_dest;
 };
 

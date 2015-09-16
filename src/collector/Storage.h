@@ -24,11 +24,15 @@
 #include "Namespace.h"
 #include "Node.h"
 
+#include "Job.h"
+
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
+class Job;
 class WorkerApplication;
 
 class Storage
@@ -68,8 +72,18 @@ public:
     std::map<std::string, Namespace> & get_namespaces()
     { return m_namespaces; }
 
+    std::map<int, Job> & get_jobs()
+    { return m_jobs; }
+
+    // save jobs received from MongoDB
+    void save_new_jobs(std::vector<Job> && new_jobs, uint64_t timestamp);
+
     // process newly received backends, i.e. create Group objects
     void update_group_structure();
+
+    // process newly received jobs, bind them to groups, update existing jobs,
+    // remove completed/cancelled jobs, unbind them from groups
+    void process_new_jobs();
 
     // process downloaded metadata, recalculate states, etc.
     void update();
@@ -88,6 +102,7 @@ private:
     Namespace & get_namespace(const std::string & name);
 
     void merge_groups(const Storage & other_storage, bool & have_newer);
+    void merge_jobs(const Storage & other_storage, bool & have_newer);
     void merge_couples(const Storage & other_storage, bool & have_newer);
 
     // find an intersection of sets of ResultItem objects
@@ -137,6 +152,13 @@ private:
     std::map<int, Group> m_groups;
     std::map<std::string, Couple> m_couples;
     std::map<std::string, Namespace> m_namespaces;
+
+    // array of jobs received from MongoDB but not processed yet
+    std::vector<Job> m_new_jobs;
+    // map group id -> job
+    std::map<int, Job> m_jobs;
+    // time database query was completed
+    uint64_t m_jobs_timestamp;
 };
 
 #endif

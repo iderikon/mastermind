@@ -19,10 +19,11 @@
 #include "Couple.h"
 #include "Filter.h"
 #include "FS.h"
-#include "Group.h"
 #include "Node.h"
-#include "Storage.h"
 #include "WorkerApplication.h"
+
+#include "Group.h"
+#include "Storage.h"
 
 #include <sstream>
 
@@ -87,12 +88,15 @@ void Storage::Entries::sort()
 }
 
 Storage::Storage(WorkerApplication & app)
-    : m_app(app)
+    :
+    m_app(app),
+    m_jobs_timestamp(0)
 {}
 
 Storage::Storage(const Storage & other)
     :
-    m_app(other.m_app)
+    m_app(other.m_app),
+    m_jobs_timestamp(0)
 {
     bool have_newer;
     merge(other, have_newer);
@@ -129,6 +133,14 @@ void Storage::handle_backend(Backend & backend)
     backend.set_group(it->second);
 }
 
+void Storage::save_new_jobs(std::vector<Job> && new_jobs, uint64_t timestamp)
+{
+    assert(m_jobs_timestamp <= timestamp);
+
+    m_new_jobs = std::move(new_jobs);
+    m_jobs_timestamp = timestamp;
+}
+
 void Storage::update_group_structure()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Updating group structure");
@@ -139,6 +151,37 @@ void Storage::update_group_structure()
         for (Backend & backend : backends)
             handle_backend(backend);
     }
+}
+
+void Storage::process_new_jobs()
+{
+    std::map<int, Job>::iterator old = m_jobs.begin();
+    std::vector<Job>::iterator fresh = m_new_jobs.begin();
+
+    while (1) {
+        if (old != m_jobs.end()) {
+            if (fresh == m_new_jobs.end() || old->first < fresh->get_group_id()) {
+                auto it = m_groups.find(old->first);
+                if (it != m_groups.end())
+                    it->second.clear_active_job();
+                m_jobs.erase(old++);
+                continue;
+            } else if (old->first == fresh->get_group_id()) {
+                old->second.update(*fresh);
+                ++old;
+                ++fresh;
+                continue;
+            }
+        }
+        if (fresh != m_new_jobs.end()) {
+            m_jobs[fresh->get_group_id()] = *fresh;
+            ++fresh;
+        } else {
+            break;
+        }
+    }
+
+    m_new_jobs.clear();
 }
 
 Namespace & Storage::get_namespace(const std::string & name)
@@ -153,12 +196,21 @@ void Storage::update()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
 
+    // Create/update filesystems depending on backend stats.
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
         it->second.update_filesystems();
 
+    // Process group metadata and jobs.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
         std::string old_namespace_name = group.get_namespace_name();
+
+        // Bind or clear an active job.
+        auto jit = m_jobs.find(group.get_id());
+        if (jit == m_jobs.end())
+            group.clear_active_job();
+        else
+            group.set_active_job(jit->second);
 
         if (group.parse_metadata() != 0)
             continue;
@@ -176,6 +228,7 @@ void Storage::update()
         group.update_status(m_app.get_config().forbidden_dht_groups);
     }
 
+    // Create/update couples depending on changes in group metadata and structure
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
         if (!group.metadata_parsed())
@@ -232,6 +285,7 @@ void Storage::update()
         }
     }
 
+    // Complete couple and group updates
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
         it->second.update_status(m_app.get_config().forbidden_unmatched_group_total_space);
 
@@ -258,6 +312,62 @@ void Storage::merge_groups(const Storage & other_storage, bool & have_newer)
 
     if (m_groups.size() > other_storage.m_groups.size())
         have_newer = true;
+}
+
+void Storage::merge_jobs(const Storage & other_storage, bool & have_newer)
+{
+    if (m_jobs_timestamp > other_storage.m_jobs_timestamp) {
+        if (m_jobs.size() != other_storage.m_jobs.size()) {
+            have_newer = true;
+            return;
+        }
+
+        auto my = m_jobs.begin();
+        auto other = other_storage.m_jobs.begin();
+        while (my != m_jobs.end() && other != other_storage.m_jobs.end()) {
+            if (my->first != other->first || !my->second.equals(other->second)) {
+                have_newer = true;
+                return;
+            }
+            ++my;
+            ++other;
+        }
+
+        assert(my == m_jobs.end() && other == m_jobs.end());
+
+        return;
+    }
+
+    if (m_jobs_timestamp == other_storage.m_jobs_timestamp)
+        return;
+
+    auto my = m_jobs.begin();
+    auto other = other_storage.m_jobs.begin();
+
+    while (1) {
+        if (my != m_jobs.end()) {
+            if (other == other_storage.m_jobs.end() || my->first < other->first) {
+                auto it = m_groups.find(my->first);
+                if (it != m_groups.end())
+                    it->second.clear_active_job();
+                m_jobs.erase(my++);
+                continue;
+            } else if (my->first == other->first) {
+                my->second.merge(other->second, have_newer);
+                ++my;
+                ++other;
+                continue;
+            }
+        }
+        if (other != other_storage.m_jobs.end()) {
+            m_jobs[other->first] = other->second;
+            ++other;
+        } else {
+            break;
+        }
+    }
+
+    m_jobs_timestamp = other_storage.m_jobs_timestamp;
 }
 
 void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
@@ -309,6 +419,7 @@ void Storage::merge(const Storage & other, bool & have_newer)
     merge_map(*this, m_nodes, other.m_nodes, have_newer);
     update_group_structure();
     merge_groups(other, have_newer);
+    merge_jobs(other, have_newer);
     merge_couples(other, have_newer);
 }
 
@@ -665,6 +776,14 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.StartArray();
         for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
             writer.String(it->first.c_str());
+        writer.EndArray();
+    }
+
+    if (!!(item_types & Filter::Job)) {
+        writer.Key("jobs");
+        writer.StartArray();
+        for (auto it = m_jobs.begin(); it != m_jobs.end(); ++it)
+            it->second.print_json(writer);
         writer.EndArray();
     }
 }
