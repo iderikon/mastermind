@@ -116,7 +116,7 @@
    when entering into the object, the value of m_depth is incremented. When leaving
    the object (EndObject() is called), we decrement the value.
 
-   Mapping between keys and tokens is stored in an array of arrays of structures of
+   Mapping between keys and tokens is stored in a vector of vectors of structures of
    type Folder. The first dimension is the depth. A set of known keys on certain
    level of depth is numbered in second dimension.
 
@@ -125,10 +125,12 @@
        const char *str;
        uint32_t keys;
        uint32_t token;
+       uint32_t str_hash;
    };
 
    'str' is the key name. 'keys' is the preceding state. The current state will be
-   or'd with 'token' if the newly coming key matches 'str'.
+   or'd with 'token' if the newly coming key matches 'str'. 'str_hash' is calculated
+   by Parser and is not exposed outside.
 
    Here is the array of objects of type Folder describing the first level of
    depth in Example document.
@@ -136,22 +138,18 @@
    {
        { "foo",    0, Foo    },
        { "garply", 0, Garply },
-       { "waldo",  0, Waldo  },
-
-       { nullptr, 0, 0 }
+       { "waldo",  0, Waldo  }
    }
 
    The first column, 'str', contains the key names. The second one contains keys
    prior to a new one. It is always zero at the first level. The last one contains
-   the token. The array is terminated with null/zero values.
+   the token.
 
    Second level:
 
    {
        { "bar",  Foo, Bar  },
-       { "quux", Foo, Quux },
-
-       { nullptr, 0, 0 }
+       { "quux", Foo, Quux }
    }
 
    "bar" and "quux" keys are found inside "foo" object, it is indicated in the second
@@ -162,24 +160,23 @@
    {
        { "baz",     Foo|Bar,  Baz    },
        { "qux",     Foo|Bar,  Qux    },
-       { MATCH_ANY, Foo|Quux, QuuxID },
-
-       { nullptr, 0, 0 }
+       { MATCH_ANY, Foo|Quux, QuuxID }
    }
 
    Here the second column contains bitwise or of two previously matched tokens.
    Note the macro MATCH_ANY. It indicates that we accept all keys inside "quux" object.
    There is another macro NOT_MATCH which follows an undesired value. For example,
    if we'd be interested in all objects except "3" we'd define the following structure:
+   Note that these macros only make sense being a single case given previous matched
+   sequence of keys, i.e. Parser doesn't support conjunctions/disjunctions of such
+   conditions.
 
    { NOT_MATCH "3", Foo|Quux, QuuxID }
 
    Fourth level:
 
    {
-       { "corge", Foo|Quux|QuuxID, Corge },
-
-       { nullptr, 0, 0 }
+       { "corge", Foo|Quux|QuuxID, Corge }
    }
 
    The absense of "grault" key means that we don't need this attribute so Parser
@@ -228,9 +225,7 @@
        { Foo|Bar|Qux,           SET, offsetof(Wibble, qux)       },
        { Foo|Quux|QuuxID|Corge, MAX, offsetof(Wibble, max_corge) },
        { Garply,                SET, offsetof(Wibble, garply)    },
-       { Waldo,                 SET, offsetof(Wibble, waldo)     },
-
-       { 0, 0, 0 }
+       { Waldo,                 SET, offsetof(Wibble, waldo)     }
    }
 
    StringInfo is used for string values in the same way. Offset of a field of
@@ -392,6 +387,7 @@ public:
         const char *str;
         uint32_t keys;
         uint32_t token;
+        uint32_t str_hash; // calculated internally
     };
 
     class FolderVector : public std::vector<Folder>

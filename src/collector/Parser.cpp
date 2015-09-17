@@ -23,12 +23,26 @@
 
 namespace {
 
+// Hash Functions: http://www.cse.yorku.ca/~oz/hash.html
+uint32_t djb2(unsigned char *str)
+{
+    uint32_t hash = 5381;
+    int c;
+
+    while (!!(c = *str++))
+        hash = ((hash << 5) + hash) + c;
+
+    return hash;
+}
+
 struct FolderLess
 {
     bool operator () (const Parser::Folder & f1, const Parser::Folder & f2) const
     {
         if (f1.keys != f2.keys)
             return f1.keys < f2.keys;
+        if (f1.str_hash != f2.str_hash)
+            return f1.str_hash < f2.str_hash;
         return std::strcmp(f1.str, f2.str) < 0;
     }
 };
@@ -40,11 +54,14 @@ struct FolderSearch
         found_eq(false),
         keys(k),
         str(s)
-    {}
+    {
+        str_hash = djb2((unsigned char *) str);
+    }
 
     mutable bool found_eq;
     uint32_t keys;
     const char *str;
+    uint32_t str_hash;
 };
 
 struct FolderSearchLess
@@ -60,12 +77,18 @@ struct FolderSearchLess
         }
 
         if (f1.str[0] == *NOT_MATCH) {
-            if (!std::strcmp(f1.str + 1, search.str))
-                return true;
+            // hash for NOT_MATCH keys is calculated beginning from the first
+            // character of a pattern, special character is not included
+            if (f1.str_hash != search.str_hash || std::strcmp(f1.str + 1, search.str)) {
+                search.found_eq = true;
+                return false;
+            }
 
-            search.found_eq = true;
-            return false;
+            return true;
         }
+
+        if (f1.str_hash != search.str_hash)
+            return f1.str_hash < search.str_hash;
 
         int res = std::strcmp(f1.str, search.str);
         if (!res) {
@@ -107,6 +130,16 @@ struct StringInfoLess
 Parser::FolderVector::FolderVector(std::initializer_list<Folder> list)
     : std::vector<Folder>(list)
 {
+    for (auto it = begin(); it != end(); ++it) {
+        Folder & fold = *it;
+        if (*fold.str != *NOT_MATCH) {
+            fold.str_hash = djb2((unsigned char *) fold.str);
+        } else {
+            // calculate hash of pattern in case of special condition
+            fold.str_hash = djb2((unsigned char *) (fold.str + 1));
+        }
+    }
+
     std::sort(begin(), end(), FolderLess());
 }
 
