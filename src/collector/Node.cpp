@@ -20,12 +20,11 @@
 #include <rapidjson/reader.h>
 
 #include "Storage.h"
-#include "BackendParser.h"
+#include "StatsParser.h"
 #include "Filter.h"
 #include "FS.h"
 #include "Metrics.h"
 #include "Node.h"
-#include "ProcfsParser.h"
 #include "WorkerApplication.h"
 
 #include <cmath>
@@ -83,46 +82,33 @@ void Node::clone_from(const Node & other)
 
 void Node::parse_stats(void *arg)
 {
-    Node *self = (Node *) arg;
+    Node & self = *(Node *) arg;
 
-    Stopwatch procfs_watch(self->m_clock.procfs_parse);
+    Stopwatch watch(self.m_clock.stats_parse);
 
-    ProcfsParser procfs_parser;
-    {
-        rapidjson::Reader reader;
-        rapidjson::StringStream ss(self->m_download_data.c_str());
-        reader.Parse(ss, procfs_parser);
-    }
+    StatsParser parser;
 
-    if (!procfs_parser.good()) {
-        BH_LOG(self->m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing procfs statistics");
-        self->m_download_data.clear();
+    rapidjson::Reader reader;
+    rapidjson::StringStream ss(self.m_download_data.c_str());
+    reader.Parse(ss, parser);
+
+    self.m_download_data.clear();
+
+    if (!parser.good()) {
+        BH_LOG(self.m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+                "Error parsing stats for node %s", self.m_key.c_str());
         return;
     }
 
-    const NodeStat & node_stat = procfs_parser.get_stat();
-    self->update(node_stat);
+    const NodeStat & node_stat = parser.get_node_stat();
+    self.update(node_stat);
 
-    procfs_watch.stop();
+    std::vector<BackendStat> & backend_stats = parser.get_backend_stats();
+    for (BackendStat & stat : backend_stats) {
+        stat.ts_sec = node_stat.ts_sec;
+        stat.ts_usec = node_stat.ts_usec;
 
-    Stopwatch backend_watch(self->m_clock.backend_parse);
-
-    BackendParser backend_parser(node_stat.ts_sec, node_stat.ts_usec,
-            std::bind(&Node::handle_backend, self, std::placeholders::_1));
-
-    {
-        rapidjson::Reader reader;
-        rapidjson::StringStream ss(self->m_download_data.c_str());
-        reader.Parse(ss, backend_parser);
-    }
-
-    self->m_download_data.clear();
-
-    if (!backend_parser.good()) {
-        BH_LOG(self->m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing backend statistics for node %s", self->m_key.c_str());
-        return;
+        self.handle_backend(stat);
     }
 }
 
@@ -349,10 +335,8 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
 
         writer.Key("clock_stat");
         writer.StartObject();
-        writer.Key("procfs_parse");
-        writer.Uint64(m_clock.procfs_parse);
-        writer.Key("backend_parse");
-        writer.Uint64(m_clock.backend_parse);
+        writer.Key("stats_parse");
+        writer.Uint64(m_clock.stats_parse);
         writer.Key("update_fs");
         writer.Uint64(m_clock.update_fs);
         writer.EndObject();

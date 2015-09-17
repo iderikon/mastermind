@@ -27,7 +27,7 @@ std::string timeval_user_friendly(time_t sec, int usec)
 
     char buf[64];
     sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%06d",
-            res->tm_year + 1900, res->tm_mon, res->tm_mday,
+            res->tm_year + 1900, res->tm_mon + 1, res->tm_mday,
             res->tm_hour, res->tm_min, res->tm_sec, usec);
     return std::string(buf);
 }

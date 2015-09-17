@@ -124,8 +124,7 @@ public:
 public:
     struct ClockStat
     {
-        uint64_t procfs_parse;
-        uint64_t backend_parse;
+        uint64_t stats_parse;
         uint64_t update_fs;
     };
 

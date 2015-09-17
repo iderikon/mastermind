@@ -49,7 +49,7 @@ struct FolderLess
 
 struct FolderSearch
 {
-    FolderSearch(uint32_t k, const char *s)
+    FolderSearch(uint64_t k, const char *s)
         :
         found_eq(false),
         keys(k),
@@ -59,7 +59,7 @@ struct FolderSearch
     }
 
     mutable bool found_eq;
-    uint32_t keys;
+    uint64_t keys;
     const char *str;
     uint32_t str_hash;
 };
@@ -106,7 +106,7 @@ struct UIntInfoLess
         return i1.keys < i2.keys;
     }
 
-    bool operator () (const Parser::UIntInfo & info, uint32_t keys) const
+    bool operator () (const Parser::UIntInfo & info, uint64_t keys) const
     {
         return info.keys < keys;
     }
@@ -119,7 +119,7 @@ struct StringInfoLess
         return i1.keys < i2.keys;
     }
 
-    bool operator () (const Parser::StringInfo & info, uint32_t keys) const
+    bool operator () (const Parser::StringInfo & info, uint64_t keys) const
     {
         return info.keys < keys;
     }

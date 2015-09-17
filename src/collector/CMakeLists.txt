@@ -1,6 +1,6 @@
 add_executable(mastermind-collector
-    Discovery.cpp Node.cpp Parser.cpp ProcfsParser.cpp
-    BackendParser.cpp Metrics.cpp
+    Discovery.cpp Node.cpp Parser.cpp
+    StatsParser.cpp Metrics.cpp
     Storage.cpp Group.cpp Couple.cpp
     ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp
     FS.cpp FilterParser.cpp Backend.cpp Inventory.cpp
