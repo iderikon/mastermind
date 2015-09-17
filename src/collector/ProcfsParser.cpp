@@ -38,72 +38,48 @@ enum ProcfsKey
     Bytes            = 0x1000
 };
 
-Parser::Folder procfs_1[] = {
-    { "timestamp", 0, Timestamp },
-    { "procfs",    0, Procfs    },
+std::vector<Parser::FolderVector> procfs_folders = {
+    {
+        { "timestamp", 0, Timestamp },
+        { "procfs",    0, Procfs    }
+    },
+    {
+        { "tv_sec",  Timestamp, TvSec  },
+        { "tv_usec", Timestamp, TvUsec },
 
-    { NULL, 0, 0 }
+        { "vm",      Procfs,    Vm     },
+        { "net",     Procfs,    Net    }
+    },
+    {
+        { "la",             Procfs|Vm,  La            },
+        { "net_interfaces", Procfs|Net, NetInterfaces }
+    },
+    {
+        { NOT_MATCH "lo", Procfs|Net|NetInterfaces, NetInterfaceName }
+    },
+    {
+        { "receive",  Procfs|Net|NetInterfaces|NetInterfaceName, Receive  },
+        { "transmit", Procfs|Net|NetInterfaces|NetInterfaceName, Transmit }
+    },
+    {
+        { "bytes", Procfs|Net|NetInterfaces|NetInterfaceName|Receive,  Bytes },
+        { "bytes", Procfs|Net|NetInterfaces|NetInterfaceName|Transmit, Bytes }
+    }
 };
 
-Parser::Folder procfs_2[] = {
-    { "tv_sec",  Timestamp, TvSec  },
-    { "tv_usec", Timestamp, TvUsec },
-
-    { "vm",      Procfs,    Vm     },
-    { "net",     Procfs,    Net    },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder procfs_3[] = {
-    { "la",             Procfs|Vm,  La            },
-    { "net_interfaces", Procfs|Net, NetInterfaces },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder procfs_4[] = {
-    { NOT_MATCH "lo", Procfs|Net|NetInterfaces, NetInterfaceName },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder procfs_5[] = {
-    { "receive",  Procfs|Net|NetInterfaces|NetInterfaceName, Receive  },
-    { "transmit", Procfs|Net|NetInterfaces|NetInterfaceName, Transmit },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder procfs_6[] = {
-    { "bytes", Procfs|Net|NetInterfaces|NetInterfaceName|Receive,  Bytes },
-    { "bytes", Procfs|Net|NetInterfaces|NetInterfaceName|Transmit, Bytes },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder *procfs_folders[] = {
-    procfs_1,
-    procfs_2,
-    procfs_3,
-    procfs_4,
-    procfs_5,
-    procfs_6
-};
-
-Parser::UIntInfo procfs_uint_info[] = {
+Parser::UIntInfoVector procfs_uint_info = {
     { Timestamp|TvSec,                                          SET, offsetof(NodeStat, ts_sec)   },
     { Timestamp|TvUsec,                                         SET, offsetof(NodeStat, ts_usec)  },
     { Procfs|Vm|La,                                             SET, offsetof(NodeStat, la1)      },
     { Procfs|Net|NetInterfaces|NetInterfaceName|Receive|Bytes,  SUM, offsetof(NodeStat, rx_bytes) },
-    { Procfs|Net|NetInterfaces|NetInterfaceName|Transmit|Bytes, SUM, offsetof(NodeStat, tx_bytes) },
-    { 0, 0, 0 }
+    { Procfs|Net|NetInterfaces|NetInterfaceName|Transmit|Bytes, SUM, offsetof(NodeStat, tx_bytes) }
 };
+
+Parser::StringInfoVector procfs_string_info;
 
 } // unnamed namespace
 
 ProcfsParser::ProcfsParser()
     :
-    super(procfs_folders, sizeof(procfs_folders)/sizeof(procfs_folders[0]),
-            procfs_uint_info, nullptr, (uint8_t *) &m_stat)
+    super(procfs_folders, procfs_uint_info, procfs_string_info, (uint8_t *) &m_stat)
 {}

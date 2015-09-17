@@ -45,44 +45,35 @@ enum ConfigKey
     ForbiddenDcSharingAmongGroups     = 0x80000
 };
 
-Parser::Folder config_1[] = {
-    { "elliptics",                             0, Elliptics                         },
-    { "forbidden_dc_sharing_among_groups",     0, ForbiddenDcSharingAmongGroups     },
-    { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
-    { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
-    { "reserved_space",                        0, ReservedSpace                     },
-    { "dnet_log_mask",                         0, DnetLogMask                       },
-    { "net_thread_num",                        0, NetThreadNum                      },
-    { "io_thread_num",                         0, IoThreadNum                       },
-    { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
-    { "metadata",                              0, Metadata                          },
-    { "collector_inventory",                   0, CollectorInventory                },
-    { NULL, 0, 0 }
+std::vector<Parser::FolderVector> config_folders = {
+    {
+        { "elliptics",                             0, Elliptics                         },
+        { "forbidden_dc_sharing_among_groups",     0, ForbiddenDcSharingAmongGroups     },
+        { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
+        { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
+        { "reserved_space",                        0, ReservedSpace                     },
+        { "dnet_log_mask",                         0, DnetLogMask                       },
+        { "net_thread_num",                        0, NetThreadNum                      },
+        { "io_thread_num",                         0, IoThreadNum                       },
+        { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
+        { "metadata",                              0, Metadata                          },
+        { "collector_inventory",                   0, CollectorInventory                }
+    },
+    {
+        { "nodes",        Elliptics, Nodes       },
+        { "monitor_port", Elliptics, MonitorPort },
+        { "wait_timeout", Elliptics, WaitTimeout },
+        { "url",          Metadata,  Url         },
+        { "jobs",         Metadata,  Jobs        },
+        { "options",      Metadata,  Options     }
+    },
+    {
+        { "db",               Metadata|Jobs,    Db               },
+        { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS }
+    }
 };
 
-Parser::Folder config_2[] = {
-    { "nodes",        Elliptics, Nodes       },
-    { "monitor_port", Elliptics, MonitorPort },
-    { "wait_timeout", Elliptics, WaitTimeout },
-    { "url",          Metadata,  Url         },
-    { "jobs",         Metadata,  Jobs        },
-    { "options",      Metadata,  Options     },
-    { NULL, 0, 0 }
-};
-
-Parser::Folder config_3[] = {
-    { "db",               Metadata|Jobs,    Db               },
-    { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS },
-    { NULL, 0, 0 }
-};
-
-Parser::Folder *config_folders[] = {
-    config_1,
-    config_2,
-    config_3
-};
-
-Parser::UIntInfo config_uint_info[] = {
+Parser::UIntInfoVector config_uint_info = {
     { Elliptics|MonitorPort,             SET, offsetof(Config, monitor_port)                          },
     { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
@@ -93,23 +84,20 @@ Parser::UIntInfo config_uint_info[] = {
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
-    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           },
-    { 0, 0, 0 }
+    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           }
 };
 
-Parser::StringInfo config_string_info[] = {
+Parser::StringInfoVector config_string_info = {
     { Metadata|Url,       offsetof(Config, metadata_url)        },
     { Metadata|Jobs|Db,   offsetof(Config, jobs_db)             },
-    { CollectorInventory, offsetof(Config, collector_inventory) },
-    { 0, 0 }
+    { CollectorInventory, offsetof(Config, collector_inventory) }
 };
 
 } // unnamed namespace
 
 ConfigParser::ConfigParser(Config & config)
     :
-    super(config_folders, sizeof(config_folders)/sizeof(config_folders[0]),
-            config_uint_info, config_string_info, (uint8_t *) &config),
+    super(config_folders, config_uint_info, config_string_info, (uint8_t *) &config),
     m_array_depth(0),
     m_config(config)
 {

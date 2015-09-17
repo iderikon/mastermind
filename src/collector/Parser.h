@@ -20,6 +20,7 @@
 #define __60719e6b_2f14_4a95_b411_d9baa339f032
 
 #include <cstdint>
+#include <initializer_list>
 #include <rapidjson/reader.h>
 #include <vector>
 
@@ -220,7 +221,7 @@
        uint64_t waldo;
    };
 
-   We pass an array of UIntInfo to Parser.
+   We pass a UIntInfoVector to Parser.
 
    {
        { Foo|Bar|Baz,           SET, offsetof(Wibble, baz)       },
@@ -393,11 +394,24 @@ public:
         uint32_t token;
     };
 
+    class FolderVector : public std::vector<Folder>
+    {
+    public:
+        FolderVector(std::initializer_list<Folder> list);
+    };
+
     struct UIntInfo
     {
         uint32_t keys;
         int action;
         size_t off;
+    };
+
+    class UIntInfoVector : public std::vector<UIntInfo>
+    {
+    public:
+        UIntInfoVector() {}
+        UIntInfoVector(std::initializer_list<UIntInfo> list);
     };
 
     struct StringInfo
@@ -406,12 +420,18 @@ public:
         size_t off;
     };
 
-public:
-    Parser(Folder **fold, int max_depth, UIntInfo *uint_info,
-            StringInfo *string_info, uint8_t *dest);
+    class StringInfoVector : public std::vector<StringInfo>
+    {
+    public:
+        StringInfoVector() {}
+        StringInfoVector(std::initializer_list<StringInfo> list);
+    };
 
-    virtual ~Parser()
-    {}
+public:
+    Parser(const std::vector<FolderVector> & folders,
+            const UIntInfoVector & uint_info,
+            const StringInfoVector & string_info,
+            uint8_t *dest);
 
     virtual bool Null()
     { return true; }
@@ -475,15 +495,11 @@ protected:
 protected:
     uint32_t m_keys;
     int m_depth;
-    int m_max_depth;
 
 private:
-    Folder **m_fold;
-    std::vector<size_t> m_fold_size;
-    UIntInfo *m_uint_info;
-    uint64_t m_uint_info_size;
-    StringInfo *m_string_info;
-    uint64_t m_string_info_size;
+    const std::vector<FolderVector> & m_folders;
+    const UIntInfoVector & m_uint_info;
+    const StringInfoVector & m_string_info;
     uint8_t *m_dest;
 };
 

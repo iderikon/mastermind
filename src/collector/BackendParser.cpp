@@ -55,82 +55,58 @@ enum BackendKey
     Group              = 0x20000000
 };
 
-Parser::Folder backend_1[] = {
-    { "backends", 0, Backends },
+std::vector<Parser::FolderVector> backend_folders = {
+    {
+        { "backends", 0, Backends }
+    },
+    {
+        { MATCH_ANY, Backends, BackendFolder }
+    },
+    {
+        { "backend",    Backends|BackendFolder, Backend   },
+        { "backend_id", Backends|BackendFolder, BackendId },
+        { "status",     Backends|BackendFolder, Status    }
+    },
+    {
+        { "dstat",         Backends|BackendFolder|Backend, Dstat        },
+        { "vfs",           Backends|BackendFolder|Backend, Vfs          },
+        { "summary_stats", Backends|BackendFolder|Backend, SummaryStats },
+        { "config",        Backends|BackendFolder|Backend, Config       },
+        { "base_stats",    Backends|BackendFolder|Backend, BaseStats    },
 
-    { NULL, 0, 0 }
-};
+        { "defrag_state",  Backends|BackendFolder|Status,  DefragState  },
+        { "state",         Backends|BackendFolder|Status,  State        }
+    },
+    {
+        { "read_ios",             Backends|BackendFolder|Backend|Dstat,        ReadIos            },
+        { "write_ios",            Backends|BackendFolder|Backend|Dstat,        WriteIos           },
+        { "error",                Backends|BackendFolder|Backend|Dstat,        Error              },
 
-Parser::Folder backend_2[] = {
-    { MATCH_ANY, Backends, BackendFolder },
+        { "blocks",               Backends|BackendFolder|Backend|Vfs,          Blocks             },
+        { "bavail",               Backends|BackendFolder|Backend|Vfs,          Bavail             },
+        { "bsize",                Backends|BackendFolder|Backend|Vfs,          Bsize              },
+        { "fsid",                 Backends|BackendFolder|Backend|Vfs,          Fsid               },
 
-    { NULL, 0, 0 }
-};
+        { "records_total",        Backends|BackendFolder|Backend|SummaryStats, RecordsTotal       },
+        { "records_removed",      Backends|BackendFolder|Backend|SummaryStats, RecordsRemoved     },
+        { "records_removed_size", Backends|BackendFolder|Backend|SummaryStats, RecordsRemovedSize },
+        { "want_defrag",          Backends|BackendFolder|Backend|SummaryStats, WantDefrag         },
+        { "base_size",            Backends|BackendFolder|Backend|SummaryStats, BaseSize           },
 
-Parser::Folder backend_3[] = {
-    { "backend",    Backends|BackendFolder, Backend   },
-    { "backend_id", Backends|BackendFolder, BackendId },
-    { "status",     Backends|BackendFolder, Status    },
+        { "blob_size_limit",      Backends|BackendFolder|Backend|Config,       BlobSizeLimit      },
+        { "blob_size",            Backends|BackendFolder|Backend|Config,       BlobSize           },
+        { "group",                Backends|BackendFolder|Backend|Config,       Group              },
 
-    { NULL, 0, 0 }
-};
-
-Parser::Folder backend_4[] = {
-    { "dstat",         Backends|BackendFolder|Backend, Dstat        },
-    { "vfs",           Backends|BackendFolder|Backend, Vfs          },
-    { "summary_stats", Backends|BackendFolder|Backend, SummaryStats },
-    { "config",        Backends|BackendFolder|Backend, Config       },
-    { "base_stats",    Backends|BackendFolder|Backend, BaseStats    },
-
-    { "defrag_state",  Backends|BackendFolder|Status,  DefragState  },
-    { "state",         Backends|BackendFolder|Status,  State        },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder backend_5[] = {
-    { "read_ios",             Backends|BackendFolder|Backend|Dstat,        ReadIos            },
-    { "write_ios",            Backends|BackendFolder|Backend|Dstat,        WriteIos           },
-    { "error",                Backends|BackendFolder|Backend|Dstat,        Error              },
-
-    { "blocks",               Backends|BackendFolder|Backend|Vfs,          Blocks             },
-    { "bavail",               Backends|BackendFolder|Backend|Vfs,          Bavail             },
-    { "bsize",                Backends|BackendFolder|Backend|Vfs,          Bsize              },
-    { "fsid",                 Backends|BackendFolder|Backend|Vfs,          Fsid               },
-
-    { "records_total",        Backends|BackendFolder|Backend|SummaryStats, RecordsTotal       },
-    { "records_removed",      Backends|BackendFolder|Backend|SummaryStats, RecordsRemoved     },
-    { "records_removed_size", Backends|BackendFolder|Backend|SummaryStats, RecordsRemovedSize },
-    { "want_defrag",          Backends|BackendFolder|Backend|SummaryStats, WantDefrag         },
-    { "base_size",            Backends|BackendFolder|Backend|SummaryStats, BaseSize           },
-
-    { "blob_size_limit",      Backends|BackendFolder|Backend|Config,       BlobSizeLimit      },
-    { "blob_size",            Backends|BackendFolder|Backend|Config,       BlobSize           },
-    { "group",                Backends|BackendFolder|Backend|Config,       Group              },
-
-    { MATCH_ANY,              Backends|BackendFolder|Backend|BaseStats,    BlobFilename       },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder backend_6[] = {
-    { "base_size", Backends|BackendFolder|Backend|BaseStats|BlobFilename, BlobBaseSize },
-
-    { NULL, 0, 0 }
-};
-
-Parser::Folder *backend_folders[] = {
-    backend_1,
-    backend_2,
-    backend_3,
-    backend_4,
-    backend_5,
-    backend_6
+        { MATCH_ANY,              Backends|BackendFolder|Backend|BaseStats,    BlobFilename       }
+    },
+    {
+        { "base_size", Backends|BackendFolder|Backend|BaseStats|BlobFilename, BlobBaseSize }
+    }
 };
 
 #define OFF(field) offsetof(BackendStat, field)
 
-Parser::UIntInfo backend_uint_info[] = {
+Parser::UIntInfoVector backend_uint_info = {
     { Backends|BackendFolder|BackendId,                                   SET, OFF(backend_id)           },
     { Backends|BackendFolder|Backend|Dstat|ReadIos,                       SET, OFF(read_ios)             },
     { Backends|BackendFolder|Backend|Dstat|WriteIos,                      SET, OFF(write_ios)            },
@@ -149,16 +125,16 @@ Parser::UIntInfo backend_uint_info[] = {
     { Backends|BackendFolder|Backend|Config|Group,                        SET, OFF(group)                },
     { Backends|BackendFolder|Backend|BaseStats|BlobFilename|BlobBaseSize, MAX, OFF(max_blob_base_size)   },
     { Backends|BackendFolder|Status|DefragState,                          SET, OFF(defrag_state)         },
-    { Backends|BackendFolder|Status|State,                                SET, OFF(state)                },
-    { 0, 0, 0 }
+    { Backends|BackendFolder|Status|State,                                SET, OFF(state)                }
 };
+
+Parser::StringInfoVector backend_string_info;
 
 } // unnamed namespace
 
 BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, std::function<void(BackendStat&)> callback)
     :
-    super(backend_folders, sizeof(backend_folders)/sizeof(backend_folders[0]),
-            backend_uint_info, nullptr, (uint8_t *) &m_stat),
+    super(backend_folders, backend_uint_info, backend_string_info, (uint8_t *) &m_stat),
     m_ts_sec(ts_sec),
     m_ts_usec(ts_usec),
     m_callback(callback)
