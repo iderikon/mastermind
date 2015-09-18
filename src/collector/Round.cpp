@@ -194,7 +194,9 @@ void Round::step2_1_jobs(void *arg)
         mongo::BSONObj fields = builder.obj();
 
         std::auto_ptr<mongo::DBClientCursor> cursor = conn->query(db_ostr.str(),
-                MONGO_QUERY("status" << mongo::NE << "completed" << "status" << mongo::NE << "cancelled"),
+                MONGO_QUERY("status" << mongo::NE << "completed"
+                         << "status" << mongo::NE << "cancelled").readPref(
+                             mongo::ReadPreference_PrimaryOnly, mongo::BSONArray()),
                 0, 0, &fields);
 
         uint64_t ts = 0;
