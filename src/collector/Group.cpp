@@ -308,6 +308,7 @@ void Group::update_status(bool forbidden_dht)
             m_status = INIT;
             m_status_text = "No node backends";
         }
+        return;
     } else if (m_backends.size() > 1 && forbidden_dht) {
         if (m_internal_status != BROKEN_DHTForbidden) {
             m_internal_status = BROKEN_DHTForbidden;
@@ -393,8 +394,10 @@ void Group::update_status(bool forbidden_dht)
         } else if (m_metadata_parsed) {
             m_status_text = "Group is OK";
             if (!m_metadata.couple.empty()) {
-                m_internal_status = COUPLED_MetadataOK;
-                m_status = COUPLED;
+                if (m_status != COUPLED) {
+                    m_internal_status = COUPLED_MetadataOK;
+                    m_status = COUPLED;
+                }
             } else {
                 m_internal_status = INIT_Uncoupled;
                 m_status = INIT;
