@@ -35,8 +35,7 @@ Backend::Backend(Node & node)
     m_node(node),
     m_fs(nullptr),
     m_group(nullptr),
-    m_read_only(false),
-    m_disabled(false)
+    m_read_only(false)
 {
     std::memset(&m_calculated, 0, sizeof(m_calculated));
 }
@@ -55,7 +54,6 @@ void Backend::clone_from(const Backend & other)
     std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
 
     m_read_only = other.m_read_only;
-    m_disabled = other.m_disabled;
 }
 
 bool Backend::full() const
@@ -123,7 +121,7 @@ void Backend::recalculate(uint64_t reserved_space)
 
 void Backend::update_status()
 {
-    if (m_stat.error || m_disabled || m_fs == nullptr)
+    if (m_stat.error || !m_stat.state || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
@@ -200,6 +198,8 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.String(m_node.get_key().c_str());
     writer.Key("backend_id");
     writer.Uint64(m_stat.backend_id);
+    writer.Key("addr");
+    writer.String(m_key.c_str());
     writer.Key("state");
     writer.Uint64(m_stat.state);
     writer.Key("vfs_blocks");
@@ -271,8 +271,6 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     // XXX
     writer.Key("read_only");
     writer.Bool(m_read_only);
-    writer.Key("disabled");
-    writer.Bool(m_disabled);
 
     writer.EndObject();
 }

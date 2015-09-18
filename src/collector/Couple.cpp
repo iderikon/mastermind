@@ -374,6 +374,9 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, boo
 {
     writer.StartObject();
 
+    writer.Key("id");
+    writer.String(m_key.c_str());
+
     writer.Key("groups");
     writer.StartArray();
     for (Group & group : m_groups)
