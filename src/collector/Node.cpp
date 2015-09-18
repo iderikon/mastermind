@@ -74,6 +74,7 @@ void Node::clone_from(const Node & other)
     m_port = other.m_port;
     m_family = other.m_family;
     m_key = other.m_key;
+    m_dc = other.m_dc;
     m_download_data = other.m_download_data;
 
     bool have_newer;
