@@ -121,7 +121,7 @@ void Backend::recalculate(uint64_t reserved_space)
 
 void Backend::update_status()
 {
-    if (m_stat.error || !m_stat.state || m_fs == nullptr)
+    if (m_stat.error || m_stat.state != 1 || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
