@@ -147,6 +147,10 @@ FS & Node::get_fs(uint64_t fsid)
 
 void Node::handle_backend(const BackendStat & new_stat)
 {
+    // skip zero group ids
+    if (!new_stat.group)
+        return;
+
     // iterator will be used below as insertion hint
     auto it = m_backends.lower_bound(new_stat.backend_id);
 
