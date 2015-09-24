@@ -106,6 +106,11 @@ void Group::add_backend(Backend & backend)
     m_backends.insert(backend);
 }
 
+void Group::remove_backend(Backend & backend)
+{
+    m_backends.erase(backend);
+}
+
 void Group::handle_metadata_download_failed(const std::string & why)
 {
     if (m_internal_status == INIT_Init) {

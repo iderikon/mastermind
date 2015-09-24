@@ -137,6 +137,11 @@ public:
     void set_fs(FS & fs);
     void recalculate(uint64_t reserved_space);
     void update_status();
+
+    // Returns id of bound Group object if it differs from one in stat.
+    // If group is unchanged or not bound, returns -1.
+    int get_old_group_id() const;
+    // Bind current Group object
     void set_group(Group & group);
 
     void merge(const Backend & other, bool & have_newer);

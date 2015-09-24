@@ -143,6 +143,18 @@ void Storage::handle_backend(Backend & backend)
         it->second.add_backend(backend);
     }
 
+    int old_id = backend.get_old_group_id();
+    if (old_id != -1) {
+        auto it_old = m_groups.find(old_id);
+        if (it_old != m_groups.end()) {
+            it_old->second.remove_backend(backend);
+        } else {
+            BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                    "Internal inconsistency: backend has moved from group %d to group %d "
+                    "but there is no old group in Storage", old_id, int(backend.get_stat().group));
+        }
+    }
+
     backend.set_group(it->second);
 }
 
