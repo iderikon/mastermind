@@ -80,7 +80,6 @@ public:
         INIT = 0,
         OK,
         RO,
-        BAD,
         STALLED,
         BROKEN
     };
@@ -136,6 +135,8 @@ public:
     void update(const BackendStat & stat);
     void set_fs(FS & fs);
     void recalculate(uint64_t reserved_space);
+
+    void check_stalled(uint64_t stall_timeout_sec);
     void update_status();
 
     // Returns id of bound Group object if it differs from one in stat.
@@ -193,6 +194,8 @@ private:
         int max_write_rps;
 
         uint64_t new_stat_commit_errors;
+
+        bool stalled;
 
         Status status;
     } m_calculated;

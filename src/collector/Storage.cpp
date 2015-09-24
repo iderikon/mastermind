@@ -171,6 +171,18 @@ void Storage::save_new_jobs(std::vector<Job> && new_jobs, uint64_t timestamp)
     m_jobs_timestamp = timestamp;
 }
 
+void Storage::process_new_backends()
+{
+    update_group_structure();
+    check_stalled_backends();
+}
+
+void Storage::process_new_backends(std::vector<std::reference_wrapper<Node>> & nodes)
+{
+    update_group_structure();
+    check_stalled_backends(nodes);
+}
+
 void Storage::update_group_structure()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Updating group structure");
@@ -181,6 +193,18 @@ void Storage::update_group_structure()
         for (Backend & backend : backends)
             handle_backend(backend);
     }
+}
+
+void Storage::check_stalled_backends()
+{
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
+        it->second.check_stalled_backends(m_app.get_config().node_backend_stat_stale_timeout);
+}
+
+void Storage::check_stalled_backends(std::vector<std::reference_wrapper<Node>> & nodes)
+{
+    for (Node & node : nodes)
+        node.check_stalled_backends(m_app.get_config().node_backend_stat_stale_timeout);
 }
 
 void Storage::process_new_jobs()

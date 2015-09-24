@@ -195,6 +195,12 @@ void Node::handle_backend(const BackendStat & new_stat)
     backend.update_status();
 }
 
+void Node::check_stalled_backends(uint64_t stale_timeout_sec)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
+        it->second.check_stalled(stale_timeout_sec);
+}
+
 void Node::update_filesystems()
 {
     Stopwatch watch(m_clock.update_fs);

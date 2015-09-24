@@ -68,7 +68,7 @@ void Backend::update(const BackendStat & stat)
     double ts2 = double(stat.get_timestamp()) / 1000000.0;
     double d_ts = ts2 - ts1;
 
-    if (d_ts > 1.0) {
+    if (d_ts > 1.0 && !stat.error) {
         m_calculated.read_rps = int(double(stat.read_ios - m_stat.read_ios) / d_ts);
         m_calculated.write_rps = int(double(stat.write_ios - m_stat.write_ios) / d_ts);
 
@@ -125,9 +125,23 @@ void Backend::recalculate(uint64_t reserved_space)
         std::max(m_calculated.free_space - (m_calculated.total_space - m_calculated.effective_space), 0L);
 }
 
+void Backend::check_stalled(uint64_t stall_timeout_sec)
+{
+    uint64_t ts_now = 0;
+    clock_get(ts_now);
+    ts_now /= 1000000000ULL;
+
+    if (ts_now <= m_stat.ts_sec) {
+        m_calculated.stalled = false;
+        return;
+    }
+
+    m_calculated.stalled = ((ts_now - m_stat.ts_sec) > stall_timeout_sec);
+}
+
 void Backend::update_status()
 {
-    if (m_stat.error || m_stat.state != 1 || m_fs == nullptr)
+    if (m_calculated.stalled || m_stat.state != 1 || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
@@ -301,6 +315,8 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     if (show_internals) {
         writer.Key("all_stat_commit_errors");
         writer.Uint64(m_stat.stat_commit_errors);
+        writer.Key("stalled");
+        writer.Uint64(m_calculated.stalled);
     }
 
     writer.EndObject();
@@ -315,8 +331,6 @@ const char *Backend::status_str(Status status)
         return "OK";
     case RO:
         return "RO";
-    case BAD:
-        return "BAD";
     case STALLED:
         return "STALLED";
     case BROKEN:

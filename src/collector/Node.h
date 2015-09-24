@@ -94,6 +94,8 @@ public:
     std::vector<std::reference_wrapper<Backend>> pick_new_backends()
     { return std::move(m_new_backends); }
 
+    void check_stalled_backends(uint64_t stale_timeout_sec);
+
     void update_filesystems();
 
     void merge(const Node & other, bool & have_newer);
