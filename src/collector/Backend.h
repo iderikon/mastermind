@@ -64,6 +64,12 @@ struct BackendStat
     uint64_t max_blob_base_size;
     uint64_t blob_size;
     uint64_t group;
+
+    uint64_t read_only;
+    uint64_t last_start_ts_sec;
+    uint64_t last_start_ts_usec;
+
+    uint64_t stat_commit_errors;
 };
 
 class Backend
@@ -181,10 +187,10 @@ private:
         int max_read_rps;
         int max_write_rps;
 
+        uint64_t new_stat_commit_errors;
+
         Status status;
     } m_calculated;
-
-    bool m_read_only;
 };
 
 #endif
