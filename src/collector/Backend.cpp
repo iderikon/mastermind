@@ -25,6 +25,8 @@
 
 #include "Storage.h"
 
+#include <ctime>
+
 BackendStat::BackendStat()
 {
     std::memset(this, 0, sizeof(*this));
@@ -34,7 +36,8 @@ Backend::Backend(Node & node)
     :
     m_node(node),
     m_fs(nullptr),
-    m_group(nullptr)
+    m_group(nullptr),
+    m_status_text("Backend is not initialized")
 {
     std::memset(&m_calculated, 0, sizeof(m_calculated));
 }
@@ -51,6 +54,7 @@ void Backend::clone_from(const Backend & other)
 
     std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
     std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
+    m_status_text = other.m_status_text;
 }
 
 bool Backend::full() const
@@ -127,28 +131,47 @@ void Backend::recalculate(uint64_t reserved_space)
 
 void Backend::check_stalled(uint64_t stall_timeout_sec)
 {
-    uint64_t ts_now = 0;
-    clock_get(ts_now);
-    ts_now /= 1000000000ULL;
-
-    if (ts_now <= m_stat.ts_sec) {
+    time_t ts_now = time(nullptr);
+    if (ts_now <= time_t(m_stat.ts_sec)) {
         m_calculated.stalled = false;
         return;
     }
-
     m_calculated.stalled = ((ts_now - m_stat.ts_sec) > stall_timeout_sec);
 }
 
 void Backend::update_status()
 {
-    if (m_calculated.stalled || m_stat.state != 1 || m_fs == nullptr)
+    if (m_stat.state != 1) {
         m_calculated.status = STALLED;
-    else if (m_fs->get_status() == FS::BROKEN)
+        m_status_text = "Backend is disabled";
+    } else if (m_calculated.stalled) {
+        m_calculated.status = STALLED;
+
+        std::ostringstream ostr;
+        ostr << "Backend statistics were gathered " << (time(nullptr) - m_stat.ts_sec) << " seconds ago";
+        m_status_text = ostr.str();
+    } else if (m_fs == nullptr) {
+        m_calculated.status = STALLED;
+
+        std::ostringstream ostr;
+        ostr << "Internal inconsistency: FS " << m_stat.fsid << " is not bound to backend " << m_node.get_key();
+        m_status_text = ostr.str();
+
+        BH_LOG(m_node.get_storage().get_app().get_logger(), DNET_LOG_ERROR, ostr.str().c_str());
+    } else if (m_fs->get_status() == FS::BROKEN) {
         m_calculated.status = BROKEN;
-    else if (m_stat.read_only || m_calculated.new_stat_commit_errors)
+        m_status_text = "Backend space limit is not properly configured on FS ";
+        m_status_text += m_fs->get_key();
+    } else if (m_stat.read_only) {
         m_calculated.status = RO;
-    else
+        m_status_text = "Backend is switched to read-only state";
+    } else if (m_calculated.new_stat_commit_errors) {
+        m_calculated.status = RO;
+        m_status_text = "Backend is read-only due to filesystem or disk errors";
+    } else {
         m_calculated.status = OK;
+        m_status_text = "Backend is OK";
+    }
 }
 
 int Backend::get_old_group_id() const
@@ -298,6 +321,8 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_calculated.max_write_rps);
     writer.Key("status");
     writer.String(status_str(m_calculated.status));
+    writer.Key("status_text");
+    writer.String(m_status_text.c_str());
 
     writer.Key("last_start");
     writer.StartObject();

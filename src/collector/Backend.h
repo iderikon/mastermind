@@ -199,6 +199,8 @@ private:
 
         Status status;
     } m_calculated;
+
+    std::string m_status_text;
 };
 
 #endif

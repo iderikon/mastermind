@@ -54,6 +54,9 @@ public:
     Node(Storage & storage, const Host & host, int port, int family);
     Node(Storage & storage, const Host & host);
 
+    Storage & get_storage()
+    { return m_storage; }
+
     static std::string key(const char *host, int port, int family);
 
     void clone_from(const Node & other);
