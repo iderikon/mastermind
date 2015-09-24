@@ -192,13 +192,15 @@ void Node::handle_backend(const BackendStat & new_stat)
 
     backend.recalculate(m_storage.get_app().get_config().reserved_space);
     new_fs.update(backend);
-    backend.update_status();
 }
 
-void Node::check_stalled_backends(uint64_t stale_timeout_sec)
+void Node::update_backend_status(uint64_t stale_timeout_sec)
 {
-    for (auto it = m_backends.begin(); it != m_backends.end(); ++it)
-        it->second.check_stalled(stale_timeout_sec);
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        Backend & backend = it->second;
+        backend.check_stalled(stale_timeout_sec);
+        backend.update_status();
+    }
 }
 
 void Node::update_filesystems()

@@ -84,9 +84,9 @@ public:
     // save jobs received from MongoDB
     void save_new_jobs(std::vector<Job> && new_jobs, uint64_t timestamp);
 
-    // process new backends, check if some backends are stalled
-    void process_new_backends();
-    void process_new_backends(std::vector<std::reference_wrapper<Node>> & nodes);
+    // process new backends, check if some backends are stalled, update backend statuses
+    void process_node_backends();
+    void process_node_backends(std::vector<std::reference_wrapper<Node>> & nodes);
 
     // process newly received jobs, bind them to groups, update existing jobs,
     // remove completed/cancelled jobs, unbind them from groups
@@ -108,10 +108,6 @@ private:
     void update_group_structure();
 
     void handle_backend(Backend & backend);
-
-    // check if there are stalled backends
-    void check_stalled_backends();
-    void check_stalled_backends(std::vector<std::reference_wrapper<Node>> & nodes);
 
     Namespace & get_namespace(const std::string & name);
 
