@@ -94,8 +94,8 @@
    number of objects, e.g. gather statistics of all network interfaces.
 
    NB: For convenience, we name tokens acoording to keys. However, if keys with the same
-       name appear in different places, particularly important when within the same
-       sequence, we must define different tokens.
+       name appear in different positions within the same sequence, we must define
+       different tokens.
 
        {
            "fred": {
@@ -103,14 +103,9 @@
                    "fred": 23
                }
            },
-           "xyzzy": {
-               "fred": {
-                   "thud": 29
-               }
-           }
        }
 
-       In this example three different tokens for the key "fred" must be defined.
+       In this example two different tokens for the key "fred" must be defined.
 
    In Parser implementation the state is stored in the member 'm_keys'. In addition,
    when entering into the object, the value of m_depth is incremented. When leaving
