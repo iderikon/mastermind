@@ -16,6 +16,8 @@
    License along with Mastermind.
 */
 
+#include "WorkerApplication.h"
+
 #include "Backend.h"
 #include "Couple.h"
 #include "Filter.h"
@@ -24,7 +26,6 @@
 #include "Host.h"
 #include "Namespace.h"
 #include "Node.h"
-#include "WorkerApplication.h"
 
 #include <algorithm>
 
