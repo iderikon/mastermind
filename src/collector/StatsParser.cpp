@@ -72,8 +72,8 @@ const uint64_t ReadOnly           = 0x200000000000ULL;
 const uint64_t LastStart          = 0x400000000000ULL;
 const uint64_t LastStartTvSec     = 0x800000000000ULL;
 const uint64_t LastStartTvUsec    = 0x1000000000000ULL;
-//                                = 0x2000000000000ULL;
-//                                = 0x4000000000000ULL;
+const uint64_t DataPath           = 0x2000000000000ULL;
+const uint64_t FilePath           = 0x4000000000000ULL;
 //                                = 0x8000000000000ULL;
 //                                = 0x10000000000000ULL;
 //                                = 0x20000000000000ULL;
@@ -139,6 +139,8 @@ std::vector<Parser::FolderVector> backend_folders = {
         { "blob_size_limit",      Backends|BackendFolder|Backend|Config,       BlobSizeLimit      },
         { "blob_size",            Backends|BackendFolder|Backend|Config,       BlobSize           },
         { "group",                Backends|BackendFolder|Backend|Config,       Group              },
+        { "data",                 Backends|BackendFolder|Backend|Config,       DataPath           },
+        { "file",                 Backends|BackendFolder|Backend|Config,       FilePath           },
         { MATCH_ANY,              Backends|BackendFolder|Backend|BaseStats,    BlobFilename       },
         { "tv_sec",               Backends|BackendFolder|Status|LastStart,     LastStartTvSec     },
         { "tv_usec",              Backends|BackendFolder|Status|LastStart,     LastStartTvUsec    },
@@ -187,7 +189,10 @@ Parser::UIntInfoVector backend_uint_info = {
     { Stats|StatName|Count,                                               SET, SOFF(count)                }
 };
 
-Parser::StringInfoVector backend_string_info;
+Parser::StringInfoVector backend_string_info = {
+    { Backends|BackendFolder|Backend|Config|DataPath, BOFF(data_path) },
+    { Backends|BackendFolder|Backend|Config|FilePath, BOFF(file_path) }
+};
 
 } // unnamed namespace
 
@@ -217,7 +222,8 @@ bool StatsParser::EndObject(rapidjson::SizeType nr_members)
 {
     if (m_keys == (Backends|BackendFolder|1) && m_depth == 3) {
         m_backend_stats.push_back(m_data.backend);
-        std::memset(&m_data.backend, 0, sizeof(m_data.backend));
+        m_data.backend.~BackendStat();
+        new (&m_data.backend) BackendStat;
     } else if (m_keys == (Stats|StatName|1) && m_depth == 3) {
         if (m_data.stat_commit.err == EROFS)
             m_rofs_errors[m_data.stat_commit.backend] = m_data.stat_commit.count;

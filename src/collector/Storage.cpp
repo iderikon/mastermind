@@ -247,6 +247,8 @@ void Storage::update()
         if (group.parse_metadata() != 0)
             continue;
 
+        group.calculate_type(m_app.get_config().cache_group_path_prefix);
+
         const std::string & new_namespace_name = group.get_namespace_name();
         if (old_namespace_name != new_namespace_name) {
             if (!old_namespace_name.empty())

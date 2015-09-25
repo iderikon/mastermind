@@ -65,6 +65,7 @@ Group::Group(int id)
     m_couple(nullptr),
     m_active_job(nullptr),
     m_namespace(nullptr),
+    m_type(DATA),
     m_status(INIT),
     m_internal_status(INIT_Init)
 {
@@ -113,12 +114,15 @@ void Group::remove_backend(Backend & backend)
 
 void Group::handle_metadata_download_failed(const std::string & why)
 {
-    if (m_internal_status == INIT_Init) {
+    if (m_internal_status != INIT_MetadataFailed) {
         m_internal_status = INIT_MetadataFailed;
 
         std::ostringstream ostr;
         ostr << "Metadata download failed: " << why;
         m_status_text = ostr.str();
+
+        m_metadata.version = 0;
+        m_clean = true;
     }
 }
 
@@ -172,6 +176,7 @@ int Group::parse_metadata()
     std::vector<int> couple;
     std::string ns;
     bool frozen = false;
+    std::string type;
     bool service_migrating = false;
     std::string service_job_id;
 
@@ -211,6 +216,14 @@ int Group::parse_metadata()
                     frozen = kv.val.via.boolean;
                 } else {
                     ostr << "Invalid 'frozen' value type " << kv.val.type;
+                    break;
+                }
+            }
+            else if (size == 4 && !std::strncmp(ptr, "type", 4)) {
+                if (kv.val.type == msgpack::type::RAW) {
+                    type.assign(kv.val.via.raw.ptr, kv.val.via.raw.size);
+                } else {
+                    ostr << "Invalid 'type' value type " << kv.val.type;
                     break;
                 }
             }
@@ -272,11 +285,31 @@ int Group::parse_metadata()
     m_metadata.frozen = frozen;
     m_metadata.couple = couple;
     m_metadata.namespace_name = ns;
+    m_metadata.type = type;
     m_metadata.service.migrating = service_migrating;
     m_metadata.service.job_id = service_job_id;
     m_metadata_parsed = true;
 
     return 0;
+}
+
+void Group::calculate_type(const std::string & cache_group_path_prefix)
+{
+    if (!m_metadata.version) {
+        if (!cache_group_path_prefix.empty()) {
+            for (Backend & backend : m_backends) {
+                if (!backend.get_base_path().compare(0,
+                            cache_group_path_prefix.length(), cache_group_path_prefix)) {
+                    m_type = UNMARKED;
+                    return;
+                }
+            }
+        }
+    } else if (m_metadata.type == "cache") {
+        m_type = CACHE;
+        return;
+    }
+    m_type = DATA;
 }
 
 uint64_t Group::get_backend_update_time() const
@@ -496,16 +529,12 @@ void Group::merge(const Group & other, bool & have_newer)
     m_metadata_file = other.m_metadata_file;
     m_update_time = other.m_update_time;
 
-    m_metadata.version = other.m_metadata.version;
-    m_metadata.frozen = other.m_metadata.frozen;
-    m_metadata.couple = other.m_metadata.couple;
-    m_metadata.namespace_name = other.m_metadata.namespace_name;
-    m_metadata.service.migrating = other.m_metadata.service.migrating;
-    m_metadata.service.job_id = other.m_metadata.service.job_id;
+    m_metadata = other.m_metadata;
 
     m_metadata_parsed = other.m_metadata_parsed;
     m_metadata_parse_duration = other.m_metadata_parse_duration;
 
+    m_type = other.m_type;
     m_status_text = other.m_status_text;
     m_status = other.m_status;
     m_internal_status = other.m_internal_status;
@@ -563,6 +592,8 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.String(m_status_text.c_str());
     writer.Key("status");
     writer.String(status_str(m_status));
+    writer.Key("type");
+    writer.String(type_str(m_type));
 
     if (m_metadata_parsed) {
         writer.Key("frozen");
@@ -617,6 +648,10 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             writer.EndArray();
             writer.Key("namespace_name");
             writer.String(m_metadata.namespace_name.c_str());
+            if (!m_metadata.type.empty()) {
+                writer.Key("type");
+                writer.String(m_metadata.type.c_str());
+            }
             writer.Key("service");
             writer.StartObject();
                 writer.Key("migrating");
@@ -687,6 +722,20 @@ const char *Group::status_str(Status status)
         return "RO";
     case MIGRATING:
         return "MIGRATING";
+    }
+    return "UNKNOWN";
+}
+
+const char *Group::type_str(Type type)
+{
+    switch (type)
+    {
+    case DATA:
+        return "DATA";
+    case CACHE:
+        return "CACHE";
+    case UNMARKED:
+        return "UNMARKED";
     }
     return "UNKNOWN";
 }

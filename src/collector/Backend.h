@@ -70,6 +70,9 @@ struct BackendStat
     uint64_t last_start_ts_usec;
 
     uint64_t stat_commit_rofs_errors;
+
+    std::string data_path;
+    std::string file_path;
 };
 
 class Backend
@@ -130,6 +133,9 @@ public:
     int get_write_rps() const
     { return m_calculated.write_rps; }
 
+    const std::string & get_base_path() const
+    { return m_calculated.base_path; }
+
     bool full() const;
 
     void update(const BackendStat & stat);
@@ -161,6 +167,9 @@ public:
 
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
             bool show_internals) const;
+
+private:
+    void calculate_base_path(const BackendStat & stat);
 
 private:
     Node & m_node;
@@ -201,6 +210,8 @@ private:
         bool stalled;
 
         Status status;
+
+        std::string base_path;
     } m_calculated;
 };
 

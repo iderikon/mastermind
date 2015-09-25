@@ -41,7 +41,9 @@ enum ConfigKey
     Db                                = 0x8000,
     Options                           = 0x10000,
     ConnectTimeoutMS                  = 0x20000,
-    NodeBackendStatStaleTimeout       = 0x100000
+    NodeBackendStatStaleTimeout       = 0x40000,
+    Cache                             = 0x80000,
+    GroupPathPrefix                   = 0x100000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -55,15 +57,17 @@ std::vector<Parser::FolderVector> config_folders = {
         { "net_thread_num",                        0, NetThreadNum                      },
         { "io_thread_num",                         0, IoThreadNum                       },
         { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
-        { "metadata",                              0, Metadata                          }
+        { "metadata",                              0, Metadata                          },
+        { "cache",                                 0, Cache                             }
     },
     {
-        { "nodes",        Elliptics, Nodes       },
-        { "monitor_port", Elliptics, MonitorPort },
-        { "wait_timeout", Elliptics, WaitTimeout },
-        { "url",          Metadata,  Url         },
-        { "jobs",         Metadata,  Jobs        },
-        { "options",      Metadata,  Options     }
+        { "nodes",             Elliptics, Nodes           },
+        { "monitor_port",      Elliptics, MonitorPort     },
+        { "wait_timeout",      Elliptics, WaitTimeout     },
+        { "url",               Metadata,  Url             },
+        { "jobs",              Metadata,  Jobs            },
+        { "options",           Metadata,  Options         },
+        { "group_path_prefix", Cache,     GroupPathPrefix }
     },
     {
         { "db",               Metadata|Jobs,    Db               },
@@ -86,8 +90,9 @@ Parser::UIntInfoVector config_uint_info = {
 };
 
 Parser::StringInfoVector config_string_info = {
-    { Metadata|Url,     offsetof(Config, metadata.url)     },
-    { Metadata|Jobs|Db, offsetof(Config, metadata.jobs.db) }
+    { Metadata|Url,     offsetof(Config, metadata.url)                 },
+    { Metadata|Jobs|Db, offsetof(Config, metadata.jobs.db)             },
+    { Cache|GroupPathPrefix, offsetof(Config, cache_group_path_prefix) }
 };
 
 } // unnamed namespace

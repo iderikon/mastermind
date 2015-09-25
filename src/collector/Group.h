@@ -66,7 +66,15 @@ public:
         MIGRATING
     };
 
+    enum Type {
+        DATA,
+        CACHE,
+        UNMARKED
+    };
+
     static const char *status_str(Status status);
+
+    static const char *type_str(Type type);
 
     struct BackendLess
     {
@@ -84,6 +92,9 @@ public:
 
     int get_key() const
     { return m_id; }
+
+    Type get_type() const
+    { return m_type; }
 
     Status get_status() const
     { return m_status; }
@@ -118,6 +129,7 @@ public:
     void handle_metadata_download_failed(const std::string & why);
     void save_metadata(const char *metadata, size_t size, uint64_t timestamp);
     int parse_metadata();
+    void calculate_type(const std::string & cache_group_path_prefix);
 
     bool metadata_parsed() const
     { return m_metadata_parsed; }
@@ -181,6 +193,7 @@ private:
         bool frozen;
         std::vector<int> couple;
         std::string namespace_name;
+        std::string type;
         struct {
             bool migrating;
             std::string job_id;
@@ -197,6 +210,8 @@ private:
     Couple *m_couple;
     const Job *m_active_job;
     Namespace *m_namespace;
+
+    Type m_type;
 
     std::string m_status_text;
     Status m_status;

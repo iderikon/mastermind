@@ -28,31 +28,55 @@
 #include <elliptics/packet.h>
 
 BackendStat::BackendStat()
-{
-    std::memset(this, 0, sizeof(*this));
-}
+    :
+    ts_sec(0),
+    ts_usec(0),
+    backend_id(0),
+    state(0),
+    vfs_blocks(0),
+    vfs_bavail(0),
+    vfs_bsize(0),
+    records_total(0),
+    records_removed(0),
+    records_removed_size(0),
+    base_size(0),
+    fsid(0),
+    defrag_state(0),
+    want_defrag(0),
+    read_ios(0),
+    write_ios(0),
+    error(0),
+    blob_size_limit(0),
+    max_blob_base_size(0),
+    blob_size(0),
+    group(0),
+    read_only(0),
+    last_start_ts_sec(0),
+    last_start_ts_usec(0),
+    stat_commit_rofs_errors(0)
+{}
 
 Backend::Backend(Node & node)
     :
     m_node(node),
     m_fs(nullptr),
-    m_group(nullptr)
-{
-    std::memset(&m_calculated, 0, sizeof(m_calculated));
-}
+    m_group(nullptr),
+    m_calculated()
+{}
 
 void Backend::init(const BackendStat & stat)
 {
-    memcpy(&m_stat, &stat, sizeof(m_stat));
+    m_stat = stat;
     m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
+    calculate_base_path(stat);
 }
 
 void Backend::clone_from(const Backend & other)
 {
     m_key = other.m_key;
 
-    std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
-    std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
+    m_stat = other.m_stat;
+    m_calculated = other.m_calculated;
 }
 
 bool Backend::full() const
@@ -93,7 +117,8 @@ void Backend::update(const BackendStat & stat)
         m_calculated.stat_commit_rofs_errors_diff += d;
     }
 
-    std::memcpy(&m_stat, &stat, sizeof(m_stat));
+    calculate_base_path(stat);
+    m_stat = stat;
 }
 
 void Backend::set_fs(FS & fs)
@@ -182,8 +207,8 @@ void Backend::merge(const Backend & other, bool & have_newer)
     uint64_t my_ts = m_stat.get_timestamp();
     uint64_t other_ts = other.m_stat.get_timestamp();
     if (my_ts < other_ts) {
-        std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
-        std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
+        m_stat = other.m_stat;
+        m_calculated = other.m_calculated;
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
@@ -216,6 +241,14 @@ void Backend::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) 
 {
     if (m_fs != nullptr)
         filesystems.push_back(*m_fs);
+}
+
+void Backend::calculate_base_path(const BackendStat & stat)
+{
+    if (!stat.data_path.empty())
+        m_calculated.base_path = stat.data_path;
+    else if (!stat.file_path.empty())
+        m_calculated.base_path = stat.file_path;
 }
 
 void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
@@ -380,7 +413,14 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Uint64(m_stat.stat_commit_rofs_errors);
         writer.Key("stalled");
         writer.Uint64(m_calculated.stalled);
+        writer.Key("data_path");
+        writer.String(m_stat.data_path.c_str());
+        writer.Key("file_path");
+        writer.String(m_stat.file_path.c_str());
     }
+
+    writer.Key("base_path");
+    writer.String(m_calculated.base_path.c_str());
 
     writer.EndObject();
 }
