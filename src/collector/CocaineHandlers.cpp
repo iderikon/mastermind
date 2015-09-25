@@ -26,7 +26,7 @@ void on_summary::on_chunk(const char *chunk, size_t size)
 
 void on_force_update::on_chunk(const char *chunk, size_t size)
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Request to force update");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Request to force update");
     m_app.get_collector().force_update(shared_from_this());
 }
 
@@ -34,7 +34,7 @@ void on_get_snapshot::on_chunk(const char *chunk, size_t size)
 {
     std::string request(chunk, size);
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Snapshot requested: '%s'", request.c_str());
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Snapshot requested: '%s'", request.c_str());
 
     if (!request.empty()) {
         FilterParser parser(m_filter);
@@ -57,7 +57,7 @@ void on_refresh::on_chunk(const char *chunk, size_t size)
 {
     std::string request(chunk, size);
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Refresh requested: '%s'", request.c_str());
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Refresh requested: '%s'", request.c_str());
 
     if (!request.empty()) {
         FilterParser parser(m_filter);

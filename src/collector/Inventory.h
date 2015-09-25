@@ -21,20 +21,16 @@
 
 #include <string>
 
-class WorkerApplication;
-
 class Inventory
 {
 public:
-    Inventory(WorkerApplication & app);
+    Inventory();
 
     int open_shared_library(const std::string & file_name);
 
     std::string get_dc_by_host(const std::string & addr);
 
 private:
-    WorkerApplication & m_app;
-
     void *m_handle;
     const char *(*m_inventory_error)(void);
     int (*m_get_dc_by_host)(const char *, char *, size_t);

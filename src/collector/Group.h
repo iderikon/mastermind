@@ -129,7 +129,7 @@ public:
     void handle_metadata_download_failed(const std::string & why);
     void save_metadata(const char *metadata, size_t size, uint64_t timestamp);
     int parse_metadata();
-    void calculate_type(const std::string & cache_group_path_prefix);
+    void calculate_type();
 
     bool metadata_parsed() const
     { return m_metadata_parsed; }
@@ -145,7 +145,7 @@ public:
     void set_active_job(const Job & job);
     void clear_active_job();
 
-    void update_status(bool forbidden_dht);
+    void update_status();
     void set_coupled_status(bool ok, uint64_t timestamp);
 
     int check_couple_equals(const Group & other);

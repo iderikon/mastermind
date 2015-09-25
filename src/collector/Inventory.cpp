@@ -21,9 +21,8 @@
 
 #include <dlfcn.h>
 
-Inventory::Inventory(WorkerApplication & app)
+Inventory::Inventory()
     :
-    m_app(app),
     m_handle(nullptr),
     m_inventory_error(nullptr),
     m_get_dc_by_host(nullptr)
@@ -35,7 +34,7 @@ int Inventory::open_shared_library(const std::string & file_name)
 
     if (m_handle == nullptr) {
         const char *err = dlerror();
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+        BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Inventory: dlopen() failed for '%s': %s",
                 file_name.c_str(), (err != nullptr ? err : "unknown error"));
         return -1;
@@ -44,7 +43,7 @@ int Inventory::open_shared_library(const std::string & file_name)
     if ((m_inventory_error = (const char* (*)()) dlsym(m_handle, "inventory_error")) == nullptr ||
             (m_get_dc_by_host = (int (*)(const char*, char*, size_t)) dlsym(m_handle, "get_dc_by_host")) == nullptr) {
         const char *err = dlerror();
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+        BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Inventory: dlsym() failed for '%s': %s",
                 file_name.c_str(), (err != nullptr ? err : "unknown error"));
 
@@ -62,7 +61,7 @@ std::string Inventory::get_dc_by_host(const std::string & addr)
     if (m_get_dc_by_host != nullptr && m_inventory_error != nullptr) {
         char buf[256];
         if (m_get_dc_by_host(addr.c_str(), buf, sizeof(buf)) != 0) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+            BH_LOG(app::logger(), DNET_LOG_ERROR,
                     "Inventory: get_dc_by_host(%s) failed: %s",
                     addr.c_str(), m_inventory_error());
             return std::string();

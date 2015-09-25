@@ -84,7 +84,7 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+    void update_status();
 
     void merge(const Couple & other, bool & have_newer);
 

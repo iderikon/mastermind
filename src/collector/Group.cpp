@@ -293,8 +293,10 @@ int Group::parse_metadata()
     return 0;
 }
 
-void Group::calculate_type(const std::string & cache_group_path_prefix)
+void Group::calculate_type()
 {
+    const std::string & cache_group_path_prefix = app::config().cache_group_path_prefix;
+
     if (!m_metadata.version) {
         if (!cache_group_path_prefix.empty()) {
             for (Backend & backend : m_backends) {
@@ -338,7 +340,7 @@ void Group::clear_active_job()
     m_active_job = nullptr;
 }
 
-void Group::update_status(bool forbidden_dht)
+void Group::update_status()
 {
     if (m_backends.empty()) {
         if (m_internal_status != INIT_NoBackends) {
@@ -347,7 +349,7 @@ void Group::update_status(bool forbidden_dht)
             m_status_text = "No node backends";
         }
         return;
-    } else if (m_backends.size() > 1 && forbidden_dht) {
+    } else if (m_backends.size() > 1 && app::config().forbidden_dht_groups) {
         if (m_internal_status != BROKEN_DHTForbidden) {
             m_internal_status = BROKEN_DHTForbidden;
             m_status = BROKEN;

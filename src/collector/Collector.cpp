@@ -26,14 +26,13 @@
 
 Collector::Collector(WorkerApplication & app)
     :
-    m_app(app),
     m_discovery(app),
     m_storage_version(1)
 {
     m_queue = dispatch_queue_create("collector", DISPATCH_QUEUE_CONCURRENT);
     dispatch_set_target_queue(m_queue, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0));
 
-    m_storage.reset(new Storage(app));
+    m_storage.reset(new Storage());
 }
 
 int Collector::init()
@@ -49,7 +48,7 @@ int Collector::init()
 
 void Collector::start()
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Collector: starting");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting");
     dispatch_async_f(m_queue, this, &Collector::step1_start_round);
 }
 
@@ -62,7 +61,7 @@ void Collector::step1_start_round(void *arg)
 {
     Collector & self = *static_cast<Collector*>(arg);
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector round: step 1");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector round: step 1");
 
     Round *round = new Round(self);
     self.m_discovery.resolve_nodes(*round);
@@ -75,7 +74,7 @@ void Collector::step1_start_forced(void *arg)
             static_cast<std::shared_ptr<on_force_update>*>(arg));
     Collector & self = (*handler_ptr)->get_app().get_collector();
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector user-requested full round: step 1");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector user-requested full round: step 1");
 
     Round *round = new Round(self, *handler_ptr);
     self.m_discovery.resolve_nodes(*round);
@@ -88,7 +87,7 @@ void Collector::step1_start_refresh(void *arg)
             static_cast<std::shared_ptr<on_refresh>*>(arg));
     Collector & self = (*handler_ptr)->get_app().get_collector();
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Collector user-requested refresh round: step 1");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector user-requested refresh round: step 1");
 
     Round *round = new Round(self, *handler_ptr);
     round->start();
@@ -100,11 +99,11 @@ void Collector::step5_compare_and_swap(void *arg)
     Collector & self = round->get_collector();
 
     if (self.m_storage_version == round->get_old_storage_version()) {
-        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Swapping storage");
+        BH_LOG(app::logger(), DNET_LOG_INFO, "Swapping storage");
         round->swap_storage(self.m_storage);
         ++self.m_storage_version;
     } else {
-        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO,
+        BH_LOG(app::logger(), DNET_LOG_INFO,
                 "Collector's storage has newer version %lu (Round's one has %lu)",
                 self.m_storage_version, round->get_old_storage_version());
         dispatch_async_f(self.m_queue, round.release(), &Collector::step6_merge_and_try_again);
@@ -146,7 +145,7 @@ void Collector::step6_merge_and_try_again(void *arg)
     round->update_storage(*self.m_storage, self.m_storage_version, have_newer);
 
     if (!have_newer) {
-        BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO,
+        BH_LOG(app::logger(), DNET_LOG_INFO,
                 "Existing storage is up-to-date, not performing swap");
         Round::Type type = round->get_type();
         if (type == Round::REGULAR) {
@@ -165,13 +164,13 @@ void Collector::step6_merge_and_try_again(void *arg)
         }
     }
 
-    BH_LOG(self.m_app.get_logger(), DNET_LOG_INFO, "Storage updated, scheduling a new CAS");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Storage updated, scheduling a new CAS");
     dispatch_barrier_async_f(self.m_queue, round, &Collector::step5_compare_and_swap);
 }
 
 void Collector::schedule_next_round()
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Scheduling next round");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Scheduling next round");
 
     dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 60000000000L),
             m_queue, this, &Collector::step1_start_round);

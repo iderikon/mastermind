@@ -39,9 +39,6 @@ class Collector
 public:
     Collector(WorkerApplication & app);
 
-    WorkerApplication & get_app()
-    { return m_app; }
-
     Discovery & get_discovery()
     { return m_discovery; }
 
@@ -77,8 +74,6 @@ private:
     static void execute_summary(void *arg);
 
 private:
-    WorkerApplication & m_app;
-
     Discovery m_discovery;
     dispatch_queue_t m_queue;
 

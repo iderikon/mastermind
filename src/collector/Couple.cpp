@@ -24,6 +24,7 @@
 #include "Host.h"
 #include "Namespace.h"
 #include "Node.h"
+#include "WorkerApplication.h"
 
 #include <algorithm>
 
@@ -42,7 +43,7 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     }
 }
 
-void Couple::update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total)
+void Couple::update_status()
 {
     Stopwatch watch(m_update_status_duration);
 
@@ -104,13 +105,13 @@ void Couple::update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_t
         return;
     }
 
-    if (forbidden_dc_sharing) {
+    if (app::config().forbidden_dc_sharing_among_groups) {
         if (check_dc_sharing() != 0)
             return;
     }
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
-        if (forbidden_unmatched_total) {
+        if (app::config().forbidden_unmatched_group_total_space) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i].get().get_total_space() != m_groups[0].get().get_total_space()) {
                     if (m_internal_status != BROKEN_UnequalTotalSpace) {

@@ -29,18 +29,23 @@
 #include <cstdio>
 #include <stdexcept>
 
+namespace {
+
+std::unique_ptr<ioremap::elliptics::logger_base> s_logger;
+std::unique_ptr<ioremap::elliptics::logger_base> s_elliptics_logger;
+
+Config s_config;
+
+} // unnamed namespace
+
 WorkerApplication::WorkerApplication()
     :
-    m_logger(nullptr),
-    m_elliptics_logger(nullptr),
-    m_collector(*this),
-    m_inventory(*this)
+    m_collector(*this)
 {}
 
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     :
-    m_collector(*this),
-    m_inventory(*this)
+    m_collector(*this)
 {
     init();
 
@@ -56,24 +61,24 @@ void WorkerApplication::init()
 {
     load_config();
 
-    m_logger.reset(new ioremap::elliptics::file_logger(
-            Config::log_file, ioremap::elliptics::log_level(m_config.dnet_log_mask)));
+    s_logger.reset(new ioremap::elliptics::file_logger(
+            Config::log_file, ioremap::elliptics::log_level(s_config.dnet_log_mask)));
 
-    m_elliptics_logger.reset(new ioremap::elliptics::file_logger(
-            Config::elliptics_log_file, ioremap::elliptics::log_level(m_config.dnet_log_mask)));
+    s_elliptics_logger.reset(new ioremap::elliptics::file_logger(
+            Config::elliptics_log_file, ioremap::elliptics::log_level(s_config.dnet_log_mask)));
 
     std::ostringstream ostr;
     ostr << "Loaded config from " << Config::config_file << ":\n";
-    m_config.print(ostr);
-    BH_LOG(get_logger(), DNET_LOG_INFO, "%s", ostr.str().c_str());
+    s_config.print(ostr);
+    BH_LOG(*s_logger, DNET_LOG_INFO, "%s", ostr.str().c_str());
 
     if (m_collector.init())
         throw std::runtime_error("failed to initialize collector");
 
-    if (!m_config.collector_inventory.empty()) {
-        BH_LOG(get_logger(), DNET_LOG_INFO, "Opening inventory from %s",
-                m_config.collector_inventory.c_str());
-        m_inventory.open_shared_library(m_config.collector_inventory);
+    if (!s_config.collector_inventory.empty()) {
+        BH_LOG(*s_logger, DNET_LOG_INFO, "Opening inventory from %s",
+                s_config.collector_inventory.c_str());
+        m_inventory.open_shared_library(s_config.collector_inventory);
     }
 }
 
@@ -84,7 +89,7 @@ void WorkerApplication::start()
 
 void WorkerApplication::load_config()
 {
-    ConfigParser parser(m_config);
+    ConfigParser parser(s_config);
 
     FILE *f = fopen(Config::config_file, "rb");
     if (f == nullptr)
@@ -100,6 +105,26 @@ void WorkerApplication::load_config()
     if (!parser.good())
         throw std::runtime_error(std::string("Error parsing ") + Config::config_file);
 
-    if (m_config.reserved_space == 0)
+    if (s_config.reserved_space == 0)
         throw std::runtime_error("Incorrect value 0 for reserved_space");
 }
+
+namespace app
+{
+
+ioremap::elliptics::logger_base & logger()
+{
+    return *s_logger;
+}
+
+ioremap::elliptics::logger_base & elliptics_logger()
+{
+    return *s_elliptics_logger;
+}
+
+const Config & config()
+{
+    return s_config;
+}
+
+} // app

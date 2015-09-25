@@ -34,7 +34,6 @@
 #include <vector>
 
 class Job;
-class WorkerApplication;
 
 class Storage
 {
@@ -52,12 +51,9 @@ public:
     };
 
 public:
-    Storage(WorkerApplication & app);
+    Storage();
     Storage(const Storage & other);
     ~Storage();
-
-    WorkerApplication & get_app()
-    { return m_app; }
 
     Host & get_host(const std::string & addr);
 
@@ -158,8 +154,6 @@ public:
     static bool split_node_num(const std::string & key, std::string & node, uint64_t & id);
 
 private:
-    WorkerApplication & m_app;
-
     // host addr -> Host
     std::map<std::string, Host> m_hosts;
     // host:port:family -> Node

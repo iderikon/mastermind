@@ -32,7 +32,6 @@
 
 class Collector;
 class Node;
-class WorkerApplication;
 
 class on_force_update;
 class on_refresh;
@@ -53,8 +52,6 @@ public:
 
     Collector & get_collector()
     { return m_collector; }
-
-    WorkerApplication & get_app();
 
     Storage & get_storage()
     { return *m_storage; }
