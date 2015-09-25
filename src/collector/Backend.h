@@ -70,6 +70,9 @@ struct BackendStat
     uint64_t last_start_ts_usec;
 
     uint64_t stat_commit_errors;
+
+    std::string data_path;
+    std::string file_path;
 };
 
 class Backend
@@ -129,6 +132,9 @@ public:
 
     int get_write_rps() const
     { return m_calculated.write_rps; }
+
+    const std::string & get_base_path() const
+    { return m_base_path; }
 
     bool full() const;
 
@@ -200,6 +206,7 @@ private:
         Status status;
     } m_calculated;
 
+    std::string m_base_path;
     std::string m_status_text;
 };
 

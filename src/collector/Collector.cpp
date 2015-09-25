@@ -228,14 +228,17 @@ void Collector::execute_summary(void *arg)
 
     std::map<Backend::Status, int> backend_status;
     std::map<Group::Status, int> group_status;
+    std::map<Group::Type, int> group_type;
     std::map<Couple::Status, int> couple_status;
     std::map<FS::Status, int> fs_status;
     std::map<Job::Status, int> job_status;
     size_t nr_backends = 0;
     size_t nr_filesystems = 0;
 
-    for (auto it = groups.begin(); it != groups.end(); ++it)
+    for (auto it = groups.begin(); it != groups.end(); ++it) {
         ++group_status[it->second.get_status()];
+        ++group_type[it->second.get_type()];
+    }
 
     for (auto it = couples.begin(); it != couples.end(); ++it)
         ++couple_status[it->second.get_status()];
@@ -273,6 +276,9 @@ void Collector::execute_summary(void *arg)
     ostr << ")\n" << groups.size() << " groups\n  ( ";
     for (auto it = group_status.begin(); it != group_status.end(); ++it)
         ostr << it->second << ' ' << Group::status_str(it->first) << ' ';
+    ostr << ")\n  ( ";
+    for (auto it = group_type.begin(); it != group_type.end(); ++it)
+        ostr << it->second << ' ' << Group::type_str(it->first) << ' ';
 
     ostr << ")\n" << couples.size() << " couples\n  ( ";
     for (auto it = couple_status.begin(); it != couple_status.end(); ++it)

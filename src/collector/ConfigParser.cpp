@@ -43,7 +43,9 @@ enum ConfigKey
     ConnectTimeoutMS                  = 0x20000,
     CollectorInventory                = 0x40000,
     ForbiddenDcSharingAmongGroups     = 0x80000,
-    NodeBackendStatStaleTimeout       = 0x100000
+    NodeBackendStatStaleTimeout       = 0x100000,
+    Cache                             = 0x200000,
+    GroupPathPrefix                   = 0x400000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -59,15 +61,17 @@ std::vector<Parser::FolderVector> config_folders = {
         { "io_thread_num",                         0, IoThreadNum                       },
         { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
         { "metadata",                              0, Metadata                          },
-        { "collector_inventory",                   0, CollectorInventory                }
+        { "collector_inventory",                   0, CollectorInventory                },
+        { "cache",                                 0, Cache                             }
     },
     {
-        { "nodes",        Elliptics, Nodes       },
-        { "monitor_port", Elliptics, MonitorPort },
-        { "wait_timeout", Elliptics, WaitTimeout },
-        { "url",          Metadata,  Url         },
-        { "jobs",         Metadata,  Jobs        },
-        { "options",      Metadata,  Options     }
+        { "nodes",             Elliptics, Nodes           },
+        { "monitor_port",      Elliptics, MonitorPort     },
+        { "wait_timeout",      Elliptics, WaitTimeout     },
+        { "url",               Metadata,  Url             },
+        { "jobs",              Metadata,  Jobs            },
+        { "options",           Metadata,  Options         },
+        { "group_path_prefix", Cache,     GroupPathPrefix }
     },
     {
         { "db",               Metadata|Jobs,    Db               },
@@ -87,13 +91,14 @@ Parser::UIntInfoVector config_uint_info = {
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
-    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           }
+    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           },
 };
 
 Parser::StringInfoVector config_string_info = {
-    { Metadata|Url,       offsetof(Config, metadata_url)        },
-    { Metadata|Jobs|Db,   offsetof(Config, jobs_db)             },
-    { CollectorInventory, offsetof(Config, collector_inventory) }
+    { Metadata|Url,          offsetof(Config, metadata_url)            },
+    { Metadata|Jobs|Db,      offsetof(Config, jobs_db)                 },
+    { CollectorInventory,    offsetof(Config, collector_inventory)     },
+    { Cache|GroupPathPrefix, offsetof(Config, cache_group_path_prefix) }
 };
 
 } // unnamed namespace

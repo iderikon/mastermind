@@ -28,9 +28,33 @@
 #include <ctime>
 
 BackendStat::BackendStat()
-{
-    std::memset(this, 0, sizeof(*this));
-}
+    :
+    ts_sec(0),
+    ts_usec(0),
+    backend_id(0),
+    state(0),
+    vfs_blocks(0),
+    vfs_bavail(0),
+    vfs_bsize(0),
+    records_total(0),
+    records_removed(0),
+    records_removed_size(0),
+    base_size(0),
+    fsid(0),
+    defrag_state(0),
+    want_defrag(0),
+    read_ios(0),
+    write_ios(0),
+    error(0),
+    blob_size_limit(0),
+    max_blob_base_size(0),
+    blob_size(0),
+    group(0),
+    read_only(0),
+    last_start_ts_sec(0),
+    last_start_ts_usec(0),
+    stat_commit_errors(0)
+{}
 
 Backend::Backend(Node & node)
     :
@@ -44,16 +68,21 @@ Backend::Backend(Node & node)
 
 void Backend::init(const BackendStat & stat)
 {
-    memcpy(&m_stat, &stat, sizeof(m_stat));
+    m_stat = stat;
     m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
+    if (!stat.data_path.empty())
+        m_base_path = stat.data_path;
+    else if (!stat.file_path.empty())
+        m_base_path = stat.file_path;
 }
 
 void Backend::clone_from(const Backend & other)
 {
     m_key = other.m_key;
 
-    std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
+    m_stat = other.m_stat;
     std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
+    m_base_path = other.m_base_path;
     m_status_text = other.m_status_text;
 }
 
@@ -92,7 +121,12 @@ void Backend::update(const BackendStat & stat)
         m_calculated.new_stat_commit_errors += d;
     }
 
-    std::memcpy(&m_stat, &stat, sizeof(m_stat));
+    if (!stat.data_path.empty())
+        m_base_path = stat.data_path;
+    else if (!stat.file_path.empty())
+        m_base_path = stat.file_path;
+
+    m_stat = stat;
 }
 
 void Backend::set_fs(FS & fs)
@@ -195,8 +229,10 @@ void Backend::merge(const Backend & other, bool & have_newer)
     uint64_t my_ts = m_stat.get_timestamp();
     uint64_t other_ts = other.m_stat.get_timestamp();
     if (my_ts < other_ts) {
-        std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
+        m_stat = other.m_stat;
         std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
+        m_base_path = other.m_base_path;
+        m_status_text = other.m_status_text;
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
@@ -342,7 +378,14 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Uint64(m_stat.stat_commit_errors);
         writer.Key("stalled");
         writer.Uint64(m_calculated.stalled);
+        writer.Key("data_path");
+        writer.String(m_stat.data_path.c_str());
+        writer.Key("file_path");
+        writer.String(m_stat.file_path.c_str());
     }
+
+    writer.Key("base_path");
+    writer.String(m_base_path.c_str());
 
     writer.EndObject();
 }

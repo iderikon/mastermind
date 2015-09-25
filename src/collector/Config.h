@@ -65,6 +65,7 @@ struct Config
     uint64_t metadata_connect_timeout_ms;
     std::string jobs_db;
     std::string collector_inventory;
+    std::string cache_group_path_prefix;
 
     void print(std::ostringstream & ostr) const
     {
@@ -84,6 +85,7 @@ struct Config
             "metadata_connect_timeout_ms: "           << metadata_connect_timeout_ms << "\n"
             "jobs_db: "                               << jobs_db << "\n"
             "collector_inventory: "                   << collector_inventory << "\n"
+            "cache_group_path_prefix: "               << cache_group_path_prefix << "\n"
             "nodes:\n";
         for (const NodeInfo & node : nodes)
             ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';

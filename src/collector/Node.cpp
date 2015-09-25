@@ -43,10 +43,7 @@ Node::Node(Storage & storage, const Host & host, int port, int family)
     m_family(family)
 {
     m_key = key(host.get_addr().c_str(), port, family);
-
-    std::memset(&m_stat, 0, sizeof(m_stat));
     std::memset(&m_clock, 0, sizeof(m_clock));
-
     m_download_data.reserve(4096);
 }
 
@@ -57,9 +54,7 @@ Node::Node(Storage & storage, const Host & host)
     m_port(0),
     m_family(0)
 {
-    std::memset(&m_stat, 0, sizeof(m_stat));
     std::memset(&m_clock, 0, sizeof(m_clock));
-
     m_download_data.reserve(4096);
 }
 
