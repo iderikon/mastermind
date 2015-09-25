@@ -16,6 +16,8 @@
    License along with Mastermind.
 */
 
+#include "WorkerApplication.h"
+
 #include "Backend.h"
 #include "Couple.h"
 #include "Filter.h"
@@ -41,10 +43,10 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     }
 }
 
-void Couple::update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool forbidden_unmatched_total)
+void Couple::update_status()
 {
     for (Group & group : m_groups)
-        group.update_status(forbidden_dht);
+        group.update_status();
 
     std::ostringstream ostr;
 
@@ -70,7 +72,8 @@ void Couple::update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool f
         return;
     }
 
-    if (forbidden_dc_sharing) {
+    // TODO: Uncomment as soon as Inventory is implemented.
+    if (/* app::config().forbidden_dc_sharing_among_groups */ false) {
         if (check_dc_sharing() != 0)
             return;
     }
@@ -83,7 +86,7 @@ void Couple::update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool f
     size_t nr_coupled = std::count_if(m_groups.begin(), m_groups.end(),
             [] (const Group & group) { return group.get_status() == Group::COUPLED; });
     if (nr_coupled == m_groups.size()) {
-        if (forbidden_unmatched_total) {
+        if (app::config().forbidden_unmatched_group_total_space) {
             for (size_t i = 1; i < m_groups.size(); ++i) {
                 if (m_groups[i].get().get_total_space() != m_groups[0].get().get_total_space()) {
                     m_status = BROKEN;

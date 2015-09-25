@@ -35,9 +35,8 @@ NodeStat::NodeStat()
     std::memset(this, 0, sizeof(*this));
 }
 
-Node::Node(Storage & storage, const Host & host, int port, int family)
+Node::Node(const Host & host, int port, int family)
     :
-    m_storage(storage),
     m_host(host),
     m_port(port),
     m_family(family)
@@ -47,9 +46,8 @@ Node::Node(Storage & storage, const Host & host, int port, int family)
     m_download_data.reserve(4096);
 }
 
-Node::Node(Storage & storage, const Host & host)
+Node::Node(const Host & host)
     :
-    m_storage(storage),
     m_host(host),
     m_port(0),
     m_family(0)
@@ -93,7 +91,7 @@ void Node::parse_stats(void *arg)
     self.m_download_data.clear();
 
     if (!parser.good()) {
-        BH_LOG(self.m_storage.get_app().get_logger(), DNET_LOG_ERROR,
+        BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Error parsing stats for node %s", self.m_key.c_str());
         return;
     }
@@ -180,7 +178,7 @@ void Node::handle_backend(const BackendStat & new_stat)
     FS & new_fs = get_fs(new_fsid);
     if (new_fsid != old_fsid) {
         if (found) {
-            BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
+            BH_LOG(app::logger(), DNET_LOG_INFO,
                     "Updating backend %s: FS changed from %lu to %lu",
                     backend.get_key().c_str(), old_fsid, new_fsid);
         }
@@ -191,17 +189,17 @@ void Node::handle_backend(const BackendStat & new_stat)
         new_fs.add_backend(backend);
     }
 
-    backend.recalculate(m_storage.get_app().get_config().reserved_space);
+    backend.recalculate();
     new_fs.update(backend);
 
     m_command_stat += backend.get_calculated().command_stat;
 }
 
-void Node::update_backend_status(uint64_t stale_timeout_sec)
+void Node::update_backend_status()
 {
     for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
         Backend & backend = it->second;
-        backend.check_stalled(stale_timeout_sec);
+        backend.check_stalled();
         backend.update_status();
     }
 }
@@ -234,7 +232,7 @@ void Node::merge_backends(const Node & other_node, bool & have_newer)
                 uint64_t new_fsid = other_backend.get_stat().fsid;
 
                 if (old_fsid != new_fsid) {
-                    BH_LOG(m_storage.get_app().get_logger(), DNET_LOG_INFO,
+                    BH_LOG(app::logger(), DNET_LOG_INFO,
                             "Merging backend %s: FS changed from %lu to %lu",
                             my_backend.get_key().c_str(), old_fsid, new_fsid);
 

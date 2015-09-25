@@ -56,7 +56,7 @@ Discovery::~Discovery()
 int Discovery::init_curl()
 {
     if (curl_global_init(CURL_GLOBAL_ALL)) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR, "Failed to initialize libcurl");
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to initialize libcurl");
         return -1;
     }
     return 0;
@@ -64,7 +64,7 @@ int Discovery::init_curl()
 
 int Discovery::init_elliptics()
 {
-    const Config & config = m_app.get_config();
+    const Config & config = app::config();
 
     dnet_config cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -74,9 +74,9 @@ int Discovery::init_elliptics()
     cfg.nonblocking_io_thread_num = config.nonblocking_io_thread_num;
 
     m_node.reset(new elliptics::node(
-                elliptics::logger(m_app.get_elliptics_logger(), blackhole::log::attributes_t()), cfg));
+                elliptics::logger(app::elliptics_logger(), blackhole::log::attributes_t()), cfg));
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_NOTICE, "Initializing discovery");
+    BH_LOG(app::logger(), DNET_LOG_NOTICE, "Initializing discovery");
 
     for (size_t i = 0; i < config.nodes.size(); ++i) {
         const Config::NodeInfo & info = config.nodes[i];
@@ -84,10 +84,10 @@ int Discovery::init_elliptics()
         try {
             m_node->add_remote(elliptics::address(info.host, info.port, info.family));
         } catch (std::exception & e) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "Failed to add remote '%s': %s\n", info.host, e.what());
+            BH_LOG(app::logger(), DNET_LOG_WARNING, "Failed to add remote '%s': %s\n", info.host, e.what());
             continue;
         } catch (...) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "Failed to add remote '%s' with unknown reason", info.host);
+            BH_LOG(app::logger(), DNET_LOG_WARNING, "Failed to add remote '%s' with unknown reason", info.host);
             continue;
         }
     }
@@ -102,8 +102,8 @@ int Discovery::init_mongo()
 {
     mongo::Status status = mongo::client::initialize(mongo::client::Options().setIPv6Enabled(true));
     if (!status.isOK()) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
-                "Failed to initialize mongo client: %s", status.toString().c_str());
+        BH_LOG(app::logger(), DNET_LOG_ERROR,
+                "Failed to initialize mongo client: %s", status.toString());
         return -1;
     }
 
@@ -113,7 +113,7 @@ int Discovery::init_mongo()
 void Discovery::resolve_nodes(Round & round)
 {
     if (m_session == NULL) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_WARNING, "resolve_nodes: session is empty");
+        BH_LOG(app::logger(), DNET_LOG_WARNING, "resolve_nodes: session is empty");
         return;
     }
 
@@ -140,7 +140,7 @@ void Discovery::resolve_nodes(Round & round)
                     hostname, sizeof(hostname), nullptr, 0, 0);
 
             if (rc != 0) {
-                BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
                         "Failed to resolve hostname for node %s:%d:%d: %s",
                         host_addr, port, addr.family, gai_strerror(rc));
             } else {

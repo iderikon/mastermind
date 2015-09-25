@@ -113,9 +113,8 @@ void Group::remove_backend(Backend & backend)
 
 void Group::handle_metadata_download_failed(const std::string & why)
 {
-    // TODO: uncomment when app::logger() will be available
-    // BH_LOG(app::logger(), DNET_LOG_ERROR,
-    //        "Group %d: Metadata download failed: %s", m_id, why.c_str());
+    BH_LOG(app::logger(), DNET_LOG_ERROR,
+            "Group %d: Metadata download failed: %s", m_id, why.c_str());
     clear_metadata();
 }
 
@@ -270,8 +269,7 @@ int Group::parse_metadata()
         clear_metadata();
         m_status_text = ostr.str();
         m_status = BAD;
-        // TODO: uncomment when app::logger() will be available
-        // BH_LOG(app::logger(), DNET_LOG_ERROR, "Metadata parse error: %s", m_status_text.c_str());
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Metadata parse error: %s", m_status_text.c_str());
         return -1;
     }
 
@@ -287,8 +285,10 @@ int Group::parse_metadata()
     return 0;
 }
 
-void Group::calculate_type(const std::string & cache_group_path_prefix)
+void Group::calculate_type()
 {
+    const std::string & cache_group_path_prefix = app::config().cache_group_path_prefix;
+
     if (!m_metadata.version) {
         if (!cache_group_path_prefix.empty()) {
             for (Backend & backend : m_backends) {
@@ -344,7 +344,7 @@ void Group::clear_metadata()
     m_clean = true;
 }
 
-void Group::update_status(bool forbidden_dht)
+void Group::update_status()
 {
     std::ostringstream ostr;
 
@@ -358,7 +358,7 @@ void Group::update_status(bool forbidden_dht)
     }
 
     // Report BROKEN if the group has several backends but DHT groups are forbidden.
-    if (forbidden_dht && m_backends.size() > 1) {
+    if (app::config().forbidden_dht_groups && m_backends.size() > 1) {
         m_status = BROKEN;
         ostr << "Group " << m_id << " is in state BROKEN because it has "
              << m_backends.size() << " backends but an option "
@@ -437,13 +437,12 @@ void Group::update_status(bool forbidden_dht)
     m_status_text = ostr.str();
 }
 
-void Group::update_status_recursive(bool forbidden_dht,
-        bool forbidden_dc_sharing, bool forbidden_unmatched_total)
+void Group::update_status_recursive()
 {
     if (m_couple != nullptr)
-        m_couple->update_status(forbidden_dht, forbidden_dc_sharing, forbidden_unmatched_total);
+        m_couple->update_status();
     else
-        this->update_status(forbidden_dht);
+        this->update_status();
 }
 
 bool Group::have_metadata_conflict(const Group & other)
