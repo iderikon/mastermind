@@ -66,8 +66,7 @@ Group::Group(int id)
     m_active_job(nullptr),
     m_namespace(nullptr),
     m_type(DATA),
-    m_status(INIT),
-    m_internal_status(INIT_Init)
+    m_status(INIT)
 {
     m_metadata.version = 0;
     m_metadata.frozen = false;
@@ -77,7 +76,7 @@ Group::Group(int id)
 bool Group::full() const
 {
     for (const Backend & backend : m_backends) {
-        if (!backend.full())
+        if (!backend.full(/* TODO: ns reserved space */))
             return false;
     }
     return true;
@@ -114,16 +113,9 @@ void Group::remove_backend(Backend & backend)
 
 void Group::handle_metadata_download_failed(const std::string & why)
 {
-    if (m_internal_status != INIT_MetadataFailed) {
-        m_internal_status = INIT_MetadataFailed;
-
-        std::ostringstream ostr;
-        ostr << "Metadata download failed: " << why;
-        m_status_text = ostr.str();
-
-        m_metadata.version = 0;
-        m_clean = true;
-    }
+    BH_LOG(app::logger(), DNET_LOG_ERROR,
+            "Group %d: Metadata download failed: %s", m_id, why.c_str());
+    clear_metadata();
 }
 
 void Group::save_metadata(const char *metadata, size_t size, uint64_t timestamp)
@@ -167,7 +159,6 @@ int Group::parse_metadata()
 
     if (!ostr.str().empty()) {
         m_status_text = ostr.str();
-        m_internal_status = BAD_ParseFailed;
         m_status = BAD;
         return -1;
     }
@@ -275,9 +266,10 @@ int Group::parse_metadata()
     }
 
     if (!ostr.str().empty()) {
+        clear_metadata();
         m_status_text = ostr.str();
-        m_internal_status = BAD_ParseFailed;
         m_status = BAD;
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Metadata parse error: %s", m_status_text.c_str());
         return -1;
     }
 
@@ -340,176 +332,161 @@ void Group::clear_active_job()
     m_active_job = nullptr;
 }
 
+void Group::clear_metadata()
+{
+    m_metadata.version = 0;
+    m_metadata.frozen = false;
+    m_metadata.couple.clear();
+    m_metadata.namespace_name.clear();
+    m_metadata.type.clear();
+    m_metadata.service.migrating = false;
+    m_metadata.service.job_id.clear();
+    m_clean = true;
+}
+
 void Group::update_status()
 {
+    std::ostringstream ostr;
+
     if (m_backends.empty()) {
-        if (m_internal_status != INIT_NoBackends) {
-            m_internal_status = INIT_NoBackends;
-            m_status = INIT;
-            m_status_text = "No node backends";
-        }
+        m_status = INIT;
+        ostr << "Group " << m_id << " is in state INIT because there are "
+                "no node backends serving this group";
+        m_status_text = ostr.str();
         return;
-    } else if (m_backends.size() > 1 && app::config().forbidden_dht_groups) {
-        if (m_internal_status != BROKEN_DHTForbidden) {
-            m_internal_status = BROKEN_DHTForbidden;
+    }
+
+    if (app::config().forbidden_dht_groups && m_backends.size() > 1) {
+        m_status = BROKEN;
+        ostr << "Group " << m_id << " is in state BROKEN because it has "
+             << m_backends.size() << " backends but an option "
+                "'forbidden_dht_groups' is set";
+        m_status_text = ostr.str();
+        return;
+    }
+
+    if (!m_metadata.version) {
+        m_status = INIT;
+        ostr << "Group " << m_id << " is in state INIT because meta key "
+                "was not read from it.";
+        m_status_text = ostr.str();
+    }
+
+    for (const Backend & backend : m_backends) {
+        if (backend.get_status() == Backend::BROKEN) {
             m_status = BROKEN;
-
-            std::ostringstream ostr;
-            ostr << "DHT groups are forbidden but the group has " << m_backends.size() << " backends";
+            ostr << "Group " << m_id << " is in state BROKEN because backend "
+                 << backend.get_key() << " is broken.";
             m_status_text = ostr.str();
-
-            uint64_t backend_ts = get_backend_update_time();
-            if (m_update_time < backend_ts)
-                m_update_time = backend_ts;
+            return;
         }
-    } else {
-        bool have_ro = false;
-        bool have_other = false;
-        uint64_t backend_ts = 0;
+    }
 
-        for (Backend & backend : m_backends) {
-            Backend::Status b_status = backend.get_status();
+    if (m_type == DATA) {
+        if (update_storage_group_status())
+            return;
+    }
 
-            uint64_t cur_ts = backend.get_stat().get_timestamp() * 1000ULL;
-            if (backend_ts < cur_ts)
-                backend_ts = cur_ts;
-
-            if (b_status == Backend::RO) {
-                have_ro = true;
-            } else if (b_status != Backend::OK) {
-                have_other = true;
-            }
-        }
-
-        if (have_ro) {
+    for (const Backend & backend : m_backends) {
+        if (backend.get_status() == Backend::RO) {
             if (m_metadata.service.migrating) {
                 if (m_active_job != nullptr && m_active_job->get_id() == m_metadata.service.job_id) {
-                    m_internal_status = MIGRATING_ServiceMigrating;
                     m_status = MIGRATING;
-
-                    std::ostringstream ostr;
-                    ostr << "Group is migrating, job id is '" << m_metadata.service.job_id << '\'';
+                    ostr << "Group " << m_id << " is migrating, job id is "
+                         << m_metadata.service.job_id << '.';
                     m_status_text = ostr.str();
                 } else {
-                    m_internal_status = BAD_NoActiveJob;
                     m_status = BAD;
-
-                    std::ostringstream ostr;
-                    ostr << "Group has no active job, but marked as migrating with job id '"
-                         << m_metadata.service.job_id << '\'';
+                    ostr << "Group " << m_id << " has no active job but marked as migrating "
+                            "by job id " << m_metadata.service.job_id << '.';
                     m_status_text = ostr.str();
                 }
             } else {
-                if (m_internal_status != RO_HaveROBackends) {
-                    if (m_update_time < backend_ts)
-                        m_update_time = backend_ts;
-
-                    m_internal_status = RO_HaveROBackends;
-                    m_status = RO;
-                    m_status_text = "Group is read-only because it has read-only backends";
-                }
+                m_status = RO;
+                ostr << "Group " << m_id << " is Read-Only because backend "
+                     << backend.get_key() << " is Read-Only.";
             }
-        } else if (have_other) {
-            if (m_internal_status != BAD_HaveOther) {
-                if (m_update_time < backend_ts)
-                    m_update_time = backend_ts;
-
-                m_internal_status = BAD_HaveOther;
-                m_status = BAD;
-                m_status_text = "Group is in state BAD because some of backends are not in state OK";
-            }
-        } else if (m_metadata_parsed) {
-            m_status_text = "Group is OK";
-            if (!m_metadata.couple.empty()) {
-                if (m_status != COUPLED) {
-                    m_internal_status = COUPLED_MetadataOK;
-                    m_status = COUPLED;
-                }
-            } else {
-                m_internal_status = INIT_Uncoupled;
-                m_status = INIT;
-            }
+            return;
         }
     }
-}
 
-void Group::set_coupled_status(bool ok, uint64_t timestamp)
-{
-    if (m_internal_status == BROKEN_DHTForbidden ||
-            m_internal_status == BAD_HaveOther ||
-            m_internal_status == BAD_ParseFailed ||
-            m_internal_status == BAD_InconsistentCouple ||
-            m_internal_status == BAD_DifferentMetadata ||
-            m_internal_status == MIGRATING_ServiceMigrating ||
-            m_internal_status == RO_HaveROBackends)
-        return;
-
-    InternalStatus new_internal_status = ok ? COUPLED_Coupled : BAD_CoupleBAD;
-
-    if (m_internal_status != new_internal_status) {
-        if (m_update_time < timestamp)
-            m_update_time = timestamp;
-        m_internal_status = new_internal_status;
-        m_status = ok ? COUPLED : BAD;
-        m_status_text = (ok ? "Group is OK"
-                            : "Group is in state BAD because couple check fails");
-    }
-}
-
-int Group::check_couple_equals(const Group & other)
-{
-    if (m_internal_status == INIT_Init ||
-            other.m_internal_status == INIT_Init ||
-            m_internal_status == INIT_NoBackends ||
-            other.m_internal_status == INIT_NoBackends ||
-            m_internal_status == INIT_MetadataFailed ||
-            other.m_internal_status == INIT_MetadataFailed)
-        return 0;
-
-    if (m_metadata.couple != other.m_metadata.couple) {
-        if (m_internal_status != BAD_InconsistentCouple) {
-            if (m_update_time < other.m_update_time)
-                m_update_time = other.m_update_time;
-
-            std::ostringstream ostr;
-            ostr << "Groups " << m_id << " and " << other.m_id << " have inconsistent couple info";
-            m_status_text = ostr.str();
-            m_internal_status = BAD_InconsistentCouple;
+    for (const Backend & backend : m_backends) {
+        if (backend.get_status() != Backend::OK) {
             m_status = BAD;
+            ostr << "Group " << m_id << " is in state BAD because backend " << backend.get_key()
+                 << " is in state " << Backend::status_str(backend.get_status());
+            m_status_text = ostr.str();
+            return;
         }
-        return -1;
     }
 
-    return 0;
+    m_status = COUPLED;
+    ostr << "Group " << m_id << " is OK";
+    m_status_text = ostr.str();
 }
 
-int Group::check_metadata_equals(const Group & other)
+void Group::update_status_recursive()
 {
-    if (m_internal_status == INIT_Init ||
-            other.m_internal_status == INIT_Init ||
-            m_internal_status == INIT_NoBackends ||
-            other.m_internal_status == INIT_NoBackends ||
-            m_internal_status == INIT_MetadataFailed ||
-            other.m_internal_status == INIT_MetadataFailed)
-        return 0;
+    if (m_couple != nullptr)
+        m_couple->update_status();
+    else
+        this->update_status();
+}
+
+bool Group::equal_meta(const Group & other)
+{
+    if (!m_metadata.version)
+        return true;
 
     if (m_metadata.frozen != other.m_metadata.frozen ||
             m_metadata.couple != other.m_metadata.couple ||
-            m_metadata.namespace_name != other.m_metadata.namespace_name) {
-        if (m_internal_status != BAD_DifferentMetadata) {
-            if (m_update_time < other.m_update_time)
-                m_update_time = other.m_update_time;
+            m_metadata.namespace_name != other.m_metadata.namespace_name ||
+            m_metadata.type != other.m_metadata.type)
+        return false;
 
-            std::ostringstream ostr;
-            ostr << "Groups " << m_id << " and " << other.m_id << " have different metadata";
-            m_status_text = ostr.str();
-            m_internal_status = BAD_DifferentMetadata;
-            m_status = BAD;
-        }
-        return -1;
+    return true;
+}
+
+bool Group::update_storage_group_status()
+{
+    std::ostringstream ostr;
+
+    if (m_metadata.couple.empty()) {
+        m_status = INIT;
+        ostr << "Group " << m_id << " is in state INIT because there is no coupling info.";
+        m_status_text = ostr.str();
+        return true;
     }
 
-    return 0;
+    if (m_couple == nullptr) {
+        m_status = BAD;
+        ostr << "Group " << m_id << " is in state BAD because couple was not created.";
+        m_status_text = ostr.str();
+        return true;
+    }
+
+    if (!m_couple->check_groups(m_metadata.couple)) {
+        m_status = BAD;
+        ostr << "Group " << m_id << " is in state BAD because couple check fails.";
+        m_status_text = ostr.str();
+        return true;
+    }
+
+    if (m_metadata.namespace_name.empty()) {
+        m_status = BAD;
+        ostr << "Group " << m_id << " is in state BAD because there is no namespace assigned to it.";
+        m_status_text = ostr.str();
+        return true;
+    }
+
+    if (std::find(m_metadata.couple.begin(), m_metadata.couple.end(), m_id) == m_metadata.couple.end()) {
+        m_status = BROKEN;
+        ostr << "Group " << m_id << " is in state BROKEN because its id is missing in coupling info.";
+        m_status_text = ostr.str();
+        return true;
+    }
+
+    return false;
 }
 
 void Group::set_couple(Couple & couple)
@@ -550,7 +527,6 @@ void Group::merge(const Group & other, bool & have_newer)
 
     m_status_text = other.m_status_text;
     m_status = other.m_status;
-    m_internal_status = other.m_internal_status;
 }
 
 void Group::push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
@@ -645,8 +621,6 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Bool(m_metadata_parsed);
         writer.Key("metadata_parse_duration");
         writer.Uint64(m_metadata_parse_duration);
-        writer.Key("internal_status");
-        writer.String(internal_status_str(m_internal_status));
 
         writer.Key("metadata_internal");
         writer.StartObject();
@@ -676,47 +650,6 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
 
     writer.EndObject();
-}
-
-    enum InternalStatus {
-    };
-
-const char *Group::internal_status_str(InternalStatus status)
-{
-    switch (status)
-    {
-    case INIT_Init:
-        return "INIT_Init";
-    case INIT_NoBackends:
-        return "INIT_NoBackends";
-    case INIT_MetadataFailed:
-        return "INIT_MetadataFailed";
-    case INIT_Uncoupled:
-        return "INIT_Uncoupled";
-    case BROKEN_DHTForbidden:
-        return "BROKEN_DHTForbidden";
-    case BAD_HaveOther:
-        return "BAD_HaveOther";
-    case BAD_ParseFailed:
-        return "BAD_ParseFailed";
-    case BAD_InconsistentCouple:
-        return "BAD_InconsistentCouple";
-    case BAD_DifferentMetadata:
-        return "BAD_DifferentMetadata";
-    case BAD_CoupleBAD:
-        return "BAD_CoupleBAD";
-    case BAD_NoActiveJob:
-        return "BAD_NoActiveJob";
-    case MIGRATING_ServiceMigrating:
-        return "MIGRATING_ServiceMigrating";
-    case RO_HaveROBackends:
-        return "RO_HaveROBackends";
-    case COUPLED_MetadataOK:
-        return "COUPLED_MetadataOK";
-    case COUPLED_Coupled:
-        return "COUPLED_Coupled";
-    }
-    return "UNKNOWN";
 }
 
 const char *Group::status_str(Status status)

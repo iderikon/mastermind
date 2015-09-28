@@ -36,26 +36,6 @@ class Storage;
 
 class Group
 {
-    enum InternalStatus {
-        INIT_Init,
-        INIT_NoBackends,
-        INIT_MetadataFailed,
-        INIT_Uncoupled,
-        BROKEN_DHTForbidden,
-        BAD_HaveOther,
-        BAD_ParseFailed,
-        BAD_InconsistentCouple,
-        BAD_DifferentMetadata,
-        BAD_CoupleBAD,
-        BAD_NoActiveJob,
-        MIGRATING_ServiceMigrating,
-        RO_HaveROBackends,
-        COUPLED_MetadataOK,
-        COUPLED_Coupled
-    };
-
-    static const char *internal_status_str(InternalStatus status);
-
 public:
     enum Status {
         INIT,
@@ -146,10 +126,9 @@ public:
     void clear_active_job();
 
     void update_status();
-    void set_coupled_status(bool ok, uint64_t timestamp);
+    void update_status_recursive();
 
-    int check_couple_equals(const Group & other);
-    int check_metadata_equals(const Group & other);
+    bool equal_meta(const Group & other);
 
     void set_couple(Couple & couple);
 
@@ -172,6 +151,11 @@ public:
 
     uint64_t get_metadata_parse_duration() const
     { return m_metadata_parse_duration; }
+
+private:
+    void clear_metadata();
+
+    bool update_storage_group_status();
 
 private:
     int m_id;
@@ -215,7 +199,6 @@ private:
 
     std::string m_status_text;
     Status m_status;
-    InternalStatus m_internal_status;
 };
 
 #endif

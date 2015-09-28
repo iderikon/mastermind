@@ -242,6 +242,10 @@ void Storage::update()
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
         it->second.update_filesystems();
 
+    // Update group status, first pass.
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+        it->second.update_status();
+
     // Process group metadata and jobs.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
@@ -268,8 +272,6 @@ void Storage::update()
             new_ns.add_group(group);
             group.set_namespace(new_ns);
         }
-
-        group.update_status();
     }
 
     // Create/update couples depending on changes in group metadata and structure
@@ -310,16 +312,6 @@ void Storage::update()
         if (have_same_couples)
             continue;
 
-        bool md_ok = true;
-        for (size_t i = 1; i < groups.size(); ++i) {
-            if (groups[0].get().check_couple_equals(groups[i]) != 0) {
-                md_ok = false;
-                break;
-            }
-        }
-        if (!md_ok)
-            continue;
-
         std::string key = CoupleKey(group_ids);
         auto cit = m_couples.lower_bound(key);
         if (cit == m_couples.end() || cit->first != key) {
@@ -329,9 +321,8 @@ void Storage::update()
         }
     }
 
-    // Complete couple and group updates
-    for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        it->second.update_status();
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
+        it->second.update_status_recursive();
 
     BH_LOG(app::logger(), DNET_LOG_INFO, "Storage update completed");
 }
