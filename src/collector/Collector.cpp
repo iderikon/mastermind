@@ -326,7 +326,7 @@ void Collector::execute_summary(void *arg)
         Distribution distrib;
         for (auto it = couples.begin(); it != couples.end(); ++it)
             distrib.add_sample(it->second.get_update_status_duration());
-        ostr << "Distribution for couple update_status:\n" << distrib.str() << '\n';
+        ostr << "Distribution for couple update_status:\n" << distrib.str();
     }
 
     (*handler_ptr)->response()->write(ostr.str());

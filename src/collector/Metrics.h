@@ -37,6 +37,8 @@ public:
 
     void add_sample(uint64_t sample);
 
+    bool empty() const;
+
     std::string str();
 
 private:

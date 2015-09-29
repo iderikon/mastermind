@@ -81,8 +81,20 @@ void Distribution::add_sample(uint64_t sample)
     m_bins.push_back(Bin());
 }
 
+bool Distribution::empty() const
+{
+    for (const Bin & bin : m_bins) {
+        if (bin.value || bin.count)
+            return false;
+    }
+    return true;
+}
+
 std::string Distribution::str()
 {
+    if (empty())
+        return std::string("<empty>\n");
+
     std::ostringstream ostr;
     for (size_t i = 0; i < (m_bins.size() - 1); ++i) {
         uint64_t value = m_bins[i].value;
