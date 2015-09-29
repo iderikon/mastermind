@@ -41,11 +41,16 @@ public:
 
     void resolve_nodes(Round & round);
 
+    uint64_t get_resolve_nodes_duration() const
+    { return m_resolve_nodes_duration; }
+
 private:
     WorkerApplication & m_app;
 
     std::unique_ptr<ioremap::elliptics::node> m_node;
     std::unique_ptr<ioremap::elliptics::session> m_session;
+
+    uint64_t m_resolve_nodes_duration;
 };
 
 #endif

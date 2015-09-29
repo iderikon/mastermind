@@ -46,7 +46,8 @@ struct dnet_addr_compare
 
 Discovery::Discovery(WorkerApplication & app)
     :
-    m_app(app)
+    m_app(app),
+    m_resolve_nodes_duration(0)
 {}
 
 Discovery::~Discovery()
@@ -114,6 +115,8 @@ int Discovery::init_mongo()
 
 void Discovery::resolve_nodes(Round & round)
 {
+    Stopwatch watch(m_resolve_nodes_duration);
+
     if (m_session == NULL) {
         BH_LOG(app::logger(), DNET_LOG_WARNING, "resolve_nodes: session is empty");
         return;
