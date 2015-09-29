@@ -45,6 +45,8 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
 
 void Couple::update_status()
 {
+    Stopwatch watch(m_update_status_duration);
+
     for (Group & group : m_groups)
         group.update_status();
 

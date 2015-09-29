@@ -301,8 +301,8 @@ void Collector::execute_summary(void *arg)
             "  Storage merge: " << MSEC(self.m_round_clock.merge_time) << " ms\n";
 
     {
-        SerialDistribution distrib_stats_parse;
-        SerialDistribution distrib_update_fs;
+        Distribution distrib_stats_parse;
+        Distribution distrib_update_fs;
 
         for (auto it = nodes.begin(); it != nodes.end(); ++it) {
             const Node::ClockStat & stat = it->second.get_clock_stat();
@@ -315,14 +315,14 @@ void Collector::execute_summary(void *arg)
     }
 
     {
-        SerialDistribution distrib;
+        Distribution distrib;
         for (auto it = groups.begin(); it != groups.end(); ++it)
             distrib.add_sample(it->second.get_metadata_parse_duration());
         ostr << "Distribution for group metadata processing:\n" << distrib.str() << '\n';
     }
 
     {
-        SerialDistribution distrib;
+        Distribution distrib;
         for (auto it = couples.begin(); it != couples.end(); ++it)
             distrib.add_sample(it->second.get_update_status_duration());
         ostr << "Distribution for couple update_status:\n" << distrib.str() << '\n';
