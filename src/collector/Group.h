@@ -190,7 +190,8 @@ private:
     // Pointers to a couple, active job, and a namespace of this group.
     // If the information is unknown, e.g. metadata was not loaded,
     // the values are set to nullptr. These objects shouldn't be modified
-    // directly but only used for status checks and by push_items().
+    // directly except that Couple::update_status() is invoked from
+    // update_status_recursive(); also items can be collected by push_items().
     Couple *m_couple;
     const Job *m_active_job;
     Namespace *m_namespace;
