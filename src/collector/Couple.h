@@ -60,6 +60,10 @@ public:
     const std::vector<std::reference_wrapper<Group>> & get_groups() const
     { return m_groups; }
 
+    std::string get_namespace_name() const;
+
+    void set_namespace(Namespace & ns);
+
     Status get_status() const
     { return m_status; }
 
@@ -96,6 +100,8 @@ private:
 private:
     std::string m_key;
     std::vector<std::reference_wrapper<Group>> m_groups;
+
+    Namespace *m_namespace;
 
     Status m_status;
     std::string m_status_text;

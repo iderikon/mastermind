@@ -32,6 +32,7 @@
 Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     :
     m_groups(groups),
+    m_namespace(nullptr),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
@@ -41,6 +42,20 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
         if (i != (groups.size() - 1))
             m_key += ':';
     }
+}
+
+std::string Couple::get_namespace_name() const
+{
+    for (const Group & group : m_groups) {
+        if (!group.get_namespace_name().empty())
+            return group.get_namespace_name();
+    }
+    return std::string();
+}
+
+void Couple::set_namespace(Namespace & ns)
+{
+    m_namespace = &ns;
 }
 
 void Couple::update_status()
@@ -191,8 +206,8 @@ void Couple::push_items(std::vector<std::reference_wrapper<Group>> & groups) con
 
 void Couple::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    if (!m_groups.empty())
-        m_groups.front().get().push_items(namespaces);
+    if (m_namespace != nullptr)
+        namespaces.push_back(*m_namespace);
 }
 
 void Couple::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const

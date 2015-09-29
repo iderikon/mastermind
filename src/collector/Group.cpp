@@ -64,7 +64,6 @@ Group::Group(int id)
     m_metadata_parse_duration(0),
     m_couple(nullptr),
     m_active_job(nullptr),
-    m_namespace(nullptr),
     m_type(DATA),
     m_status(INIT)
 {
@@ -317,11 +316,6 @@ uint64_t Group::get_backend_update_time() const
     return res;
 }
 
-void Group::set_namespace(Namespace & ns)
-{
-    m_namespace = &ns;
-}
-
 void Group::set_active_job(const Job & job)
 {
     m_active_job = &job;
@@ -539,8 +533,8 @@ void Group::push_items(std::vector<std::reference_wrapper<Couple>> & couples) co
 
 void Group::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    if (m_namespace != nullptr)
-        namespaces.push_back(*m_namespace);
+    if (m_couple != nullptr)
+        m_couple->push_items(namespaces);
 }
 
 void Group::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const

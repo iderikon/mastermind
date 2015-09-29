@@ -249,7 +249,6 @@ void Storage::update()
     // Process group metadata and jobs.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
-        std::string old_namespace_name = group.get_namespace_name();
 
         // Bind or clear an active job.
         auto jit = m_jobs.find(group.get_id());
@@ -262,16 +261,6 @@ void Storage::update()
             continue;
 
         group.calculate_type();
-
-        const std::string & new_namespace_name = group.get_namespace_name();
-        if (old_namespace_name != new_namespace_name) {
-            if (!old_namespace_name.empty())
-                get_namespace(old_namespace_name).remove_group(group);
-
-            Namespace & new_ns = get_namespace(new_namespace_name);
-            new_ns.add_group(group);
-            group.set_namespace(new_ns);
-        }
     }
 
     // Create/update couples depending on changes in group metadata and structure
@@ -316,8 +305,14 @@ void Storage::update()
         auto cit = m_couples.lower_bound(key);
         if (cit == m_couples.end() || cit->first != key) {
             cit = m_couples.insert(cit, std::make_pair(key, Couple(groups)));
+
+            Couple & couple = cit->second;
+            Namespace & ns = get_namespace(couple.get_namespace_name());
+            ns.add_couple(couple);
+            couple.set_namespace(ns);
+
             for (Group & group : groups)
-                group.set_couple(cit->second);
+                group.set_couple(couple);
         }
     }
 
@@ -435,6 +430,10 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
 
             my = m_couples.insert(my, std::make_pair(other_couple.get_key(), Couple(my_groups)));
             Couple & my_couple = my->second;
+
+            Namespace & my_ns = get_namespace(my_couple.get_namespace_name());
+            my_ns.add_couple(my_couple);
+            my_couple.set_namespace(my_ns);
 
             for (Group & group : my_groups)
                 group.set_couple(my_couple);
@@ -827,7 +826,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("namespaces");
         writer.StartArray();
         for (Namespace & ns : entries.namespaces)
-            writer.String(ns.get_name().c_str());
+            ns.print_json(writer);
         writer.EndArray();
     }
 }
@@ -867,7 +866,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("namespaces");
         writer.StartArray();
         for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
-            writer.String(it->first.c_str());
+            it->second.print_json(writer);
         writer.EndArray();
     }
 

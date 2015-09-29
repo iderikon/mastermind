@@ -120,8 +120,6 @@ public:
     // the most recently updated backend
     uint64_t get_backend_update_time() const;
 
-    void set_namespace(Namespace & ns);
-
     void set_active_job(const Job & job);
     void clear_active_job();
 
@@ -194,7 +192,6 @@ private:
     // update_status_recursive(); also items can be collected by push_items().
     Couple *m_couple;
     const Job *m_active_job;
-    Namespace *m_namespace;
 
     Type m_type;
 
