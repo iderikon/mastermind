@@ -310,6 +310,7 @@ void Collector::execute_summary(void *arg)
 
     ostr << "Round metrics:\n"
             "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"
+            "  Resolve nodes: " << MSEC(self.m_discovery.get_resolve_nodes_duration()) << " ms\n"
             "  Jobs & history databases: " << MSEC(self.m_round_clock.mongo) << " ms\n"
             "  HTTP download time: " << MSEC(self.m_round_clock.perform_download) << " ms\n"
             "  Remaining JSON parsing and jobs processing after HTTP download completed: "
