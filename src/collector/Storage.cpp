@@ -363,7 +363,7 @@ void Storage::merge_jobs(const Storage & other_storage, bool & have_newer)
             ++other;
         }
 
-        assert(my == m_jobs.end() && other == m_jobs.end());
+        assert(my == m_jobs.end() && other == other_storage.m_jobs.end());
 
         return;
     }
