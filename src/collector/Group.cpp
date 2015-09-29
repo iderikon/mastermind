@@ -519,12 +519,14 @@ void Group::merge(const Group & other, bool & have_newer)
     m_metadata.frozen = other.m_metadata.frozen;
     m_metadata.couple = other.m_metadata.couple;
     m_metadata.namespace_name = other.m_metadata.namespace_name;
+    m_metadata.type = other.m_metadata.type;
     m_metadata.service.migrating = other.m_metadata.service.migrating;
     m_metadata.service.job_id = other.m_metadata.service.job_id;
 
     m_metadata_parsed = other.m_metadata_parsed;
     m_metadata_parse_duration = other.m_metadata_parse_duration;
 
+    m_type = other.m_type;
     m_status_text = other.m_status_text;
     m_status = other.m_status;
 }
