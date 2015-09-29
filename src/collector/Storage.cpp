@@ -113,7 +113,7 @@ Host & Storage::get_host(const std::string & addr)
 
 bool Storage::has_node(const char *host, int port, int family) const
 {
-    auto it = m_nodes.lower_bound(Node::key(host, port, family));
+    auto it = m_nodes.find(Node::key(host, port, family));
     return (it != m_nodes.end());
 }
 
