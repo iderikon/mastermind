@@ -499,6 +499,8 @@ void Storage::merge_hosts(const Storage & other, bool & have_newer)
 
 void Storage::merge(const Storage & other, bool & have_newer)
 {
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Merging storage");
+
     have_newer = false;
 
     merge_hosts(other, have_newer);
@@ -507,6 +509,10 @@ void Storage::merge(const Storage & other, bool & have_newer)
     merge_groups(other, have_newer);
     merge_jobs(other, have_newer);
     merge_couples(other, have_newer);
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Merge done, %s",
+            (have_newer ? "this instance has some more recent data"
+                        : "source instance is up-to-date"));
 }
 
 template<typename SourceItem, typename ResultItem>

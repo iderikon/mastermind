@@ -527,6 +527,9 @@ void Round::final(size_t group_idx, const elliptics::error_info & error)
 {
     if (error)
         m_groups_to_read[group_idx].get().handle_metadata_download_failed(error.message());
+    else
+        BH_LOG(app::logger(), DNET_LOG_DEBUG, "Successfully downloaded metadata for group %d",
+                m_groups_to_read[group_idx].get().get_id());
 
     if (! --m_nr_groups) {
         BH_LOG(app::logger(), DNET_LOG_INFO, "Group metadata download completed");
