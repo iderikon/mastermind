@@ -56,6 +56,9 @@ void Namespace::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) 
 {
     writer.StartObject();
 
+    writer.Key("id");
+    writer.String(m_id.c_str());
+
     writer.Key("couples");
     writer.StartArray();
     for (const Couple & couple : m_couples)

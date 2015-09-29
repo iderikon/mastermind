@@ -441,7 +441,7 @@ CURL *Round::create_easy_handle(Node *node)
     std::ostringstream url;
     url << "http://" << node->get_host().get_addr() << ':'
         << app::config().monitor_port << "/?categories="
-        << uint32_t(DNET_MONITOR_PROCFS | DNET_MONITOR_BACKEND | DNET_MONITOR_STATS);
+        << uint32_t(DNET_MONITOR_PROCFS | DNET_MONITOR_BACKEND | DNET_MONITOR_STATS | DNET_MONITOR_COMMANDS);
 
     curl_easy_setopt(easy, CURLOPT_URL, url.str().c_str());
     curl_easy_setopt(easy, CURLOPT_PRIVATE, node);

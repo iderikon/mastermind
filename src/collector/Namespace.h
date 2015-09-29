@@ -38,12 +38,9 @@ public:
     typedef std::set<std::reference_wrapper<Couple>, CoupleLess> Couples;
 
 public:
-    Namespace(const std::string & name)
-        : m_name(name)
+    Namespace(const std::string & id)
+        : m_id(id)
     {}
-
-    const std::string & get_name() const
-    { return m_name; }
 
     void add_couple(Couple & couple)
     { m_couples.insert(couple); }
@@ -64,7 +61,7 @@ public:
     void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
-    const std::string m_name;
+    const std::string m_id;
 
     // Set of references to couples in this namespace. The objects shouldn't be
     // modified directly but only used by push_items().
