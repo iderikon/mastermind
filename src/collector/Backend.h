@@ -89,6 +89,34 @@ public:
 
     static const char *status_str(Status status);
 
+    struct Calculated
+    {
+        uint64_t vfs_free_space;
+        uint64_t vfs_total_space;
+        uint64_t vfs_used_space;
+
+        uint64_t records;
+
+        int64_t free_space;
+        int64_t total_space;
+        int64_t used_space;
+        int64_t effective_space;
+        int64_t effective_free_space;
+
+        double fragmentation;
+
+        int read_rps;
+        int write_rps;
+        int max_read_rps;
+        int max_write_rps;
+
+        uint64_t new_stat_commit_errors;
+
+        bool stalled;
+
+        Status status;
+    };
+
 public:
     Backend(Node & node);
 
@@ -108,30 +136,8 @@ public:
     Status get_status() const
     { return m_calculated.status; }
 
-    uint64_t get_vfs_free_space() const
-    { return m_calculated.vfs_free_space; }
-    uint64_t get_vfs_total_space() const
-    { return m_calculated.vfs_total_space; }
-    uint64_t get_vfs_used_space() const
-    { return m_calculated.vfs_used_space; }
-
-    uint64_t get_free_space() const
-    { return m_calculated.free_space; }
-    uint64_t get_total_space() const
-    { return m_calculated.total_space; }
-    uint64_t get_used_space() const
-    { return m_calculated.used_space; }
-    uint64_t get_effective_space() const
-    { return m_calculated.effective_space; }
-
-    double get_fragmentation() const
-    { return m_calculated.fragmentation; }
-
-    int get_read_rps() const
-    { return m_calculated.read_rps; }
-
-    int get_write_rps() const
-    { return m_calculated.write_rps; }
+    const Calculated & get_calculated() const
+    { return m_calculated; }
 
     const std::string & get_base_path() const
     { return m_base_path; }
@@ -179,32 +185,7 @@ private:
 
     BackendStat m_stat;
 
-    struct {
-        uint64_t vfs_free_space;
-        uint64_t vfs_total_space;
-        uint64_t vfs_used_space;
-
-        uint64_t records;
-
-        int64_t free_space;
-        int64_t total_space;
-        int64_t used_space;
-        int64_t effective_space;
-        int64_t effective_free_space;
-
-        double fragmentation;
-
-        int read_rps;
-        int write_rps;
-        int max_read_rps;
-        int max_write_rps;
-
-        uint64_t new_stat_commit_errors;
-
-        bool stalled;
-
-        Status status;
-    } m_calculated;
+    Calculated m_calculated;
 
     std::string m_base_path;
     std::string m_status_text;
