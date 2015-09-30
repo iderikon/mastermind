@@ -46,6 +46,7 @@ struct BackendStat
     uint64_t vfs_blocks;
     uint64_t vfs_bavail;
     uint64_t vfs_bsize;
+    uint64_t vfs_error;
 
     uint64_t records_total;
     uint64_t records_removed;
@@ -58,7 +59,11 @@ struct BackendStat
 
     uint64_t read_ios;
     uint64_t write_ios;
-    uint64_t error;
+    uint64_t read_ticks;
+    uint64_t write_ticks;
+    uint64_t io_ticks;
+    uint64_t read_sectors;
+    uint64_t dstat_error;
 
     uint64_t blob_size_limit;
     uint64_t max_blob_base_size;
