@@ -39,14 +39,14 @@ struct FolderLess
 {
     bool operator () (const Parser::Folder & f1, const Parser::Folder & f2) const
     {
-        if (f1.keys != f2.keys)
-            return f1.keys < f2.keys;
         if (*f1.str == *NOT_MATCH || *f2.str == *NOT_MATCH) {
             if (*f1.str == *NOT_MATCH)
                 return true;
             else
                 return false;
         }
+        if (f1.keys != f2.keys)
+            return f1.keys < f2.keys;
         if (f1.str_hash != f2.str_hash)
             return f1.str_hash < f2.str_hash;
         return std::strcmp(f1.str, f2.str) < 0;
@@ -235,14 +235,16 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
 
     // NOT_MATCH keys are always in the beginning
     auto begin = m_folders[idx].begin();
-    if (*begin->str == *NOT_MATCH) {
+    for (; begin != m_folders[idx].end() && *begin->str == *NOT_MATCH; ++begin) {
+        if (begin->keys != (m_keys - 1))
+            continue;
+
         // hash for NOT_MATCH keys is calculated beginning from the first
         // character of a pattern, special character is not included
         if (begin->str_hash != search.str_hash || std::strcmp(begin->str + 1, str)) {
             m_keys |= begin->token;
             return true;
         }
-        ++begin;
     }
 
     auto fold = std::lower_bound(begin, m_folders[idx].end(), search, FolderSearchLess());
