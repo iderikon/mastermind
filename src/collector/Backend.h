@@ -76,6 +76,15 @@ struct BackendStat
 
     uint64_t stat_commit_errors;
 
+    uint64_t ell_cache_write_size;
+    uint64_t ell_cache_write_time;
+    uint64_t ell_disk_write_size;
+    uint64_t ell_disk_write_time;
+    uint64_t ell_cache_read_size;
+    uint64_t ell_cache_read_time;
+    uint64_t ell_disk_read_size;
+    uint64_t ell_disk_read_time;
+
     std::string data_path;
     std::string file_path;
 };

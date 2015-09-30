@@ -58,7 +58,15 @@ BackendStat::BackendStat()
     read_only(0),
     last_start_ts_sec(0),
     last_start_ts_usec(0),
-    stat_commit_errors(0)
+    stat_commit_errors(0),
+    ell_cache_write_size(0),
+    ell_cache_write_time(0),
+    ell_disk_write_size(0),
+    ell_disk_write_time(0),
+    ell_cache_read_size(0),
+    ell_cache_read_time(0),
+    ell_disk_read_size(0),
+    ell_disk_read_time(0)
 {}
 
 Backend::Backend(Node & node)
@@ -372,6 +380,23 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("ts_usec");
     writer.Uint64(m_stat.last_start_ts_usec);
     writer.EndObject();
+
+    writer.Key("ell_cache_write_size");
+    writer.Uint64(m_stat.ell_cache_write_size);
+    writer.Key("ell_cache_write_time");
+    writer.Uint64(m_stat.ell_cache_write_time);
+    writer.Key("ell_disk_write_size");
+    writer.Uint64(m_stat.ell_disk_write_size);
+    writer.Key("ell_disk_write_time");
+    writer.Uint64(m_stat.ell_disk_write_time);
+    writer.Key("ell_cache_read_size");
+    writer.Uint64(m_stat.ell_cache_read_size);
+    writer.Key("ell_cache_read_time");
+    writer.Uint64(m_stat.ell_cache_read_time);
+    writer.Key("ell_disk_read_size");
+    writer.Uint64(m_stat.ell_disk_read_size);
+    writer.Key("ell_disk_read_time");
+    writer.Uint64(m_stat.ell_disk_read_time);
 
     writer.Key("read_only");
     writer.Bool(!!m_stat.read_only);
