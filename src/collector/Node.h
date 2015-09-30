@@ -143,6 +143,7 @@ private:
     std::string m_download_data;
 
     NodeStat m_stat;
+    CommandStat m_command_stat;
 
     std::map<int, Backend> m_backends;
     std::map<uint64_t, FS> m_filesystems;

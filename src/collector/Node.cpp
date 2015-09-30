@@ -97,6 +97,8 @@ void Node::parse_stats(void *arg)
     const NodeStat & node_stat = parser.get_node_stat();
     self.update(node_stat);
 
+    self.m_command_stat.clear();
+
     std::vector<BackendStat> & backend_stats = parser.get_backend_stats();
     std::map<unsigned int, uint64_t> & rofs_errors = parser.get_rofs_errors();
     for (BackendStat & stat : backend_stats) {
@@ -185,6 +187,8 @@ void Node::handle_backend(const BackendStat & new_stat)
 
     backend.recalculate();
     new_fs.update(backend);
+
+    m_command_stat += backend.get_calculated().command_stat;
 }
 
 void Node::update_backend_status()
@@ -200,8 +204,11 @@ void Node::update_filesystems()
 {
     Stopwatch watch(m_clock.update_fs);
 
-    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it)
-        it->second.update_status();
+    for (auto it = m_filesystems.begin(); it != m_filesystems.end(); ++it) {
+        FS & fs = it->second;
+        fs.update_command_stat();
+        fs.update_status();
+    }
 }
 
 void Node::merge_backends(const Node & other_node, bool & have_newer)
@@ -338,6 +345,15 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Double(m_stat.tx_rate);
     writer.Key("rx_rate");
     writer.Double(m_stat.rx_rate);
+
+    writer.Key("disk_read_rate");
+    writer.Double(m_command_stat.disk_read_rate);
+    writer.Key("disk_write_rate");
+    writer.Double(m_command_stat.disk_write_rate);
+    writer.Key("net_read_rate");
+    writer.Double(m_command_stat.net_read_rate);
+    writer.Key("net_write_rate");
+    writer.Double(m_command_stat.net_write_rate);
 
     if (show_internals) {
         writer.Key("la");
