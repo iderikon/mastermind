@@ -116,14 +116,34 @@ CommandStat & CommandStat::operator += (const CommandStat & other)
     return *this;
 }
 
+Backend::Calculated::Calculated()
+    :
+    vfs_free_space(0),
+    vfs_total_space(0),
+    vfs_used_space(0),
+    records(0),
+    free_space(0),
+    total_space(0),
+    used_space(0),
+    effective_space(0),
+    effective_free_space(0),
+    fragmentation(0.0),
+    read_rps(0),
+    write_rps(0),
+    max_read_rps(0),
+    max_write_rps(0),
+    new_stat_commit_errors(0),
+    stalled(0),
+    status(INIT)
+{}
+
 Backend::Backend(Node & node)
     :
     m_node(node),
     m_fs(nullptr),
-    m_group(nullptr),
-    m_status_text("Backend is not initialized")
+    m_group(nullptr)
 {
-    std::memset(&m_calculated, 0, sizeof(m_calculated));
+    m_calculated.status_text = "Backend is not initialized.";
 }
 
 void Backend::init(const BackendStat & stat)
@@ -131,9 +151,9 @@ void Backend::init(const BackendStat & stat)
     m_stat = stat;
     m_key = m_node.get_key() + '/' + std::to_string(stat.backend_id);
     if (!stat.data_path.empty())
-        m_base_path = stat.data_path;
+        m_calculated.base_path = stat.data_path;
     else if (!stat.file_path.empty())
-        m_base_path = stat.file_path;
+        m_calculated.base_path = stat.file_path;
 }
 
 void Backend::clone_from(const Backend & other)
@@ -141,9 +161,7 @@ void Backend::clone_from(const Backend & other)
     m_key = other.m_key;
 
     m_stat = other.m_stat;
-    std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
-    m_base_path = other.m_base_path;
-    m_status_text = other.m_status_text;
+    m_calculated = other.m_calculated;
 }
 
 bool Backend::full(double reserved_space) const
@@ -184,9 +202,9 @@ void Backend::update(const BackendStat & stat)
     }
 
     if (!stat.data_path.empty())
-        m_base_path = stat.data_path;
+        m_calculated.base_path = stat.data_path;
     else if (!stat.file_path.empty())
-        m_base_path = stat.file_path;
+        m_calculated.base_path = stat.file_path;
 
     m_stat = stat;
 }
@@ -239,34 +257,34 @@ void Backend::update_status()
 {
     if (m_stat.state != 1) {
         m_calculated.status = STALLED;
-        m_status_text = "Backend is disabled";
+        m_calculated.status_text = "Backend is disabled";
     } else if (m_calculated.stalled) {
         m_calculated.status = STALLED;
 
         std::ostringstream ostr;
         ostr << "Backend statistics were gathered " << (time(nullptr) - m_stat.ts_sec) << " seconds ago";
-        m_status_text = ostr.str();
+        m_calculated.status_text = ostr.str();
     } else if (m_fs == nullptr) {
         m_calculated.status = STALLED;
 
         std::ostringstream ostr;
         ostr << "Internal inconsistency: FS " << m_stat.fsid << " is not bound to backend " << m_node.get_key();
-        m_status_text = ostr.str();
+        m_calculated.status_text = ostr.str();
 
         BH_LOG(app::logger(), DNET_LOG_ERROR, ostr.str().c_str());
     } else if (m_fs->get_status() == FS::BROKEN) {
         m_calculated.status = BROKEN;
-        m_status_text = "Backend space limit is not properly configured on FS ";
-        m_status_text += m_fs->get_key();
+        m_calculated.status_text = "Backend space limit is not properly configured on FS ";
+        m_calculated.status_text += m_fs->get_key();
     } else if (m_stat.read_only) {
         m_calculated.status = RO;
-        m_status_text = "Backend is switched to read-only state";
+        m_calculated.status_text = "Backend is switched to read-only state";
     } else if (m_calculated.new_stat_commit_errors) {
         m_calculated.status = RO;
-        m_status_text = "Backend is read-only due to filesystem or disk errors";
+        m_calculated.status_text = "Backend is read-only due to filesystem or disk errors";
     } else {
         m_calculated.status = OK;
-        m_status_text = "Backend is OK";
+        m_calculated.status_text = "Backend is OK";
     }
 }
 
@@ -292,9 +310,7 @@ void Backend::merge(const Backend & other, bool & have_newer)
     uint64_t other_ts = other.m_stat.get_timestamp();
     if (my_ts < other_ts) {
         m_stat = other.m_stat;
-        std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
-        m_base_path = other.m_base_path;
-        m_status_text = other.m_status_text;
+        m_calculated = other.m_calculated;
     } else if (my_ts > other_ts) {
         have_newer = true;
     }
@@ -420,7 +436,7 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("status");
     writer.String(status_str(m_calculated.status));
     writer.Key("status_text");
-    writer.String(m_status_text.c_str());
+    writer.String(m_calculated.status_text.c_str());
 
     writer.Key("last_start");
     writer.StartObject();
@@ -473,7 +489,7 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
 
     writer.Key("base_path");
-    writer.String(m_base_path.c_str());
+    writer.String(m_calculated.base_path.c_str());
 
     writer.EndObject();
 }

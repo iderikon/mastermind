@@ -120,6 +120,8 @@ public:
 
     struct Calculated
     {
+        Calculated();
+
         uint64_t vfs_free_space;
         uint64_t vfs_total_space;
         uint64_t vfs_used_space;
@@ -146,6 +148,9 @@ public:
         Status status;
 
         CommandStat command_stat;
+
+        std::string base_path;
+        std::string status_text;
     };
 
 public:
@@ -169,9 +174,6 @@ public:
 
     const Calculated & get_calculated() const
     { return m_calculated; }
-
-    const std::string & get_base_path() const
-    { return m_base_path; }
 
     bool full(double reserved_space = 0.0) const;
 
@@ -217,9 +219,6 @@ private:
     BackendStat m_stat;
 
     Calculated m_calculated;
-
-    std::string m_base_path;
-    std::string m_status_text;
 };
 
 #endif

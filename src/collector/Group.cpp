@@ -326,7 +326,7 @@ void Group::calculate_type()
     if (!m_metadata.version) {
         if (!cache_group_path_prefix.empty()) {
             for (Backend & backend : m_backends) {
-                if (!backend.get_base_path().compare(0,
+                if (!backend.get_calculated().base_path.compare(0,
                             cache_group_path_prefix.length(), cache_group_path_prefix)) {
                     m_type = UNMARKED;
                     return;
