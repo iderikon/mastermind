@@ -19,25 +19,39 @@
 #ifndef __bbd6c304_2898_4ea0_afae_ee8b16e21893
 #define __bbd6c304_2898_4ea0_afae_ee8b16e21893
 
+#include <memory>
 #include <string>
 
-class WorkerApplication;
+class InventoryDriver
+{
+public:
+    // This method is not guaranteed to be thread-safe.
+    virtual std::string get_dc_by_host(const std::string & addr, std::string & error_text) = 0;
+};
+
+class DefaultInventory : public InventoryDriver
+{
+public:
+    virtual std::string get_dc_by_host(const std::string & addr, std::string & error_text);
+};
 
 class Inventory
 {
 public:
-    Inventory(WorkerApplication & app);
+    Inventory();
+    ~Inventory();
 
+    // Open shared object file containing C-linkage function
+    // create_inventory(void) returning InventoryDriver*
     int open_shared_library(const std::string & file_name);
+
+    void close();
 
     std::string get_dc_by_host(const std::string & addr);
 
 private:
-    WorkerApplication & m_app;
-
     void *m_handle;
-    const char *(*m_inventory_error)(void);
-    int (*m_get_dc_by_host)(const char *, char *, size_t);
+    std::unique_ptr<InventoryDriver> m_driver;
 };
 
 #endif
