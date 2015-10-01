@@ -82,9 +82,13 @@ public:
     const Backends & get_backends() const
     { return m_backends; }
 
-    bool full() const;
+    bool full(double reserved_space = 0.0) const;
 
     uint64_t get_total_space() const;
+
+    uint64_t get_free_space() const;
+
+    uint64_t get_effective_space() const;
 
     bool has_active_job() const;
 

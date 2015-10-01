@@ -45,7 +45,8 @@ enum ConfigKey
     ForbiddenDcSharingAmongGroups     = 0x80000,
     NodeBackendStatStaleTimeout       = 0x100000,
     Cache                             = 0x200000,
-    GroupPathPrefix                   = 0x400000
+    GroupPathPrefix                   = 0x400000,
+    ForbiddenNsWithoutSettings        = 0x800000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -54,6 +55,7 @@ std::vector<Parser::FolderVector> config_folders = {
         { "forbidden_dc_sharing_among_groups",     0, ForbiddenDcSharingAmongGroups     },
         { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
         { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
+        { "forbidden_ns_without_settings",         0, ForbiddenNsWithoutSettings        },
         { "reserved_space",                        0, ReservedSpace                     },
         { "node_backend_stat_stale_timeout",       0, NodeBackendStatStaleTimeout       },
         { "dnet_log_mask",                         0, DnetLogMask                       },
@@ -85,6 +87,7 @@ Parser::UIntInfoVector config_uint_info = {
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
     { ForbiddenDcSharingAmongGroups,     SET, offsetof(Config, forbidden_dc_sharing_among_groups)     },
+    { ForbiddenNsWithoutSettings,        SET, offsetof(Config, forbidden_ns_without_settings)         },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
     { NodeBackendStatStaleTimeout,       SET, offsetof(Config, node_backend_stat_stale_timeout)       },
     { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },

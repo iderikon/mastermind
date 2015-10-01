@@ -93,9 +93,21 @@ void Couple::update_status()
             return;
     }
 
-    //// TODO
-    // if (app::config().forbidden_ns_without_settings) {
-    // }
+    if (app::config().forbidden_ns_without_settings) {
+        if (m_namespace != nullptr) {
+            if (m_namespace->default_settings()) {
+                m_status = BROKEN;
+                ostr << "Couple " << m_key << " is assigned to namespace '"
+                     << m_namespace->get_id() << "' which is not set up";
+                m_status_text = ostr.str();
+                return;
+            }
+        } else {
+            BH_LOG(app::logger(), DNET_LOG_ERROR,
+                    "Internal inconsistency: Updating status of couple %s: "
+                    "Couple has no namespace bound", m_key.c_str());
+        }
+    }
 
     size_t nr_coupled = std::count_if(m_groups.begin(), m_groups.end(),
             [] (const Group & group) { return group.get_status() == Group::COUPLED; });
@@ -306,16 +318,58 @@ int Couple::check_dc_sharing()
     return 0;
 }
 
+uint64_t Couple::get_effective_space() const
+{
+    if (m_groups.empty())
+        return 0;
+
+    uint64_t group_effective_space = m_groups[0].get().get_effective_space();
+    for (size_t i = 1; i < m_groups.size(); ++i) {
+        const Group & group = m_groups[i].get();
+        uint64_t eff = group.get_effective_space();
+        if (eff < group_effective_space)
+            group_effective_space = eff;
+    }
+
+    double ns_reserved = (m_namespace != nullptr ? m_namespace->get_settings().reserved_space : 0.0);
+    return uint64_t(std::floor(double(group_effective_space) * (1.0 - ns_reserved)));
+}
+
+uint64_t Couple::get_effective_free_space() const
+{
+    if (m_groups.empty())
+        return 0;
+
+    int64_t group_free_space = m_groups[0].get().get_free_space();
+    int64_t group_total_space = m_groups[0].get().get_total_space();
+
+    for (size_t i = 1; i < m_groups.size(); ++i) {
+        const Group & group = m_groups[i].get();
+        int64_t free = group.get_free_space();
+        int64_t total = group.get_total_space();
+
+        if (free < group_free_space)
+            group_free_space = free;
+        if (total < group_total_space)
+            group_total_space = total;
+    }
+
+    int64_t eff = get_effective_space();
+
+    return uint64_t(std::max(group_free_space - (group_total_space - eff), int64_t(0)));
+}
+
 bool Couple::full()
 {
+    double ns_reserved = (m_namespace != nullptr ? m_namespace->get_settings().reserved_space : 0.0);
+
     for (const Group & group : m_groups) {
-        if (group.full())
+        if (group.full(ns_reserved))
             return true;
     }
 
-    // TODO
-    // if (get_effective_free_space() <= 0)
-    //    return true;
+    if (!get_effective_free_space())
+        return true;
 
     return false;
 }
@@ -332,6 +386,11 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, boo
     for (Group & group : m_groups)
         writer.Uint64(group.get_id());
     writer.EndArray();
+
+    writer.Key("effective_space");
+    writer.Uint64(get_effective_space());
+    writer.Key("effective_free_space");
+    writer.Uint64(get_effective_free_space());
 
     writer.Key("status");
     writer.String(status_str(m_status));

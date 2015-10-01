@@ -71,6 +71,8 @@ public:
 
     bool check_groups(const std::vector<int> & group_ids) const;
 
+    uint64_t get_effective_space() const;
+
     uint64_t get_effective_free_space() const;
 
     bool full();

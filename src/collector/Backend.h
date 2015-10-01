@@ -173,7 +173,7 @@ public:
     const std::string & get_base_path() const
     { return m_base_path; }
 
-    bool full() const;
+    bool full(double reserved_space = 0.0) const;
 
     void update(const BackendStat & stat);
     void set_fs(FS & fs);

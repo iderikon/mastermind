@@ -72,10 +72,10 @@ Group::Group(int id)
     m_metadata.service.migrating = false;
 }
 
-bool Group::full() const
+bool Group::full(double reserved_space) const
 {
     for (const Backend & backend : m_backends) {
-        if (!backend.full(/* TODO: ns reserved space */))
+        if (!backend.full(reserved_space))
             return false;
     }
     return true;
@@ -87,6 +87,24 @@ uint64_t Group::get_total_space() const
 
     for (const Backend & backend : m_backends)
         res += backend.get_calculated().total_space;
+    return res;
+}
+
+uint64_t Group::get_free_space() const
+{
+    uint64_t res = 0;
+
+    for (const Backend & backend : m_backends)
+        res += backend.get_calculated().free_space;
+    return res;
+}
+
+uint64_t Group::get_effective_space() const
+{
+    uint64_t res = 0;
+
+    for (const Backend & backend : m_backends)
+        res += backend.get_calculated().effective_space;
     return res;
 }
 

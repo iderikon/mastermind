@@ -148,7 +148,7 @@ void FS::update_command_stat()
 {
     m_calculated.command_stat.clear();
     for (Backend & backend : m_backends) {
-        if (backend.get_calculated().status == Backend::OK)
+        if (backend.get_calculated().status != Backend::STALLED)
             m_calculated.command_stat += backend.get_calculated().command_stat;
     }
 }

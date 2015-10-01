@@ -23,6 +23,12 @@
 #include "Namespace.h"
 #include "Node.h"
 
+Namespace::Namespace(const std::string & id)
+    :
+    m_id(id),
+    m_default_settings(true)
+{}
+
 void Namespace::push_items(std::vector<std::reference_wrapper<Group>> & groups) const
 {
     for (Couple & couple : m_couples)
