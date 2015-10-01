@@ -269,7 +269,7 @@ void Storage::update()
         if (!group.metadata_parsed())
             continue;
 
-        const std::vector<int> & group_ids = group.get_couple_group_ids();
+        const std::vector<int> & group_ids = group.get_metadata().couple;
         if (group_ids.empty())
             continue;
 

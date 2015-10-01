@@ -47,8 +47,8 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
 std::string Couple::get_namespace_name() const
 {
     for (const Group & group : m_groups) {
-        if (!group.get_namespace_name().empty())
-            return group.get_namespace_name();
+        if (!group.get_metadata().namespace_name.empty())
+            return group.get_metadata().namespace_name;
     }
     return std::string();
 }
@@ -80,7 +80,7 @@ void Couple::update_status()
     }
 
     for (const Group & group : m_groups) {
-        if (group.get_frozen()) {
+        if (group.get_metadata().frozen) {
             m_status = FROZEN;
             ostr << "Group " << group.get_id() << " is frozen.";
             m_status_text = ostr.str();

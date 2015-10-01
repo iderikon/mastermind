@@ -55,6 +55,25 @@ bool parse_couple(msgpack::object & obj, std::vector<int> & couple)
 
 } // unnamed namespace
 
+Group::Metadata::Metadata()
+    :
+    version(0),
+    frozen(false)
+{
+    service.migrating = false;
+}
+
+void Group::Metadata::clear()
+{
+    version = 0;
+    frozen = false;
+    couple.clear();
+    namespace_name.clear();
+    type.clear();
+    service.migrating = false;
+    service.job_id.clear();
+}
+
 Group::Group(int id)
     :
     m_id(id),
@@ -66,11 +85,7 @@ Group::Group(int id)
     m_active_job(nullptr),
     m_type(DATA),
     m_status(INIT)
-{
-    m_metadata.version = 0;
-    m_metadata.frozen = false;
-    m_metadata.service.migrating = false;
-}
+{}
 
 bool Group::full(double reserved_space) const
 {
@@ -132,7 +147,8 @@ void Group::handle_metadata_download_failed(const std::string & why)
 {
     BH_LOG(app::logger(), DNET_LOG_ERROR,
             "Group %d: Metadata download failed: %s", m_id, why.c_str());
-    clear_metadata();
+    m_metadata.clear();
+    m_clean = true;
 }
 
 void Group::save_metadata(const char *metadata, size_t size, uint64_t timestamp)
@@ -283,7 +299,8 @@ int Group::parse_metadata()
     }
 
     if (!ostr.str().empty()) {
-        clear_metadata();
+        m_metadata.clear();
+        m_clean = true;
         m_status_text = ostr.str();
         m_status = BAD;
         BH_LOG(app::logger(), DNET_LOG_ERROR, "Metadata parse error: %s", m_status_text.c_str());
@@ -342,18 +359,6 @@ void Group::set_active_job(const Job & job)
 void Group::clear_active_job()
 {
     m_active_job = nullptr;
-}
-
-void Group::clear_metadata()
-{
-    m_metadata.version = 0;
-    m_metadata.frozen = false;
-    m_metadata.couple.clear();
-    m_metadata.namespace_name.clear();
-    m_metadata.type.clear();
-    m_metadata.service.migrating = false;
-    m_metadata.service.job_id.clear();
-    m_clean = true;
 }
 
 void Group::update_status()
