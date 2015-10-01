@@ -90,10 +90,10 @@ Group::Group(int id)
 bool Group::full(double reserved_space) const
 {
     for (const Backend & backend : m_backends) {
-        if (!backend.full(reserved_space))
-            return false;
+        if (backend.full(reserved_space))
+            return true;
     }
-    return true;
+    return false;
 }
 
 uint64_t Group::get_total_space() const
