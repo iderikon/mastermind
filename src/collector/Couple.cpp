@@ -67,6 +67,22 @@ void Couple::update_status()
 
     std::ostringstream ostr;
 
+    for (const Group & group : m_groups) {
+        if (!group.get_metadata().version) {
+            m_status = BAD;
+            ostr << "Group " << group.get_id() << " has empty metadata.";
+            m_status_text = ostr.str();
+            return;
+        }
+        if (m_namespace != nullptr && m_namespace->get_id() != group.get_metadata().namespace_name) {
+            m_status = BAD;
+            ostr << "Couple's namespace '" << m_namespace->get_id() << "' doesn't match group's "
+                    "namespace '" << group.get_metadata().namespace_name << "'.";
+            m_status_text = ostr.str();
+            return;
+        }
+    }
+
     for (size_t i = 1; i < m_groups.size(); ++i) {
         if (!m_groups[0].get().equal_meta(m_groups[i].get())) {
             if (!account_job_in_status()) {
