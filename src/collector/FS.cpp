@@ -80,38 +80,44 @@ void FS::update(const Backend & backend)
 
     // dstat
 
-    if (new_bstat.io_ticks > m_stat.io_ticks)
-        m_calculated.disk_util = (double(new_bstat.io_ticks) - double(m_stat.io_ticks)) / dt / 1000.0;
+    if (!new_bstat.dstat_error) {
+        if (new_bstat.io_ticks > m_stat.io_ticks)
+            m_calculated.disk_util = (double(new_bstat.io_ticks) - double(m_stat.io_ticks)) / dt / 1000.0;
 
-    uint64_t read_ticks = std::max(int64_t(new_bstat.read_ticks) - int64_t(m_stat.read_ticks), int64_t());
-    uint64_t write_ticks = std::max(int64_t(new_bstat.write_ticks) - int64_t(m_stat.write_ticks), int64_t());
-    uint64_t total_rw_ticks = read_ticks + write_ticks;
+        uint64_t read_ticks = std::max(int64_t(new_bstat.read_ticks) - int64_t(m_stat.read_ticks), int64_t());
+        uint64_t write_ticks = std::max(int64_t(new_bstat.write_ticks) - int64_t(m_stat.write_ticks), int64_t());
+        uint64_t total_rw_ticks = read_ticks + write_ticks;
 
-    if (read_ticks)
-        m_calculated.disk_util_read = m_calculated.disk_util * double(read_ticks) / double(total_rw_ticks);
+        if (read_ticks)
+            m_calculated.disk_util_read = m_calculated.disk_util * double(read_ticks) / double(total_rw_ticks);
 
-    if (write_ticks)
-        m_calculated.disk_util_write = m_calculated.disk_util * double(write_ticks) / double(total_rw_ticks);
+        if (write_ticks)
+            m_calculated.disk_util_write = m_calculated.disk_util * double(write_ticks) / double(total_rw_ticks);
 
-    // assume 512 byte sectors
-    if (new_bstat.read_sectors > m_stat.read_sectors)
-        m_calculated.disk_read_rate = double(new_bstat.read_sectors - m_stat.read_sectors) * 512.0 / dt;
+        // assume 512 byte sectors
+        if (new_bstat.read_sectors > m_stat.read_sectors)
+            m_calculated.disk_read_rate = double(new_bstat.read_sectors - m_stat.read_sectors) * 512.0 / dt;
+    }
 
     // VFS
 
     uint64_t new_free_space = backend.get_calculated().vfs_free_space;
-    if (new_free_space < m_calculated.free_space)
+    if (!new_bstat.vfs_error && new_free_space < m_calculated.free_space)
         m_calculated.disk_write_rate = double(new_free_space - m_calculated.free_space) / dt;
 
     m_calculated.total_space = backend.get_calculated().vfs_total_space;
     m_calculated.free_space = backend.get_calculated().vfs_free_space;
 
-    m_stat.ts_sec = new_bstat.ts_sec;
-    m_stat.ts_usec = new_bstat.ts_usec;
-    m_stat.read_ticks = new_bstat.read_ticks;
-    m_stat.write_ticks = new_bstat.write_ticks;
-    m_stat.read_sectors = new_bstat.read_sectors;
-    m_stat.io_ticks = new_bstat.io_ticks;
+    if (!new_bstat.dstat_error && !new_bstat.vfs_error) {
+        m_stat.ts_sec = new_bstat.ts_sec;
+        m_stat.ts_usec = new_bstat.ts_usec;
+        m_stat.read_ticks = new_bstat.read_ticks;
+        m_stat.write_ticks = new_bstat.write_ticks;
+        m_stat.read_sectors = new_bstat.read_sectors;
+        m_stat.io_ticks = new_bstat.io_ticks;
+    } else {
+        memset(&m_stat, 0, sizeof(m_stat));
+    }
 }
 
 void FS::update_status()
