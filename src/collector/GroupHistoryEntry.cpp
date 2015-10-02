@@ -62,16 +62,13 @@ int GroupHistoryEntry::parse_backend(mongo::BSONObj & obj, BackendObj & backend)
         const char *field_name = elem.fieldName();
 
         if (!std::strcmp(field_name, "backend_id")) {
-            if (elem.type() == mongo::NumberDouble)
-                backend.backend_id = int(elem.Double());
-            else if (elem.type() == mongo::NumberInt)
-                backend.backend_id = elem.Int();
+            backend.backend_id = elem.Number();
         } else if (!std::strcmp(field_name, "hostname")) {
             backend.hostname = elem.String();
         } else if (!std::strcmp(field_name, "port")) {
-            backend.port = elem.Int();
+            backend.port = elem.Number();
         } else if (!std::strcmp(field_name, "family")) {
-            backend.family = elem.Int();
+            backend.family = elem.Number();
         }
     }
 
@@ -131,11 +128,9 @@ int GroupHistoryEntry::init(mongo::BSONObj & obj)
         const char *field_name = elem1.fieldName();
 
         try {
+            BH_LOG(app::logger(), DNET_LOG_DEBUG, "field name %s", field_name);
             if (!std::strcmp(field_name, "group_id")) {
-                if (elem1.type() == mongo::NumberDouble)
-                    m_group_id = int(elem1.Double());
-                else if (elem1.type() == mongo::NumberInt)
-                    m_group_id = elem1.Int();
+                m_group_id = elem1.Number();
             } else if (!std::strcmp(field_name, "nodes")) {
                 std::vector<mongo::BSONElement> nodes = elem1.Array();
                 for (mongo::BSONElement & elem2 : nodes) {
