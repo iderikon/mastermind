@@ -69,6 +69,7 @@ struct Config
     uint64_t metadata_connect_timeout_ms;
     std::string jobs_db;
     std::string inventory_db;
+    std::string history_db;
     std::string collector_inventory;
     uint64_t infrastructure_dc_cache_update_period;
     uint64_t infrastructure_dc_cache_valid_time;
@@ -93,6 +94,7 @@ struct Config
             "metadata_connect_timeout_ms: "           << metadata_connect_timeout_ms << "\n"
             "jobs_db: "                               << jobs_db << "\n"
             "inventory_db: "                          << inventory_db << "\n"
+            "history_db: "                            << history_db << "\n"
             "collector_inventory: "                   << collector_inventory << "\n"
             "infrastructure_dc_cache_update_period: " << infrastructure_dc_cache_update_period << "\n"
             "infrastructure_dc_cache_valid_time: "    << infrastructure_dc_cache_valid_time << "\n"

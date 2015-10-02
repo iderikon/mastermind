@@ -1,7 +1,7 @@
 add_executable(mastermind-collector
     Discovery.cpp Node.cpp Parser.cpp Host.cpp
     StatsParser.cpp Metrics.cpp Namespace.cpp
-    Storage.cpp Group.cpp Couple.cpp
+    Storage.cpp Group.cpp Couple.cpp GroupHistoryEntry.cpp
     ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp
     FS.cpp FilterParser.cpp Backend.cpp Inventory.cpp
     Filter.cpp Round.cpp Collector.cpp Job.cpp main.cpp)

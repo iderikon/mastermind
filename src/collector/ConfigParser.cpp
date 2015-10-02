@@ -39,17 +39,18 @@ enum ConfigKey
     Url                               = 0x2000,
     Jobs                              = 0x4000,
     Inventory                         = 0x8000,
-    Db                                = 0x10000,
-    Options                           = 0x20000,
-    ConnectTimeoutMS                  = 0x40000,
-    CollectorInventory                = 0x80000,
-    ForbiddenDcSharingAmongGroups     = 0x100000,
-    NodeBackendStatStaleTimeout       = 0x200000,
-    Cache                             = 0x400000,
-    GroupPathPrefix                   = 0x800000,
-    ForbiddenNsWithoutSettings        = 0x1000000,
-    InfrastructureDcCacheUpdatePeriod = 0x2000000,
-    InfrastructureDcCacheValidTime    = 0x4000000
+    History                           = 0x10000,
+    Db                                = 0x20000,
+    Options                           = 0x40000,
+    ConnectTimeoutMS                  = 0x80000,
+    CollectorInventory                = 0x100000,
+    ForbiddenDcSharingAmongGroups     = 0x200000,
+    NodeBackendStatStaleTimeout       = 0x400000,
+    Cache                             = 0x800000,
+    GroupPathPrefix                   = 0x1000000,
+    ForbiddenNsWithoutSettings        = 0x2000000,
+    InfrastructureDcCacheUpdatePeriod = 0x4000000,
+    InfrastructureDcCacheValidTime    = 0x8000000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -78,12 +79,14 @@ std::vector<Parser::FolderVector> config_folders = {
         { "url",               Metadata,  Url             },
         { "jobs",              Metadata,  Jobs            },
         { "inventory",         Metadata,  Inventory       },
+        { "history",           Metadata,  History         },
         { "options",           Metadata,  Options         },
         { "group_path_prefix", Cache,     GroupPathPrefix }
     },
     {
         { "db",               Metadata|Jobs,      Db               },
         { "db",               Metadata|Inventory, Db               },
+        { "db",               Metadata|History,   Db               },
         { "connectTimeoutMS", Metadata|Options,   ConnectTimeoutMS }
     }
 };
@@ -110,6 +113,7 @@ Parser::StringInfoVector config_string_info = {
     { Metadata|Url,          offsetof(Config, metadata_url)            },
     { Metadata|Jobs|Db,      offsetof(Config, jobs_db)                 },
     { Metadata|Inventory|Db, offsetof(Config, inventory_db)            },
+    { Metadata|History|Db,   offsetof(Config, history_db)              },
     { CollectorInventory,    offsetof(Config, collector_inventory)     },
     { Cache|GroupPathPrefix, offsetof(Config, cache_group_path_prefix) }
 };

@@ -63,7 +63,7 @@ private:
 
     int cache_db_connect();
 
-    void cache_db_add(const HostInfo & info);
+    void cache_db_update(const HostInfo & info, bool existing);
 
     std::vector<HostInfo> load_cache_db();
 
@@ -71,7 +71,7 @@ private:
 
     static void execute_reload(void *arg);
 
-    std::string fetch_from_driver(const std::string & addr);
+    std::string fetch_from_driver(const std::string & addr, bool update);
 
 private:
     std::map<std::string, HostInfo> m_host_info;

@@ -53,6 +53,13 @@ inline void clock_get(uint64_t & value)
     value = ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
 
+inline void clock_get_real(uint64_t & value)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    value = ts.tv_sec * 1000000000 + ts.tv_nsec;
+}
+
 inline void clock_start(uint64_t & value)
 {
     clock_get(value);
