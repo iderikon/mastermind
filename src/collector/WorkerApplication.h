@@ -21,7 +21,6 @@
 
 #include "Collector.h"
 #include "Config.h"
-#include "Inventory.h"
 
 #include <cocaine/framework/dispatch.hpp>
 #include <elliptics/logger.hpp>
@@ -40,15 +39,11 @@ public:
     Collector & get_collector()
     { return m_collector; }
 
-    Inventory & get_inventory()
-    { return m_inventory; }
-
 private:
     static void load_config();
 
 private:
     Collector m_collector;
-    Inventory m_inventory;
 };
 
 namespace app

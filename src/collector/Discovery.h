@@ -23,13 +23,13 @@
 
 #include <memory>
 
+class Collector;
 class Round;
-class WorkerApplication;
 
 class Discovery
 {
 public:
-    Discovery(WorkerApplication & app);
+    Discovery(Collector & collector);
     ~Discovery();
 
     int init_curl();
@@ -45,7 +45,7 @@ public:
     { return m_resolve_nodes_duration; }
 
 private:
-    WorkerApplication & m_app;
+    Collector & m_collector;
 
     std::unique_ptr<ioremap::elliptics::node> m_node;
     std::unique_ptr<ioremap::elliptics::session> m_session;

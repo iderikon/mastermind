@@ -178,8 +178,8 @@ void Round::step2_1_jobs(void *arg)
             return;
         }
 
-        std::ostringstream db_ostr;
-        db_ostr << config.jobs_db << ".jobs";
+        std::ostringstream collection_ostr;
+        collection_ostr << config.jobs_db << ".jobs";
 
         mongo::BSONObjBuilder builder;
         builder.append("id", 1);
@@ -188,7 +188,7 @@ void Round::step2_1_jobs(void *arg)
         builder.append("type", 1);
         mongo::BSONObj fields = builder.obj();
 
-        std::auto_ptr<mongo::DBClientCursor> cursor = conn->query(db_ostr.str(),
+        std::auto_ptr<mongo::DBClientCursor> cursor = conn->query(collection_ostr.str(),
                 MONGO_QUERY("status" << mongo::NE << "completed"
                          << "status" << mongo::NE << "cancelled").readPref(
                              mongo::ReadPreference_PrimaryOnly, mongo::BSONArray()),

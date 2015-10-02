@@ -20,6 +20,7 @@
 #define __4e5e1746_2d12_42c1_9384_b1a59c632ca3
 
 #include "Discovery.h"
+#include "Inventory.h"
 #include "Round.h"
 #include "Storage.h"
 
@@ -41,6 +42,9 @@ public:
 
     Discovery & get_discovery()
     { return m_discovery; }
+
+    Inventory & get_inventory()
+    { return m_inventory; }
 
     Storage & get_storage()
     { return *m_storage; }
@@ -75,6 +79,8 @@ private:
 
 private:
     Discovery m_discovery;
+    Inventory m_inventory;
+
     dispatch_queue_t m_queue;
 
     std::unique_ptr<Storage> m_storage;

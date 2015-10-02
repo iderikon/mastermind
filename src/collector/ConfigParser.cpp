@@ -38,15 +38,18 @@ enum ConfigKey
     Metadata                          = 0x1000,
     Url                               = 0x2000,
     Jobs                              = 0x4000,
-    Db                                = 0x8000,
-    Options                           = 0x10000,
-    ConnectTimeoutMS                  = 0x20000,
-    CollectorInventory                = 0x40000,
-    ForbiddenDcSharingAmongGroups     = 0x80000,
-    NodeBackendStatStaleTimeout       = 0x100000,
-    Cache                             = 0x200000,
-    GroupPathPrefix                   = 0x400000,
-    ForbiddenNsWithoutSettings        = 0x800000
+    Inventory                         = 0x8000,
+    Db                                = 0x10000,
+    Options                           = 0x20000,
+    ConnectTimeoutMS                  = 0x40000,
+    CollectorInventory                = 0x80000,
+    ForbiddenDcSharingAmongGroups     = 0x100000,
+    NodeBackendStatStaleTimeout       = 0x200000,
+    Cache                             = 0x400000,
+    GroupPathPrefix                   = 0x800000,
+    ForbiddenNsWithoutSettings        = 0x1000000,
+    InfrastructureDcCacheUpdatePeriod = 0x2000000,
+    InfrastructureDcCacheValidTime    = 0x4000000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -64,6 +67,8 @@ std::vector<Parser::FolderVector> config_folders = {
         { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
         { "metadata",                              0, Metadata                          },
         { "collector_inventory",                   0, CollectorInventory                },
+        { "infrastructure_dc_cache_update_period", 0, InfrastructureDcCacheUpdatePeriod },
+        { "infrastructure_dc_cache_valid_time",    0, InfrastructureDcCacheValidTime    },
         { "cache",                                 0, Cache                             }
     },
     {
@@ -72,12 +77,14 @@ std::vector<Parser::FolderVector> config_folders = {
         { "wait_timeout",      Elliptics, WaitTimeout     },
         { "url",               Metadata,  Url             },
         { "jobs",              Metadata,  Jobs            },
+        { "inventory",         Metadata,  Inventory       },
         { "options",           Metadata,  Options         },
         { "group_path_prefix", Cache,     GroupPathPrefix }
     },
     {
-        { "db",               Metadata|Jobs,    Db               },
-        { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS }
+        { "db",               Metadata|Jobs,      Db               },
+        { "db",               Metadata|Inventory, Db               },
+        { "connectTimeoutMS", Metadata|Options,   ConnectTimeoutMS }
     }
 };
 
@@ -95,11 +102,14 @@ Parser::UIntInfoVector config_uint_info = {
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
     { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata_connect_timeout_ms)           },
+    { InfrastructureDcCacheUpdatePeriod, SET, offsetof(Config, infrastructure_dc_cache_update_period) },
+    { InfrastructureDcCacheValidTime,    SET, offsetof(Config, infrastructure_dc_cache_valid_time)    }
 };
 
 Parser::StringInfoVector config_string_info = {
     { Metadata|Url,          offsetof(Config, metadata_url)            },
     { Metadata|Jobs|Db,      offsetof(Config, jobs_db)                 },
+    { Metadata|Inventory|Db, offsetof(Config, inventory_db)            },
     { CollectorInventory,    offsetof(Config, collector_inventory)     },
     { Cache|GroupPathPrefix, offsetof(Config, cache_group_path_prefix) }
 };

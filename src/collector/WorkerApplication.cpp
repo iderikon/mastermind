@@ -74,12 +74,6 @@ void WorkerApplication::init()
 
     if (m_collector.init())
         throw std::runtime_error("failed to initialize collector");
-
-    if (!s_config.collector_inventory.empty()) {
-        BH_LOG(*s_logger, DNET_LOG_INFO, "Opening inventory from %s",
-                s_config.collector_inventory.c_str());
-        m_inventory.open_shared_library(s_config.collector_inventory);
-    }
 }
 
 void WorkerApplication::start()

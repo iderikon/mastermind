@@ -26,7 +26,7 @@
 
 Collector::Collector(WorkerApplication & app)
     :
-    m_discovery(app),
+    m_discovery(*this),
     m_storage_version(1)
 {
     m_queue = dispatch_queue_create("collector", DISPATCH_QUEUE_CONCURRENT);
@@ -43,12 +43,17 @@ int Collector::init()
         return -1;
     if (m_discovery.init_mongo())
         return -1;
+    if (m_inventory.init())
+        return -1;
     return 0;
 }
 
 void Collector::start()
 {
-    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting inventory");
+    m_inventory.start();
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: dispatching step 1");
     dispatch_async_f(m_queue, this, &Collector::step1_start_round);
 }
 

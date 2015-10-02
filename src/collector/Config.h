@@ -47,7 +47,9 @@ struct Config
         net_thread_num(3),
         io_thread_num(3),
         nonblocking_io_thread_num(3),
-        metadata_connect_timeout_ms(5000)
+        metadata_connect_timeout_ms(5000),
+        infrastructure_dc_cache_update_period(150),
+        infrastructure_dc_cache_valid_time(604800)
     {}
 
     uint64_t monitor_port;
@@ -66,7 +68,10 @@ struct Config
     std::string metadata_url;
     uint64_t metadata_connect_timeout_ms;
     std::string jobs_db;
+    std::string inventory_db;
     std::string collector_inventory;
+    uint64_t infrastructure_dc_cache_update_period;
+    uint64_t infrastructure_dc_cache_valid_time;
     std::string cache_group_path_prefix;
 
     void print(std::ostringstream & ostr) const
@@ -87,7 +92,10 @@ struct Config
             "metadata_url: "                          << metadata_url << "\n"
             "metadata_connect_timeout_ms: "           << metadata_connect_timeout_ms << "\n"
             "jobs_db: "                               << jobs_db << "\n"
+            "inventory_db: "                          << inventory_db << "\n"
             "collector_inventory: "                   << collector_inventory << "\n"
+            "infrastructure_dc_cache_update_period: " << infrastructure_dc_cache_update_period << "\n"
+            "infrastructure_dc_cache_valid_time: "    << infrastructure_dc_cache_valid_time << "\n"
             "cache_group_path_prefix: "               << cache_group_path_prefix << "\n"
             "nodes:\n";
         for (const NodeInfo & node : nodes)
