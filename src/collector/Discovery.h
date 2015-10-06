@@ -26,6 +26,11 @@
 class Round;
 class WorkerApplication;
 
+// Discovery is responsible for maintaining elliptics connection,
+// root session, provides Storage with a list of nodes, and
+// performs global initialization and deinitialization of cURL,
+// elliptics, and MongoDB driver. Only a single instance of
+// this object is created.
 class Discovery
 {
 public:
@@ -34,11 +39,15 @@ public:
 
     int init_curl();
     int init_elliptics();
+    int init_mongo();
 
     ioremap::elliptics::session & get_session()
     { return *m_session; }
 
     void resolve_nodes(Round & round);
+
+    void stop_mongo();
+    void stop_curl();
 
 private:
     WorkerApplication & m_app;
