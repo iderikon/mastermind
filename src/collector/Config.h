@@ -20,7 +20,7 @@
 #define __106a1cb9_f3de_4358_86b0_b357cbd4855c
 
 #include <cstdint>
-#include <sstream>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -44,7 +44,9 @@ struct Config
         net_thread_num(3),
         io_thread_num(3),
         nonblocking_io_thread_num(3)
-    {}
+    {
+        metadata.options.connectTimeoutMS = 5000;
+    }
 
     uint64_t monitor_port;
     uint64_t wait_timeout;
@@ -57,27 +59,47 @@ struct Config
     uint64_t nonblocking_io_thread_num;
     std::vector<NodeInfo> nodes;
 
-    void print(std::ostringstream & ostr) const
-    {
-        ostr <<
-            "monitor_port: "                          << monitor_port << "\n"
-            "wait_timeout: "                          << wait_timeout << "\n"
-            "forbidden_dht_groups: "                  << forbidden_dht_groups << "\n"
-            "forbidden_unmatched_group_total_space: " << forbidden_unmatched_group_total_space << "\n"
-            "reserved_space: "                        << reserved_space << "\n"
-            "dnet_log_mask: "                         << dnet_log_mask << "\n"
-            "net_thread_num: "                        << net_thread_num << "\n"
-            "io_thread_num: "                         << io_thread_num << "\n"
-            "nonblocking_io_thread_num: "             << nonblocking_io_thread_num << "\n"
-            "nodes:\n";
-        for (const NodeInfo & node : nodes)
-            ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';
-    }
+    struct {
+        std::string url;
+        struct {
+            uint64_t connectTimeoutMS;
+        } options;
+        struct {
+            std::string db;
+        } jobs;
+    } metadata;
 
     constexpr static const char *config_file        = "/etc/elliptics/mastermind.conf";
     constexpr static const char *log_file           = "/var/log/mastermind/mastermind-collector.log";
     constexpr static const char *elliptics_log_file = "/var/log/mastermind/elliptics-collector.log";
 };
+
+inline std::ostream & operator << (std::ostream & ostr, const Config & config)
+{
+    ostr <<
+        "monitor_port: "                          << config.monitor_port << "\n"
+        "wait_timeout: "                          << config.wait_timeout << "\n"
+        "forbidden_dht_groups: "                  << config.forbidden_dht_groups << "\n"
+        "forbidden_unmatched_group_total_space: " << config.forbidden_unmatched_group_total_space << "\n"
+        "reserved_space: "                        << config.reserved_space << "\n"
+        "dnet_log_mask: "                         << config.dnet_log_mask << "\n"
+        "net_thread_num: "                        << config.net_thread_num << "\n"
+        "io_thread_num: "                         << config.io_thread_num << "\n"
+        "nonblocking_io_thread_num: "             << config.nonblocking_io_thread_num << "\n"
+        "metadata: {\n"
+        "  url: "                                 << config.metadata.url << "\n"
+        "  options: {\n"
+        "    metadata_connect_timeout_ms: "       << config.metadata.options.connectTimeoutMS << "\n"
+        "  }\n"
+        "  jobs: {\n"
+        "    db: "                                << config.metadata.jobs.db << "\n"
+        "  }\n"
+        "}\n"
+        "nodes:\n";
+    for (const Config::NodeInfo & node : config.nodes)
+        ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';
+    return ostr;
+}
 
 #endif
 

@@ -16,10 +16,11 @@
    License along with Mastermind.
 */
 
-#include "Storage.h"
 #include "CocaineHandlers.h"
 #include "ConfigParser.h"
 #include "WorkerApplication.h"
+
+#include "Storage.h"
 
 #include <elliptics/logger.hpp>
 #include <rapidjson/reader.h>
@@ -59,10 +60,8 @@ void WorkerApplication::init()
     m_elliptics_logger.reset(new ioremap::elliptics::file_logger(
             Config::elliptics_log_file, ioremap::elliptics::log_level(m_config.dnet_log_mask)));
 
-    std::ostringstream ostr;
-    ostr << "Loaded config from " << Config::config_file << ":\n";
-    m_config.print(ostr);
-    BH_LOG(get_logger(), DNET_LOG_INFO, "%s", ostr.str().c_str());
+    const char *config_file = Config::config_file;
+    BH_LOG(get_logger(), DNET_LOG_INFO, "Loaded config from %s:\n%s", config_file, m_config);
 
     if (m_collector.init())
         throw std::runtime_error("failed to initialize collector");
