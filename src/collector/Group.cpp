@@ -381,7 +381,7 @@ void Group::set_coupled_status(bool ok, uint64_t timestamp)
             m_internal_status == BAD_InconsistentCouple ||
             m_internal_status == BAD_DifferentMetadata ||
             m_internal_status == MIGRATING_ServiceMigrating ||
-            RO_HaveROBackends)
+            m_internal_status == RO_HaveROBackends)
         return;
 
     InternalStatus new_internal_status = ok ? COUPLED_Coupled : BAD_CoupleBAD;
