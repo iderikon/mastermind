@@ -26,6 +26,8 @@
 #include <string>
 #include <vector>
 
+#include "Job.h"
+
 class Backend;
 class Couple;
 class Filter;
@@ -46,6 +48,7 @@ class Group
         BAD_InconsistentCouple,
         BAD_DifferentMetadata,
         BAD_CoupleBAD,
+        BAD_NoActiveJob,
         MIGRATING_ServiceMigrating,
         RO_HaveROBackends,
         COUPLED_MetadataOK,
@@ -90,6 +93,11 @@ public:
 
     uint64_t get_total_space() const;
 
+    bool has_active_job() const;
+
+    // have_active_job() must be checked first
+    const Job & get_active_job() const;
+
     const std::string & get_namespace_name() const
     { return m_metadata.namespace_name; }
 
@@ -101,9 +109,6 @@ public:
 
     int get_version() const
     { return m_metadata.version; }
-
-    bool get_service_migrating() const
-    { return m_metadata.service.migrating; }
 
     void add_backend(Backend & backend);
 
@@ -121,6 +126,9 @@ public:
     uint64_t get_backend_update_time() const;
 
     void set_namespace(Namespace & ns);
+
+    void set_active_job(const Job & job);
+    void clear_active_job();
 
     void update_status(bool forbidden_dht);
     void set_coupled_status(bool ok, uint64_t timestamp);
@@ -179,11 +187,12 @@ private:
     bool m_metadata_parsed;
     uint64_t m_metadata_parse_duration;
 
-    // Pointers to a couple and a namespace of this group. If the information is
-    // unknown, e.g. metadata was not loaded, the values are set to nullptr.
-    // These objects shouldn't be modified directly but only used for status
-    // checks and by push_items().
+    // Pointers to a couple, active job, and a namespace of this group.
+    // If the information is unknown, e.g. metadata was not loaded,
+    // the values are set to nullptr. These objects shouldn't be modified
+    // directly but only used for status checks and by push_items().
     Couple *m_couple;
+    const Job *m_active_job;
     Namespace *m_namespace;
 
     std::string m_status_text;

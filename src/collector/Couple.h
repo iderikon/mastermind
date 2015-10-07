@@ -47,6 +47,8 @@ class Couple
         BROKEN_GroupBROKEN,
         FROZEN_Frozen,
         FULL_Full,
+        SERVICE_ACTIVE_ServiceActive,
+        SERVICE_STALLED_ServiceStalled,
         OK_OK
     };
 
@@ -99,6 +101,9 @@ public:
 
     uint64_t get_update_status_duration() const
     { return m_update_status_duration; }
+
+private:
+    void account_job_in_status();
 
 private:
     std::string m_key;

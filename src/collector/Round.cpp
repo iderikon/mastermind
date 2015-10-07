@@ -224,7 +224,7 @@ void Round::step2_1_jobs(void *arg)
         BH_LOG(self.get_app().get_logger(), DNET_LOG_INFO,
                 "Successfully processed %lu of %lu active jobs", jobs.size(), count);
 
-        // self.m_storage->save_new_jobs(std::move(jobs), ts);
+        self.m_storage->save_new_jobs(std::move(jobs), ts);
 
     } catch (const mongo::DBException & e) {
         BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
@@ -258,7 +258,7 @@ void Round::step3_prepare_metadata_download(void *arg)
     clock_stop(self.m_clock.finish_monitor_stats_and_jobs);
 
     self.m_storage->update_group_structure();
-    // self.m_storage->process_new_jobs();
+    self.m_storage->process_new_jobs();
 
     self.m_nr_groups = (self.m_type != FORCED_PARTIAL
             ? self.m_storage->get_groups().size()

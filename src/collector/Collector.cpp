@@ -242,6 +242,7 @@ void Collector::execute_summary(void *arg)
     std::map<std::string, Node> & nodes = self.m_storage->get_nodes();
     std::map<int, Group> & groups = self.m_storage->get_groups();
     std::map<std::string, Couple> & couples = self.m_storage->get_couples();
+    std::map<int, Job> & jobs = self.m_storage->get_jobs();
 
     std::map<Backend::Status, int> backend_status;
     std::map<Group::Status, int> group_status;
@@ -271,6 +272,9 @@ void Collector::execute_summary(void *arg)
             ++fs_status[fsit->second.get_status()];
     }
 
+    for (auto it = jobs.begin(); it != jobs.end(); ++it)
+        ++job_status[it->second.get_status()];
+
     std::ostringstream ostr;
 
     ostr << "Storage contains:\n"
@@ -293,7 +297,11 @@ void Collector::execute_summary(void *arg)
         ostr << it->second << ' ' << Couple::status_str(it->first) << ' ';
     ostr << ")\n";
 
-    ostr << self.m_storage->get_namespaces().size() << " namespaces\n";
+    ostr << self.m_storage->get_namespaces().size() << " namespaces\n"
+         << jobs.size() << " jobs\n  ( ";
+    for (auto it = job_status.begin(); it != job_status.end(); ++it)
+        ostr << it->second << ' ' << Job::status_str(it->first) << ' ';
+    ostr << ")\n";
 
     ostr << "Round metrics:\n"
             "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"

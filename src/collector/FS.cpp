@@ -21,8 +21,9 @@
 #include "FS.h"
 #include "Metrics.h"
 #include "Node.h"
-#include "Storage.h"
 #include "WorkerApplication.h"
+
+#include "Storage.h"
 
 FS::FS(Node & node, uint64_t fsid)
     :
