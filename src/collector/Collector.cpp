@@ -22,6 +22,8 @@
 #include "Node.h"
 #include "WorkerApplication.h"
 
+#include "Job.h"
+
 Collector::Collector(WorkerApplication & app)
     :
     m_app(app),
@@ -36,11 +38,24 @@ Collector::Collector(WorkerApplication & app)
 
 int Collector::init()
 {
-    if (m_discovery.init_curl())
-        return -1;
-    if (m_discovery.init_elliptics())
-        return -1;
-    return 0;
+    do {
+        if (m_discovery.init_curl())
+            return -1;
+
+        if (m_discovery.init_elliptics())
+            break;
+
+        if (m_discovery.init_mongo()) {
+            m_discovery.stop_elliptics();
+            break;
+        }
+
+        return 0;
+    }
+    while (0);
+
+    m_discovery.stop_curl();
+    return -1;
 }
 
 void Collector::start()
@@ -52,6 +67,13 @@ void Collector::start()
 void Collector::finalize_round(Round *round)
 {
     dispatch_barrier_async_f(m_queue, round, &Collector::step5_compare_and_swap);
+}
+
+void Collector::stop()
+{
+    m_discovery.stop_mongo();
+    m_discovery.stop_elliptics();
+    m_discovery.stop_curl();
 }
 
 void Collector::step1_start_round(void *arg)
@@ -225,6 +247,7 @@ void Collector::execute_summary(void *arg)
     std::map<Group::Status, int> group_status;
     std::map<Couple::Status, int> couple_status;
     std::map<FS::Status, int> fs_status;
+    std::map<Job::Status, int> job_status;
     size_t nr_backends = 0;
     size_t nr_filesystems = 0;
 
@@ -274,9 +297,10 @@ void Collector::execute_summary(void *arg)
 
     ostr << "Round metrics:\n"
             "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"
+            "  Jobs database: " << MSEC(self.m_round_clock.jobs_database) << " ms\n"
             "  HTTP download time: " << MSEC(self.m_round_clock.perform_download) << " ms\n"
-            "  Remaining JSON parsing after HTTP download completed: "
-                << MSEC(self.m_round_clock.finish_monitor_stats) << " ms\n"
+            "  Remaining JSON parsing and jobs processing after HTTP download completed: "
+                << MSEC(self.m_round_clock.finish_monitor_stats_and_jobs) << " ms\n"
             "  Metadata download: " << MSEC(self.m_round_clock.metadata_download) << " ms\n"
             "  Storage update: " << MSEC(self.m_round_clock.storage_update) << " ms\n"
             "  Storage merge: " << MSEC(self.m_round_clock.merge_time) << " ms\n";

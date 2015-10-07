@@ -136,6 +136,12 @@ void Discovery::stop_mongo()
     mongo::client::shutdown();
 }
 
+void Discovery::stop_elliptics()
+{
+    m_session.reset();
+    m_node.reset();
+}
+
 void Discovery::stop_curl()
 {
     curl_global_cleanup();

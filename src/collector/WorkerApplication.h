@@ -32,9 +32,11 @@ class WorkerApplication
 public:
     WorkerApplication();
     WorkerApplication(cocaine::framework::dispatch_t & d);
+    ~WorkerApplication();
 
     void init();
     void start();
+    void stop();
 
     ioremap::elliptics::logger_base & get_logger()
     { return *m_logger; }
@@ -60,6 +62,8 @@ private:
 
     Config m_config;
     Collector m_collector;
+
+    bool m_initialized;
 };
 
 #endif

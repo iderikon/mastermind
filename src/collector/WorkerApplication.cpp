@@ -33,7 +33,8 @@ WorkerApplication::WorkerApplication()
     :
     m_logger(nullptr),
     m_elliptics_logger(nullptr),
-    m_collector(*this)
+    m_collector(*this),
+    m_initialized(false)
 {}
 
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
@@ -48,6 +49,11 @@ WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     d.on<on_refresh>("refresh", *this);
 
     start();
+}
+
+WorkerApplication::~WorkerApplication()
+{
+    stop();
 }
 
 void WorkerApplication::init()
@@ -65,6 +71,17 @@ void WorkerApplication::init()
 
     if (m_collector.init())
         throw std::runtime_error("failed to initialize collector");
+
+    m_initialized = true;
+}
+
+void WorkerApplication::stop()
+{
+    // invoke stop() exactly one time
+    if (m_initialized) {
+        m_collector.stop();
+        m_initialized = false;
+    }
 }
 
 void WorkerApplication::start()

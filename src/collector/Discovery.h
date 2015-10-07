@@ -47,6 +47,7 @@ public:
     void resolve_nodes(Round & round);
 
     void stop_mongo();
+    void stop_elliptics();
     void stop_curl();
 
 private:

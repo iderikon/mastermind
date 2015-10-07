@@ -22,7 +22,10 @@
 #include "Round.h"
 #include "WorkerApplication.h"
 
+#include "Job.h"
+
 #include <errno.h>
+#include <mongo/client/dbclient.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
 
@@ -145,10 +148,97 @@ void Round::start()
             (m_type == REGULAR) ? "regular" : (m_type == FORCED_FULL) ? "forced full" : "forced partial",
             (m_type == FORCED_PARTIAL ? m_entries.nodes.size() : m_storage->get_nodes().size()));
 
-    dispatch_async_f(m_queue, this, &Round::step2_curl_download);
+    dispatch_async_f(m_queue, this, &Round::step2_1_jobs);
+    dispatch_async_f(m_queue, this, &Round::step2_2_curl_download);
 }
 
-void Round::step2_curl_download(void *arg)
+void Round::step2_1_jobs(void *arg)
+{
+    Round & self = *static_cast<Round*>(arg);
+
+    Stopwatch watch(self.m_clock.jobs_database);
+
+    try {
+        const Config & config = self.get_app().get_config();
+
+        if (config.metadata.url.empty() || config.metadata.jobs.db.empty()) {
+            BH_LOG(self.get_app().get_logger(), DNET_LOG_WARNING,
+                    "Not connecting to jobs database because it was not configured");
+            return;
+        }
+
+        std::string errmsg;
+        mongo::ConnectionString cs = mongo::ConnectionString::parse(config.metadata.url, errmsg);
+        if (!cs.isValid()) {
+            BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                    "Mongo client ConnectionString error: %s", errmsg.c_str());
+            return;
+        }
+
+        std::unique_ptr<mongo::DBClientReplicaSet> conn((mongo::DBClientReplicaSet *) cs.connect(
+                errmsg, double(config.metadata.options.connectTimeoutMS) / 1000.0));
+        if (conn == nullptr) {
+            BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                    "Connection failed: %s", errmsg.c_str());
+            return;
+        }
+
+        mongo::BSONObjBuilder builder;
+        builder.append("id", 1);
+        builder.append("status", 1);
+        builder.append("group", 1);
+        builder.append("type", 1);
+        mongo::BSONObj fields = builder.obj();
+
+        std::unique_ptr<mongo::DBClientCursor> cursor(conn->query(config.metadata.jobs.db + ".jobs",
+                MONGO_QUERY("status" << mongo::NE << "completed"
+                         << "status" << mongo::NE << "cancelled").readPref(
+                             mongo::ReadPreference_PrimaryOnly, mongo::BSONArray()),
+                0, 0, &fields).release());
+
+        uint64_t ts = 0;
+        clock_get(ts);
+        std::vector<Job> jobs;
+        size_t count = 0;
+
+        while (cursor->more()) {
+            mongo::BSONObj obj = cursor->next();
+            try {
+                Job job(obj, ts);
+                jobs.emplace_back(std::move(job));
+            } catch (const mongo::MsgAssertionException & e) {
+                BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                        "Failed to parse database record: %s\nBSON object: %s",
+                        e.what(), obj.jsonString(mongo::Strict, 1));
+            } catch (const std::exception & e) {
+                BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                        "Failed to initialize job: %s\nBSON object: %s",
+                        e.what(), obj.jsonString(mongo::Strict, 1));
+            } catch (...) {
+                BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                        "Initializing job: Unknown exception thrown");
+            }
+            ++count;
+        }
+
+        BH_LOG(self.get_app().get_logger(), DNET_LOG_INFO,
+                "Successfully processed %lu of %lu active jobs", jobs.size(), count);
+
+        // self.m_storage->save_new_jobs(std::move(jobs), ts);
+
+    } catch (const mongo::DBException & e) {
+        BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                "MongoDB thrown exception: %s", e.what());
+    } catch (const std::exception & e) {
+        BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                "Exception thrown while connecting to jobs database: %s", e.what());
+    } catch (...) {
+        BH_LOG(self.get_app().get_logger(), DNET_LOG_ERROR,
+                "Unknown exception thrown while connecting to jobs database");
+    }
+}
+
+void Round::step2_2_curl_download(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
 
@@ -157,7 +247,7 @@ void Round::step2_curl_download(void *arg)
 
     self.perform_download();
 
-    clock_start(self.m_clock.finish_monitor_stats);
+    clock_start(self.m_clock.finish_monitor_stats_and_jobs);
     dispatch_barrier_async_f(self.m_queue, &self, &Round::step3_prepare_metadata_download);
 }
 
@@ -165,9 +255,10 @@ void Round::step3_prepare_metadata_download(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
 
-    clock_stop(self.m_clock.finish_monitor_stats);
+    clock_stop(self.m_clock.finish_monitor_stats_and_jobs);
 
     self.m_storage->update_group_structure();
+    // self.m_storage->process_new_jobs();
 
     self.m_nr_groups = (self.m_type != FORCED_PARTIAL
             ? self.m_storage->get_groups().size()
