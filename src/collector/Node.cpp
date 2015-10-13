@@ -121,7 +121,7 @@ void Node::parse_stats(void *arg)
 
     if (!backend_parser.good()) {
         BH_LOG(self->m_storage.get_app().get_logger(), DNET_LOG_ERROR,
-                "Error parsing backend statistics");
+                "Error parsing backend statistics for node %s", self->m_key.c_str());
         return;
     }
 }
@@ -329,6 +329,8 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_port);
     writer.Key("family");
     writer.Uint64(m_family);
+    writer.Key("dc");
+    writer.String(m_dc.c_str());
 
     writer.Key("tx_bytes");
     writer.Uint64(m_stat.tx_bytes);

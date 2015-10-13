@@ -70,6 +70,12 @@ public:
     const std::string & get_key() const
     { return m_key; }
 
+    void set_dc(const std::string & dc)
+    { m_dc = dc; }
+
+    const std::string & get_dc() const
+    { return m_dc; }
+
     const NodeStat & get_stat() const
     { return m_stat; }
 
@@ -137,8 +143,8 @@ private:
     std::string m_host;
     int m_port;
     int m_family;
-
     std::string m_key;
+    std::string m_dc;
 
     // backend and procfs statistics downloaded using HTTP
     std::string m_download_data;
