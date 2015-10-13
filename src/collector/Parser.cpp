@@ -39,6 +39,14 @@ struct FolderLess
 {
     bool operator () (const Parser::Folder & f1, const Parser::Folder & f2) const
     {
+        // NOT_MATCH tokens are always at the beginning. A folder can only
+        // contain single NOT_MATCH and optionally its complement.
+        if (*f1.str == *NOT_MATCH || *f2.str == *NOT_MATCH) {
+            if (*f1.str == *NOT_MATCH && *f2.str != *NOT_MATCH)
+                return true;
+            else
+                return false;
+        }
         if (f1.keys != f2.keys)
             return f1.keys < f2.keys;
         if (f1.str_hash != f2.str_hash)
@@ -74,17 +82,6 @@ struct FolderSearchLess
         if (f1.str[0] == *MATCH_ANY) {
             search.found_eq = true;
             return false;
-        }
-
-        if (f1.str[0] == *NOT_MATCH) {
-            // hash for NOT_MATCH keys is calculated beginning from the first
-            // character of a pattern, special character is not included
-            if (f1.str_hash != search.str_hash || std::strcmp(f1.str + 1, search.str)) {
-                search.found_eq = true;
-                return false;
-            }
-
-            return true;
         }
 
         if (f1.str_hash != search.str_hash)
@@ -237,8 +234,22 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
 
     FolderSearch search(m_keys - 1, str);
     int idx = m_depth - 1;
-    auto fold = std::lower_bound(m_folders[idx].begin(), m_folders[idx].end(),
-            search, FolderSearchLess());
+
+    // NOT_MATCH keys are always in the beginning
+    auto begin = m_folders[idx].begin();
+    for (; begin != m_folders[idx].end() && *begin->str == *NOT_MATCH; ++begin) {
+        if (begin->keys != (m_keys - 1))
+            continue;
+
+        // hash for NOT_MATCH keys is calculated beginning from the first
+        // character of a pattern, special character is not included
+        if (begin->str_hash != search.str_hash || std::strcmp(begin->str + 1, str)) {
+            m_keys |= begin->token;
+            return true;
+        }
+    }
+
+    auto fold = std::lower_bound(begin, m_folders[idx].end(), search, FolderSearchLess());
 
     if (search.found_eq)
         m_keys |= fold->token;

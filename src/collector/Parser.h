@@ -163,8 +163,7 @@
    There is another macro NOT_MATCH which follows an undesired value. For example,
    if we'd be interested in all objects except "3" we'd define the following structure:
    Note that these macros only make sense being a single case given previous matched
-   sequence of keys, i.e. Parser doesn't support conjunctions/disjunctions of such
-   conditions.
+   sequence of keys, or have an opposite condition in case of NOT_MATCH.
 
    { NOT_MATCH "3", Foo|Quux, QuuxID }
 
