@@ -92,12 +92,18 @@ Parser::UIntInfo config_uint_info[] = {
     { 0, 0, 0 }
 };
 
+Parser::StringInfo config_string_info[] = {
+    { Metadata|Url,     offsetof(Config, metadata.url)     },
+    { Metadata|Jobs|Db, offsetof(Config, metadata.jobs.db) },
+    { 0, 0 }
+};
+
 } // unnamed namespace
 
 ConfigParser::ConfigParser(Config & config)
     :
     super(config_folders, sizeof(config_folders)/sizeof(config_folders[0]),
-            config_uint_info, (uint8_t *) &config),
+            config_uint_info, config_string_info, (uint8_t *) &config),
     m_array_depth(0),
     m_config(config)
 {
@@ -107,13 +113,12 @@ ConfigParser::ConfigParser(Config & config)
 
 bool ConfigParser::String(const char* str, rapidjson::SizeType length, bool copy)
 {
-    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2)
+    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2) {
         m_current_node.host = std::string(str, length);
-    else if (m_keys == (Metadata|Url|1))
-        m_config.metadata.url = std::string(str, length);
-    else if (m_keys == (Metadata|Jobs|Db|1))
-        m_config.metadata.jobs.db = std::string(str, length);
-    return true;
+        return true;
+    }
+
+    return super::String(str, length, copy);
 }
 
 bool ConfigParser::StartArray()

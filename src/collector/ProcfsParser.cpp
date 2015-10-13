@@ -105,5 +105,5 @@ Parser::UIntInfo procfs_uint_info[] = {
 ProcfsParser::ProcfsParser()
     :
     super(procfs_folders, sizeof(procfs_folders)/sizeof(procfs_folders[0]),
-            procfs_uint_info, (uint8_t *) &m_stat)
+            procfs_uint_info, nullptr, (uint8_t *) &m_stat)
 {}

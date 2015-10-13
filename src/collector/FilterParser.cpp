@@ -69,7 +69,7 @@ Parser::UIntInfo filter_uint_info[] = {
 FilterParser::FilterParser(Filter & filter)
     :
     super(filter_folders, sizeof(filter_folders)/sizeof(filter_folders[0]),
-            filter_uint_info, (uint8_t *) &filter),
+            filter_uint_info, nullptr, (uint8_t *) &filter),
     m_filter(filter),
     m_array_depth(0)
 {}

@@ -158,7 +158,7 @@ Parser::UIntInfo backend_uint_info[] = {
 BackendParser::BackendParser(uint64_t ts_sec, uint64_t ts_usec, std::function<void(BackendStat&)> callback)
     :
     super(backend_folders, sizeof(backend_folders)/sizeof(backend_folders[0]),
-            backend_uint_info, (uint8_t *) &m_stat),
+            backend_uint_info, nullptr, (uint8_t *) &m_stat),
     m_ts_sec(ts_sec),
     m_ts_usec(ts_usec),
     m_callback(callback)
