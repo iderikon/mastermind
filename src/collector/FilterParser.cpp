@@ -93,22 +93,23 @@ bool FilterParser::String(const char* str, rapidjson::SizeType length, bool copy
         m_filter.filesystems.emplace_back(std::move(string));
         break;
     case ItemTypes:
-        if (length == 5 && !std::strncmp(str, "group", 5))
+        if (!std::strcmp(str, "group"))
             m_filter.item_types |= Filter::Group;
-        else if (length == 6 && !std::strncmp(str, "couple", 6))
+        else if (!std::strcmp(str, "couple"))
             m_filter.item_types |= Filter::Couple;
-        else if (length == 9 && !std::strncmp(str, "namespace", 5))
+        else if (!std::strcmp(str, "namespace"))
             m_filter.item_types |= Filter::Namespace;
-        else if (length == 4 && !std::strncmp(str, "node", 4))
+        else if (!std::strcmp(str, "node"))
             m_filter.item_types |= Filter::Node;
-        else if (length == 7 && !std::strncmp(str, "backend", 7))
+        else if (!std::strcmp(str, "backend"))
             m_filter.item_types |= Filter::Backend;
-        else if (length == 2 && !std::strncmp(str, "fs", 2))
+        else if (!std::strcmp(str, "fs"))
             m_filter.item_types |= Filter::FS;
-        else if (length == 3 && !std::strncmp(str, "job", 3))
+        else if (!std::strcmp(str, "job"))
             m_filter.item_types |= Filter::Job;
         else
             return false;
+        break;
     }
 
     return true;
