@@ -57,6 +57,8 @@ public:
 
     void finalize_round(Round *round);
 
+    void stop();
+
 public:
     void force_update(std::shared_ptr<on_force_update> handler);
     void get_snapshot(std::shared_ptr<on_get_snapshot> handler);

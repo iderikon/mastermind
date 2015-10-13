@@ -16,6 +16,8 @@
    License along with Mastermind.
 */
 
+#include "WorkerApplication.h"
+
 #include "Backend.h"
 #include "Config.h"
 #include "Couple.h"
@@ -25,7 +27,6 @@
 #include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
-#include "WorkerApplication.h"
 
 #include <msgpack.hpp>
 
@@ -62,6 +63,7 @@ Group::Group(int id)
     m_metadata_parsed(false),
     m_metadata_parse_duration(0),
     m_couple(nullptr),
+    m_active_job(nullptr),
     m_namespace(nullptr),
     m_status(INIT),
     m_internal_status(INIT_Init)
@@ -87,6 +89,16 @@ uint64_t Group::get_total_space() const
     for (const Backend & backend : m_backends)
         res += backend.get_total_space();
     return res;
+}
+
+bool Group::has_active_job() const
+{
+    return m_active_job != nullptr;
+}
+
+const Job & Group::get_active_job() const
+{
+    return *m_active_job;
 }
 
 void Group::add_backend(Backend & backend)
@@ -278,6 +290,16 @@ void Group::set_namespace(Namespace & ns)
     m_namespace = &ns;
 }
 
+void Group::set_active_job(const Job & job)
+{
+    m_active_job = &job;
+}
+
+void Group::clear_active_job()
+{
+    m_active_job = nullptr;
+}
+
 void Group::update_status(bool forbidden_dht)
 {
     if (m_backends.empty()) {
@@ -333,13 +355,22 @@ void Group::update_status(bool forbidden_dht)
             }
         } else if (have_ro) {
             if (m_metadata.service.migrating) {
-                m_internal_status = MIGRATING_ServiceMigrating;
-                m_status = MIGRATING;
+                if (m_active_job != nullptr && m_active_job->get_id() == m_metadata.service.job_id) {
+                    m_internal_status = MIGRATING_ServiceMigrating;
+                    m_status = MIGRATING;
 
-                std::ostringstream ostr;
-                ostr << "Group is migrating, job id is '" << m_metadata.service.job_id << '\'';
-                m_status_text = ostr.str();
-                // TODO: check whether the job was initiated
+                    std::ostringstream ostr;
+                    ostr << "Group is migrating, job id is '" << m_metadata.service.job_id << '\'';
+                    m_status_text = ostr.str();
+                } else {
+                    m_internal_status = BAD_NoActiveJob;
+                    m_status = BAD;
+
+                    std::ostringstream ostr;
+                    ostr << "Group has no active job, but marked as migrating with job id '"
+                         << m_metadata.service.job_id << '\'';
+                    m_status_text = ostr.str();
+                }
             } else {
                 if (m_internal_status != RO_HaveROBackends) {
                     if (m_update_time < backend_ts)
@@ -560,6 +591,16 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         }
     }
 
+    if (m_active_job != nullptr) {
+        writer.Key("active_job");
+        writer.StartObject();
+        writer.Key("type");
+        writer.String(Job::type_str(m_active_job->get_type()));
+        writer.Key("status");
+        writer.String(Job::status_str(m_active_job->get_status()));
+        writer.EndObject();
+    }
+
     if (show_internals) {
         writer.Key("clean");
         writer.Bool(m_clean);
@@ -627,6 +668,8 @@ const char *Group::internal_status_str(InternalStatus status)
         return "BAD_DifferentMetadata";
     case BAD_CoupleBAD:
         return "BAD_CoupleBAD";
+    case BAD_NoActiveJob:
+        return "BAD_NoActiveJob";
     case MIGRATING_ServiceMigrating:
         return "MIGRATING_ServiceMigrating";
     case RO_HaveROBackends:
