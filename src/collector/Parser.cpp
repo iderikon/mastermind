@@ -104,50 +104,49 @@ struct StringInfoLess
 
 } // unnamed namespace
 
-Parser::Parser(Folder **fold, int max_depth, UIntInfo *uint_info,
-        StringInfo *string_info, uint8_t *dest)
+Parser::FolderVector::FolderVector(std::initializer_list<Folder> list)
+    : std::vector<Folder>(list)
+{
+    std::sort(begin(), end(), FolderLess());
+}
+
+Parser::UIntInfoVector::UIntInfoVector(std::initializer_list<UIntInfo> list)
+    : std::vector<UIntInfo>(list)
+{
+    std::sort(begin(), end(), UIntInfoLess());
+}
+
+Parser::StringInfoVector::StringInfoVector(std::initializer_list<StringInfo> list)
+    : std::vector<StringInfo>(list)
+{
+    std::sort(begin(), end(), StringInfoLess());
+}
+
+Parser::Parser(const std::vector<FolderVector> & folders,
+        const UIntInfoVector & uint_info,
+        const StringInfoVector & string_info,
+        uint8_t *dest)
     :
     m_keys(1),
     m_depth(0),
-    m_max_depth(max_depth),
-    m_fold(fold),
+    m_folders(folders),
     m_uint_info(uint_info),
-    m_uint_info_size(0),
     m_string_info(string_info),
-    m_string_info_size(0),
     m_dest(dest)
-{
-    m_fold_size.resize(max_depth);
-
-    for (int i = 0; i < max_depth; ++i) {
-        size_t & folder_size = m_fold_size[i];
-        for (folder_size = 0; m_fold[i][folder_size].str != nullptr; ++folder_size);
-        std::sort(m_fold[i], m_fold[i] + folder_size, FolderLess());
-    }
-
-    if (m_uint_info != nullptr) {
-        for (; m_uint_info[m_uint_info_size].keys; ++m_uint_info_size);
-        std::sort(m_uint_info, m_uint_info + m_uint_info_size, UIntInfoLess());
-    }
-
-    if (m_string_info != nullptr) {
-        for (; m_string_info[m_string_info_size].keys; ++m_string_info_size);
-        std::sort(m_string_info, m_string_info + m_string_info_size, StringInfoLess());
-    }
-}
+{}
 
 bool Parser::UInteger(uint64_t val)
 {
-    if (m_uint_info == nullptr)
+    if (m_uint_info.empty())
         return true;
 
     if (key_depth() != (m_depth + 1))
         return true;
 
-    auto info = std::lower_bound(m_uint_info, m_uint_info + m_uint_info_size, m_keys - 1, UIntInfoLess());
+    auto info = std::lower_bound(m_uint_info.begin(), m_uint_info.end(), m_keys - 1, UIntInfoLess());
 
     // if we haven't found the UIntInfo, something is wrong
-    if (info == (m_uint_info + m_uint_info_size) || info->keys != (m_keys - 1))
+    if (info == m_uint_info.end() || info->keys != (m_keys - 1))
         return false;
 
     uint64_t *dst_val = (uint64_t *) (m_dest + info->off);
@@ -173,17 +172,17 @@ bool Parser::UInteger(uint64_t val)
 
 bool Parser::String(const char* str, rapidjson::SizeType length, bool copy)
 {
-    if (m_string_info == nullptr)
+    if (m_string_info.empty())
         return true;
 
     if (key_depth() != (m_depth + 1))
         return true;
 
-    auto info = std::lower_bound(m_string_info, m_string_info + m_string_info_size,
+    auto info = std::lower_bound(m_string_info.begin(), m_string_info.end(),
             m_keys - 1, StringInfoLess());
 
     // if we haven't found the StringInfo, something is wrong
-    if (info == (m_string_info + m_string_info_size) || info->keys != (m_keys - 1))
+    if (info == m_string_info.end() || info->keys != (m_keys - 1))
         return false;
 
     std::string & dst_val = *(std::string *) (m_dest + info->off);
@@ -200,13 +199,13 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
     if (m_depth != kdepth)
         return true;
 
-    if (kdepth > m_max_depth)
+    if (size_t(kdepth) > m_folders.size())
         return false;
 
     FolderSearch search(m_keys - 1, str);
     int idx = m_depth - 1;
-    size_t size = m_fold_size[idx];
-    auto fold = std::lower_bound(m_fold[idx], m_fold[idx] + size, search, FolderSearchLess());
+    auto fold = std::lower_bound(m_folders[idx].begin(), m_folders[idx].end(),
+            search, FolderSearchLess());
 
     if (search.found_eq)
         m_keys |= fold->token;

@@ -36,40 +36,34 @@ enum FilterKey
     ShowInternals = 0x400
 };
 
-Parser::Folder filter_1[] = {
-    { "filter",     0, FilterSec },
-    { "item_types", 0, ItemTypes },
-    { "options",    0, Options   },
-    { NULL, 0, 0 }
+std::vector<Parser::FolderVector> filter_folders = {
+    {
+        { "filter",     0, FilterSec },
+        { "item_types", 0, ItemTypes },
+        { "options",    0, Options   }
+    },
+    {
+        { "namespaces",     FilterSec, Namespaces    },
+        { "couples",        FilterSec, Couples       },
+        { "groups",         FilterSec, Groups        },
+        { "backends",       FilterSec, Backends      },
+        { "nodes",          FilterSec, Nodes         },
+        { "filesystems",    FilterSec, Filesystems   },
+        { "show_internals", Options,   ShowInternals }
+    }
 };
 
-Parser::Folder filter_2[] = {
-    { "namespaces",     FilterSec, Namespaces    },
-    { "couples",        FilterSec, Couples       },
-    { "groups",         FilterSec, Groups        },
-    { "backends",       FilterSec, Backends      },
-    { "nodes",          FilterSec, Nodes         },
-    { "filesystems",    FilterSec, Filesystems   },
-    { "show_internals", Options,   ShowInternals },
-    { NULL, 0, 0 }
+Parser::UIntInfoVector filter_uint_info = {
+    { Options|ShowInternals, SET, offsetof(Filter, show_internals) }
 };
 
-Parser::Folder *filter_folders[] = {
-    filter_1,
-    filter_2
-};
-
-Parser::UIntInfo filter_uint_info[] = {
-    { Options|ShowInternals, SET, offsetof(Filter, show_internals) },
-    { 0, 0, 0 }
-};
+Parser::StringInfoVector filter_string_info;
 
 } // unnamed namespace
 
 FilterParser::FilterParser(Filter & filter)
     :
-    super(filter_folders, sizeof(filter_folders)/sizeof(filter_folders[0]),
-            filter_uint_info, nullptr, (uint8_t *) &filter),
+    super(filter_folders, filter_uint_info, filter_string_info, (uint8_t *) &filter),
     m_filter(filter),
     m_array_depth(0)
 {}
