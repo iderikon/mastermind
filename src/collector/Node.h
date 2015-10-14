@@ -118,8 +118,7 @@ public:
 public:
     struct ClockStat
     {
-        uint64_t procfs_parse;
-        uint64_t backend_parse;
+        uint64_t stats_parse;
         uint64_t update_fs;
     };
 
@@ -137,7 +136,6 @@ private:
     std::string m_host;
     int m_port;
     int m_family;
-
     std::string m_key;
 
     // backend and procfs statistics downloaded using HTTP

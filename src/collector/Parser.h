@@ -123,8 +123,8 @@
    struct Folder
    {
        const char *str;
-       uint32_t keys;
-       uint32_t token;
+       uint64_t keys;
+       uint64_t token;
        uint32_t str_hash;
    };
 
@@ -198,7 +198,7 @@
 
    struct UIntInfo
    {
-       uint32_t keys;
+       uint64_t keys;
        int action;
        size_t off;
    };
@@ -234,7 +234,7 @@
 
    struct StringInfo
    {
-       uint32_t keys;
+       uint64_t keys;
        size_t off;
    };
 
@@ -385,8 +385,8 @@ public:
     struct Folder
     {
         const char *str;
-        uint32_t keys;
-        uint32_t token;
+        uint64_t keys;
+        uint64_t token;
         uint32_t str_hash; // calculated internally
     };
 
@@ -398,7 +398,7 @@ public:
 
     struct UIntInfo
     {
-        uint32_t keys;
+        uint64_t keys;
         int action;
         size_t off;
     };
@@ -412,7 +412,7 @@ public:
 
     struct StringInfo
     {
-        uint32_t keys;
+        uint64_t keys;
         size_t off;
     };
 
@@ -476,20 +476,22 @@ protected:
     void clear_key()
     {
         if (m_keys != 1) {
-            uint32_t msig = 1 << (31 - __builtin_clz(m_keys));
+            // __builtin_clz(x) returns the number of leading 0-bits in x,
+            // starting at the most significant bit position.
+            uint64_t msig = 1ULL << (63 - __builtin_clzll(m_keys));
             m_keys ^= msig;
         }
     }
 
     int key_depth() const
     {
-        return __builtin_popcount(m_keys);
+        return __builtin_popcountll(m_keys);
     }
 
     virtual bool UInteger(uint64_t val);
 
 protected:
-    uint32_t m_keys;
+    uint64_t m_keys;
     int m_depth;
 
 private:

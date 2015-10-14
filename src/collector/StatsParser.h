@@ -16,24 +16,39 @@
    License along with Mastermind.
 */
 
-#ifndef __fcc5929b_b189_4dd0_add4_743ec4f888cc
-#define __fcc5929b_b189_4dd0_add4_743ec4f888cc
+#ifndef __b0f837f3_4008_452e_a47a_e7fc060a7974
+#define __b0f837f3_4008_452e_a47a_e7fc060a7974
 
+#include "Backend.h"
 #include "Node.h"
 #include "Parser.h"
 
-class ProcfsParser : public Parser
+class StatsParser : public Parser
 {
     typedef Parser super;
 
 public:
-    ProcfsParser();
+    struct Data {
+        // backend is a currently processing object.
+        // It will be put into m_backend_stats.
+        BackendStat backend;
+        NodeStat node;
+    };
 
-    const NodeStat & get_stat() const
-    { return m_stat; }
+    StatsParser();
+
+    std::vector<BackendStat> & get_backend_stats()
+    { return m_backend_stats; }
+
+    NodeStat & get_node_stat()
+    { return m_data.node; }
+
+public:
+    virtual bool EndObject(rapidjson::SizeType nr_members);
 
 private:
-    NodeStat m_stat;
+    Data m_data;
+    std::vector<BackendStat> m_backend_stats;
 };
 
 #endif
