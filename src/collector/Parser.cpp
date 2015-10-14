@@ -170,7 +170,7 @@ bool Parser::UInteger(uint64_t val)
     if (m_uint_info.empty())
         return true;
 
-    if (key_depth() != (m_depth + 1))
+    if (key_depth() != m_depth)
         return true;
 
     auto info = std::lower_bound(m_uint_info.begin(), m_uint_info.end(), m_keys - 1, UIntInfoLess());
@@ -205,7 +205,7 @@ bool Parser::String(const char* str, rapidjson::SizeType length, bool copy)
     if (m_string_info.empty())
         return true;
 
-    if (key_depth() != (m_depth + 1))
+    if (key_depth() != m_depth)
         return true;
 
     auto info = std::lower_bound(m_string_info.begin(), m_string_info.end(),
@@ -226,7 +226,8 @@ bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
 {
     int kdepth = key_depth();
 
-    if (m_depth != kdepth)
+    // Check if we're just before the next known key.
+    if ((m_depth - 1) != kdepth)
         return true;
 
     if (size_t(kdepth) > m_folders.size())

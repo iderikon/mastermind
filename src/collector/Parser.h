@@ -264,7 +264,7 @@
    [ m_keys: Foo|Bar|Baz|1 m_depth: 3 ]
 
                       1
-   [ Uint64(1)  { key_depth() == 4 } ]
+   [ Uint64(1)  { key_depth() == 3 } ]
    [ m_keys: Foo|Bar|1  m_depth: 3   ]
 
                "qux":
@@ -272,7 +272,7 @@
    [ m_keys: Foo|Bar|Qux|1  m_depth: 3 ]
 
                       2
-   [ Uint64(2)  { key_depth() == 4 } ]
+   [ Uint64(2)  { key_depth() == 3 } ]
    [ m_keys: Foo|Bar|1  m_depth: 3   ]
 
            },
@@ -300,7 +300,7 @@
    [ m_keys: Foo|Quux|QuuxID|Corge|1  m_depth: 4 ]
 
                             5,
-   [ Uint64(5)  { key_depth() == 5 }       ]
+   [ Uint64(5)  { key_depth() == 4 }       ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                    "grault":
@@ -308,7 +308,7 @@
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                              7
-   [ Uint64(7)  { key_depth() == 4 }       ]
+   [ Uint64(7)  { key_depth() == 3 }       ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                },
@@ -328,7 +328,7 @@
    [ m_keys: Foo|Quux|QuuxID|Corge|1  m_depth: 4 ]
 
                             11,
-   [ Uint64(11)  { key_depth() == 5 }      ]
+   [ Uint64(11)  { key_depth() == 4 }      ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                    "grault":
@@ -356,7 +356,7 @@
    [ m_keys: Garply|1  m_depth: 1 ]
 
                  17,
-   [ Uint64(17)  { key_depth() == 2 } ]
+   [ Uint64(17)  { key_depth() == 1 } ]
    [ m_keys: 1  m_depth: 1            ]
 
        "waldo":
@@ -364,7 +364,7 @@
    [ m_keys: Waldo|1  m_depth: 1 ]
 
                 19
-   [ Uint64(19)  { key_depth() == 2 } ]
+   [ Uint64(19)  { key_depth() == 1 } ]
    [ m_keys: 1  m_depth: 1            ]
 
    }
@@ -455,7 +455,7 @@ public:
 
     virtual bool EndObject(rapidjson::SizeType nr_members)
     {
-        if (m_depth == key_depth())
+        if ((m_depth - 1) == key_depth())
             clear_key();
         --m_depth;
         return true;
@@ -479,7 +479,8 @@ protected:
 
     int key_depth() const
     {
-        return __builtin_popcountll(m_keys);
+        // __builtin_popcountllx() returns the number of 1-bits in x.
+        return (__builtin_popcountll(m_keys) - 1);
     }
 
     virtual bool UInteger(uint64_t val);
