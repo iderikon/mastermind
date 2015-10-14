@@ -43,42 +43,33 @@ enum ConfigKey
     ConnectTimeoutMS                  = 0x20000
 };
 
-Parser::Folder config_1[] = {
-    { "elliptics",                             0, Elliptics                         },
-    { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
-    { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
-    { "reserved_space",                        0, ReservedSpace                     },
-    { "dnet_log_mask",                         0, DnetLogMask                       },
-    { "net_thread_num",                        0, NetThreadNum                      },
-    { "io_thread_num",                         0, IoThreadNum                       },
-    { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
-    { "metadata",                              0, Metadata                          },
-    { NULL, 0, 0 }
+std::vector<Parser::FolderVector> config_folders = {
+    {
+        { "elliptics",                             0, Elliptics                         },
+        { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
+        { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
+        { "reserved_space",                        0, ReservedSpace                     },
+        { "dnet_log_mask",                         0, DnetLogMask                       },
+        { "net_thread_num",                        0, NetThreadNum                      },
+        { "io_thread_num",                         0, IoThreadNum                       },
+        { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
+        { "metadata",                              0, Metadata                          }
+    },
+    {
+        { "nodes",        Elliptics, Nodes       },
+        { "monitor_port", Elliptics, MonitorPort },
+        { "wait_timeout", Elliptics, WaitTimeout },
+        { "url",          Metadata,  Url         },
+        { "jobs",         Metadata,  Jobs        },
+        { "options",      Metadata,  Options     }
+    },
+    {
+        { "db",               Metadata|Jobs,    Db               },
+        { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS }
+    }
 };
 
-Parser::Folder config_2[] = {
-    { "nodes",        Elliptics, Nodes       },
-    { "monitor_port", Elliptics, MonitorPort },
-    { "wait_timeout", Elliptics, WaitTimeout },
-    { "url",          Metadata,  Url         },
-    { "jobs",         Metadata,  Jobs        },
-    { "options",      Metadata,  Options     },
-    { NULL, 0, 0 }
-};
-
-Parser::Folder config_3[] = {
-    { "db",               Metadata|Jobs,    Db               },
-    { "connectTimeoutMS", Metadata|Options, ConnectTimeoutMS },
-    { NULL, 0, 0 }
-};
-
-Parser::Folder *config_folders[] = {
-    config_1,
-    config_2,
-    config_3
-};
-
-Parser::UIntInfo config_uint_info[] = {
+Parser::UIntInfoVector config_uint_info = {
     { Elliptics|MonitorPort,             SET, offsetof(Config, monitor_port)                          },
     { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
@@ -88,16 +79,19 @@ Parser::UIntInfo config_uint_info[] = {
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
-    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata.options.connectTimeoutMS)     },
-    { 0, 0, 0 }
+    { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata.options.connectTimeoutMS)     }
+};
+
+Parser::StringInfoVector config_string_info = {
+    { Metadata|Url,     offsetof(Config, metadata.url)     },
+    { Metadata|Jobs|Db, offsetof(Config, metadata.jobs.db) }
 };
 
 } // unnamed namespace
 
 ConfigParser::ConfigParser(Config & config)
     :
-    super(config_folders, sizeof(config_folders)/sizeof(config_folders[0]),
-            config_uint_info, (uint8_t *) &config),
+    super(config_folders, config_uint_info, config_string_info, (uint8_t *) &config),
     m_array_depth(0),
     m_config(config)
 {
@@ -107,13 +101,12 @@ ConfigParser::ConfigParser(Config & config)
 
 bool ConfigParser::String(const char* str, rapidjson::SizeType length, bool copy)
 {
-    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2)
+    if (m_keys == (Elliptics|Nodes|1) && m_array_depth == 2) {
         m_current_node.host = std::string(str, length);
-    else if (m_keys == (Metadata|Url|1))
-        m_config.metadata.url = std::string(str, length);
-    else if (m_keys == (Metadata|Jobs|Db|1))
-        m_config.metadata.jobs.db = std::string(str, length);
-    return true;
+        return true;
+    }
+
+    return super::String(str, length, copy);
 }
 
 bool ConfigParser::StartArray()

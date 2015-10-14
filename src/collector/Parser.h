@@ -20,6 +20,7 @@
 #define __60719e6b_2f14_4a95_b411_d9baa339f032
 
 #include <cstdint>
+#include <initializer_list>
 #include <rapidjson/reader.h>
 #include <vector>
 
@@ -93,8 +94,8 @@
    number of objects, e.g. gather statistics of all network interfaces.
 
    NB: For convenience, we name tokens acoording to keys. However, if keys with the same
-       name appear in different places, particularly important when within the same
-       sequence, we must define different tokens.
+       name appear in different positions within the same sequence, we must define
+       different tokens.
 
        {
            "fred": {
@@ -102,32 +103,29 @@
                    "fred": 23
                }
            },
-           "xyzzy": {
-               "fred": {
-                   "thud": 29
-               }
-           }
        }
 
-       In this example three different tokens for the key "fred" must be defined.
+       In this example two different tokens for the key "fred" must be defined.
 
    In Parser implementation the state is stored in the member 'm_keys'. In addition,
    when entering into the object, the value of m_depth is incremented. When leaving
    the object (EndObject() is called), we decrement the value.
 
-   Mapping between keys and tokens is stored in an array of arrays of structures of
+   Mapping between keys and tokens is stored in a vector of vectors of structures of
    type Folder. The first dimension is the depth. A set of known keys on certain
    level of depth is numbered in second dimension.
 
    struct Folder
    {
        const char *str;
-       uint32_t keys;
-       uint32_t token;
+       uint64_t keys;
+       uint64_t token;
+       uint32_t str_hash;
    };
 
    'str' is the key name. 'keys' is the preceding state. The current state will be
-   or'd with 'token' if the newly coming key matches 'str'.
+   or'd with 'token' if the newly coming key matches 'str'. 'str_hash' is calculated
+   by Parser and is not exposed outside.
 
    Here is the array of objects of type Folder describing the first level of
    depth in Example document.
@@ -135,22 +133,18 @@
    {
        { "foo",    0, Foo    },
        { "garply", 0, Garply },
-       { "waldo",  0, Waldo  },
-
-       { nullptr, 0, 0 }
+       { "waldo",  0, Waldo  }
    }
 
    The first column, 'str', contains the key names. The second one contains keys
    prior to a new one. It is always zero at the first level. The last one contains
-   the token. The array is terminated with null/zero values.
+   the token.
 
    Second level:
 
    {
        { "bar",  Foo, Bar  },
-       { "quux", Foo, Quux },
-
-       { nullptr, 0, 0 }
+       { "quux", Foo, Quux }
    }
 
    "bar" and "quux" keys are found inside "foo" object, it is indicated in the second
@@ -161,24 +155,22 @@
    {
        { "baz",     Foo|Bar,  Baz    },
        { "qux",     Foo|Bar,  Qux    },
-       { MATCH_ANY, Foo|Quux, QuuxID },
-
-       { nullptr, 0, 0 }
+       { MATCH_ANY, Foo|Quux, QuuxID }
    }
 
    Here the second column contains bitwise or of two previously matched tokens.
    Note the macro MATCH_ANY. It indicates that we accept all keys inside "quux" object.
    There is another macro NOT_MATCH which follows an undesired value. For example,
    if we'd be interested in all objects except "3" we'd define the following structure:
+   Note that these macros only make sense being a single case given previous matched
+   sequence of keys, or have an opposite condition in case of NOT_MATCH.
 
    { NOT_MATCH "3", Foo|Quux, QuuxID }
 
    Fourth level:
 
    {
-       { "corge", Foo|Quux|QuuxID, Corge },
-
-       { nullptr, 0, 0 }
+       { "corge", Foo|Quux|QuuxID, Corge }
    }
 
    The absense of "grault" key means that we don't need this attribute so Parser
@@ -200,7 +192,7 @@
 
    struct UIntInfo
    {
-       uint32_t keys;
+       uint64_t keys;
        int action;
        size_t off;
    };
@@ -220,17 +212,25 @@
        uint64_t waldo;
    };
 
-   We pass an array of UIntInfo to Parser.
+   We pass a UIntInfoVector to Parser.
 
    {
        { Foo|Bar|Baz,           SET, offsetof(Wibble, baz)       },
        { Foo|Bar|Qux,           SET, offsetof(Wibble, qux)       },
        { Foo|Quux|QuuxID|Corge, MAX, offsetof(Wibble, max_corge) },
        { Garply,                SET, offsetof(Wibble, garply)    },
-       { Waldo,                 SET, offsetof(Wibble, waldo)     },
-
-       { 0, 0, 0 }
+       { Waldo,                 SET, offsetof(Wibble, waldo)     }
    }
+
+   StringInfo is used for string values in the same way. Offset of a field of
+   type std::string is specified in 'off'. There is no 'action' field in
+   StringInfo, only SET method is supported.
+
+   struct StringInfo
+   {
+       uint64_t keys;
+       size_t off;
+   };
 
    Initially, m_keys is set to 1 (note that the least significant bit is not set
    in the array of Folder objects). Let's consider how the state is changed
@@ -264,7 +264,7 @@
    [ m_keys: Foo|Bar|Baz|1 m_depth: 3 ]
 
                       1
-   [ Uint64(1)  { key_depth() == 4 } ]
+   [ Uint64(1)  { key_depth() == 3 } ]
    [ m_keys: Foo|Bar|1  m_depth: 3   ]
 
                "qux":
@@ -272,7 +272,7 @@
    [ m_keys: Foo|Bar|Qux|1  m_depth: 3 ]
 
                       2
-   [ Uint64(2)  { key_depth() == 4 } ]
+   [ Uint64(2)  { key_depth() == 3 } ]
    [ m_keys: Foo|Bar|1  m_depth: 3   ]
 
            },
@@ -300,7 +300,7 @@
    [ m_keys: Foo|Quux|QuuxID|Corge|1  m_depth: 4 ]
 
                             5,
-   [ Uint64(5)  { key_depth() == 5 }       ]
+   [ Uint64(5)  { key_depth() == 4 }       ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                    "grault":
@@ -308,7 +308,7 @@
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                              7
-   [ Uint64(7)  { key_depth() == 4 }       ]
+   [ Uint64(7)  { key_depth() == 3 }       ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                },
@@ -328,7 +328,7 @@
    [ m_keys: Foo|Quux|QuuxID|Corge|1  m_depth: 4 ]
 
                             11,
-   [ Uint64(11)  { key_depth() == 5 }      ]
+   [ Uint64(11)  { key_depth() == 4 }      ]
    [ m_keys: Foo|Quux|QuuxID|1  m_depth: 4 ]
 
                    "grault":
@@ -356,7 +356,7 @@
    [ m_keys: Garply|1  m_depth: 1 ]
 
                  17,
-   [ Uint64(17)  { key_depth() == 2 } ]
+   [ Uint64(17)  { key_depth() == 1 } ]
    [ m_keys: 1  m_depth: 1            ]
 
        "waldo":
@@ -364,7 +364,7 @@
    [ m_keys: Waldo|1  m_depth: 1 ]
 
                 19
-   [ Uint64(19)  { key_depth() == 2 } ]
+   [ Uint64(19)  { key_depth() == 1 } ]
    [ m_keys: 1  m_depth: 1            ]
 
    }
@@ -379,22 +379,49 @@ public:
     struct Folder
     {
         const char *str;
-        uint32_t keys;
-        uint32_t token;
+        uint64_t keys;
+        uint64_t token;
+        uint32_t str_hash; // calculated internally
+    };
+
+    class FolderVector : public std::vector<Folder>
+    {
+    public:
+        FolderVector(std::initializer_list<Folder> list);
     };
 
     struct UIntInfo
     {
-        uint32_t keys;
+        uint64_t keys;
         int action;
         size_t off;
     };
 
-public:
-    Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest);
+    class UIntInfoVector : public std::vector<UIntInfo>
+    {
+    public:
+        UIntInfoVector() {}
+        UIntInfoVector(std::initializer_list<UIntInfo> list);
+    };
 
-    virtual ~Parser()
-    {}
+    struct StringInfo
+    {
+        uint64_t keys;
+        size_t off;
+    };
+
+    class StringInfoVector : public std::vector<StringInfo>
+    {
+    public:
+        StringInfoVector() {}
+        StringInfoVector(std::initializer_list<StringInfo> list);
+    };
+
+public:
+    Parser(const std::vector<FolderVector> & folders,
+            const UIntInfoVector & uint_info,
+            const StringInfoVector & string_info,
+            uint8_t *dest);
 
     virtual bool Null()
     { return true; }
@@ -405,8 +432,6 @@ public:
     virtual bool Int64(int64_t i)
     { return true; }
     virtual bool Double(double d)
-    { return true; }
-    virtual bool String(const char* str, rapidjson::SizeType length, bool copy)
     { return true; }
     virtual bool StartArray()
     { return true; }
@@ -420,6 +445,8 @@ public:
 
     virtual bool Key(const char* str, rapidjson::SizeType length, bool copy);
 
+    virtual bool String(const char* str, rapidjson::SizeType length, bool copy);
+
     virtual bool StartObject()
     {
         ++m_depth;
@@ -428,7 +455,7 @@ public:
 
     virtual bool EndObject(rapidjson::SizeType nr_members)
     {
-        if (m_depth == key_depth())
+        if ((m_depth - 1) == key_depth())
             clear_key();
         --m_depth;
         return true;
@@ -443,28 +470,29 @@ protected:
     void clear_key()
     {
         if (m_keys != 1) {
-            uint32_t msig = 1 << (31 - __builtin_clz(m_keys));
+            // __builtin_clz(x) returns the number of leading 0-bits in x,
+            // starting at the most significant bit position.
+            uint64_t msig = 1ULL << (63 - __builtin_clzll(m_keys));
             m_keys ^= msig;
         }
     }
 
     int key_depth() const
     {
-        return __builtin_popcount(m_keys);
+        // __builtin_popcountllx() returns the number of 1-bits in x.
+        return (__builtin_popcountll(m_keys) - 1);
     }
 
     virtual bool UInteger(uint64_t val);
 
 protected:
-    uint32_t m_keys;
+    uint64_t m_keys;
     int m_depth;
-    int m_max_depth;
 
 private:
-    Folder **m_fold;
-    std::vector<size_t> m_fold_size;
-    UIntInfo *m_uint_info;
-    uint64_t m_uint_info_size;
+    const std::vector<FolderVector> & m_folders;
+    const UIntInfoVector & m_uint_info;
+    const StringInfoVector & m_string_info;
     uint8_t *m_dest;
 };
 

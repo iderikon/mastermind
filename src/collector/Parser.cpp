@@ -19,31 +19,57 @@
 #include "Parser.h"
 
 #include <algorithm>
+#include <string>
 
 namespace {
+
+// Hash Functions: http://www.cse.yorku.ca/~oz/hash.html
+uint32_t djb2(unsigned char *str)
+{
+    uint32_t hash = 5381;
+    int c;
+
+    while (!!(c = *str++))
+        hash = ((hash << 5) + hash) + c;
+
+    return hash;
+}
 
 struct FolderLess
 {
     bool operator () (const Parser::Folder & f1, const Parser::Folder & f2) const
     {
+        // NOT_MATCH tokens are always at the beginning. A folder can only
+        // contain single NOT_MATCH and optionally its complement.
+        if (*f1.str == *NOT_MATCH || *f2.str == *NOT_MATCH) {
+            if (*f1.str == *NOT_MATCH && *f2.str != *NOT_MATCH)
+                return true;
+            else
+                return false;
+        }
         if (f1.keys != f2.keys)
             return f1.keys < f2.keys;
+        if (f1.str_hash != f2.str_hash)
+            return f1.str_hash < f2.str_hash;
         return std::strcmp(f1.str, f2.str) < 0;
     }
 };
 
 struct FolderSearch
 {
-    FolderSearch(uint32_t k, const char *s)
+    FolderSearch(uint64_t k, const char *s)
         :
         found_eq(false),
         keys(k),
         str(s)
-    {}
+    {
+        str_hash = djb2((unsigned char *) str);
+    }
 
     mutable bool found_eq;
-    uint32_t keys;
+    uint64_t keys;
     const char *str;
+    uint32_t str_hash;
 };
 
 struct FolderSearchLess
@@ -58,13 +84,8 @@ struct FolderSearchLess
             return false;
         }
 
-        if (f1.str[0] == *NOT_MATCH) {
-            if (!std::strcmp(f1.str + 1, search.str))
-                return true;
-
-            search.found_eq = true;
-            return false;
-        }
+        if (f1.str_hash != search.str_hash)
+            return f1.str_hash < search.str_hash;
 
         int res = std::strcmp(f1.str, search.str);
         if (!res) {
@@ -82,7 +103,20 @@ struct UIntInfoLess
         return i1.keys < i2.keys;
     }
 
-    bool operator () (const Parser::UIntInfo & info, uint32_t keys) const
+    bool operator () (const Parser::UIntInfo & info, uint64_t keys) const
+    {
+        return info.keys < keys;
+    }
+};
+
+struct StringInfoLess
+{
+    bool operator () (const Parser::StringInfo & i1, const Parser::StringInfo & i2) const
+    {
+        return i1.keys < i2.keys;
+    }
+
+    bool operator () (const Parser::StringInfo & info, uint64_t keys) const
     {
         return info.keys < keys;
     }
@@ -90,36 +124,59 @@ struct UIntInfoLess
 
 } // unnamed namespace
 
-Parser::Parser(Folder **fold, int max_depth, UIntInfo *info, uint8_t *dest)
+Parser::FolderVector::FolderVector(std::initializer_list<Folder> list)
+    : std::vector<Folder>(list)
+{
+    for (auto it = begin(); it != end(); ++it) {
+        Folder & fold = *it;
+        if (*fold.str != *NOT_MATCH) {
+            fold.str_hash = djb2((unsigned char *) fold.str);
+        } else {
+            // calculate hash of pattern in case of special condition
+            fold.str_hash = djb2((unsigned char *) (fold.str + 1));
+        }
+    }
+
+    std::sort(begin(), end(), FolderLess());
+}
+
+Parser::UIntInfoVector::UIntInfoVector(std::initializer_list<UIntInfo> list)
+    : std::vector<UIntInfo>(list)
+{
+    std::sort(begin(), end(), UIntInfoLess());
+}
+
+Parser::StringInfoVector::StringInfoVector(std::initializer_list<StringInfo> list)
+    : std::vector<StringInfo>(list)
+{
+    std::sort(begin(), end(), StringInfoLess());
+}
+
+Parser::Parser(const std::vector<FolderVector> & folders,
+        const UIntInfoVector & uint_info,
+        const StringInfoVector & string_info,
+        uint8_t *dest)
     :
     m_keys(1),
     m_depth(0),
-    m_max_depth(max_depth),
-    m_fold(fold),
-    m_uint_info(info),
+    m_folders(folders),
+    m_uint_info(uint_info),
+    m_string_info(string_info),
     m_dest(dest)
-{
-    m_fold_size.resize(max_depth);
-
-    for (int i = 0; i < max_depth; ++i) {
-        size_t & folder_size = m_fold_size[i];
-        for (folder_size = 0; m_fold[i][folder_size].str != nullptr; ++folder_size);
-        std::sort(m_fold[i], m_fold[i] + folder_size, FolderLess());
-    }
-
-    for (m_uint_info_size = 0; m_uint_info[m_uint_info_size].keys; ++m_uint_info_size);
-    std::sort(m_uint_info, m_uint_info + m_uint_info_size, UIntInfoLess());
-}
+{}
 
 bool Parser::UInteger(uint64_t val)
 {
-    if (key_depth() != (m_depth + 1))
+    if (m_uint_info.empty())
         return true;
 
-    auto info = std::lower_bound(m_uint_info, m_uint_info + m_uint_info_size, m_keys - 1, UIntInfoLess());
+    if (key_depth() != m_depth)
+        return true;
+
+    auto info = std::lower_bound(m_uint_info.begin(), m_uint_info.end(), m_keys - 1, UIntInfoLess());
 
     // if we haven't found the UIntInfo, something is wrong
-    if (info == (m_uint_info + m_uint_info_size) || info->keys != (m_keys - 1))
+    if (info == m_uint_info.end() || info->keys != (m_keys - 1))
         return false;
 
     uint64_t *dst_val = (uint64_t *) (m_dest + info->off);
@@ -143,20 +200,57 @@ bool Parser::UInteger(uint64_t val)
     return true;
 }
 
+bool Parser::String(const char* str, rapidjson::SizeType length, bool copy)
+{
+    if (m_string_info.empty())
+        return true;
+
+    if (key_depth() != m_depth)
+        return true;
+
+    auto info = std::lower_bound(m_string_info.begin(), m_string_info.end(),
+            m_keys - 1, StringInfoLess());
+
+    // if we haven't found the StringInfo, something is wrong
+    if (info == m_string_info.end() || info->keys != (m_keys - 1))
+        return false;
+
+    std::string & dst_val = *(std::string *) (m_dest + info->off);
+    dst_val.assign(str, length);
+
+    clear_key();
+    return true;
+}
+
 bool Parser::Key(const char* str, rapidjson::SizeType length, bool copy)
 {
     int kdepth = key_depth();
 
-    if (m_depth != kdepth)
+    // Check if we're just before the next known key.
+    if ((m_depth - 1) != kdepth)
         return true;
 
-    if (kdepth > m_max_depth)
+    if (size_t(kdepth) > m_folders.size())
         return false;
 
     FolderSearch search(m_keys - 1, str);
     int idx = m_depth - 1;
-    size_t size = m_fold_size[idx];
-    auto fold = std::lower_bound(m_fold[idx], m_fold[idx] + size, search, FolderSearchLess());
+
+    // NOT_MATCH keys are always in the beginning
+    auto begin = m_folders[idx].begin();
+    for (; begin != m_folders[idx].end() && *begin->str == *NOT_MATCH; ++begin) {
+        if (begin->keys != (m_keys - 1))
+            continue;
+
+        // hash for NOT_MATCH keys is calculated beginning from the first
+        // character of a pattern, special character is not included
+        if (begin->str_hash != search.str_hash || std::strcmp(begin->str + 1, str)) {
+            m_keys |= begin->token;
+            return true;
+        }
+    }
+
+    auto fold = std::lower_bound(begin, m_folders[idx].end(), search, FolderSearchLess());
 
     if (search.found_eq)
         m_keys |= fold->token;
