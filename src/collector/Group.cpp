@@ -431,6 +431,8 @@ int Group::check_couple_equals(const Group & other)
 {
     if (m_internal_status == INIT_Init ||
             other.m_internal_status == INIT_Init ||
+            m_internal_status == INIT_NoBackends ||
+            other.m_internal_status == INIT_NoBackends ||
             m_internal_status == INIT_MetadataFailed ||
             other.m_internal_status == INIT_MetadataFailed)
         return 0;
@@ -456,6 +458,8 @@ int Group::check_metadata_equals(const Group & other)
 {
     if (m_internal_status == INIT_Init ||
             other.m_internal_status == INIT_Init ||
+            m_internal_status == INIT_NoBackends ||
+            other.m_internal_status == INIT_NoBackends ||
             m_internal_status == INIT_MetadataFailed ||
             other.m_internal_status == INIT_MetadataFailed)
         return 0;
