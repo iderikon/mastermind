@@ -40,7 +40,8 @@ enum ConfigKey
     Jobs                              = 0x4000,
     Db                                = 0x8000,
     Options                           = 0x10000,
-    ConnectTimeoutMS                  = 0x20000
+    ConnectTimeoutMS                  = 0x20000,
+    NodeBackendStatStaleTimeout       = 0x100000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -49,6 +50,7 @@ std::vector<Parser::FolderVector> config_folders = {
         { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
         { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
         { "reserved_space",                        0, ReservedSpace                     },
+        { "node_backend_stat_stale_timeout",       0, NodeBackendStatStaleTimeout       },
         { "dnet_log_mask",                         0, DnetLogMask                       },
         { "net_thread_num",                        0, NetThreadNum                      },
         { "io_thread_num",                         0, IoThreadNum                       },
@@ -75,6 +77,7 @@ Parser::UIntInfoVector config_uint_info = {
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
+    { NodeBackendStatStaleTimeout,       SET, offsetof(Config, node_backend_stat_stale_timeout)       },
     { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
     { IoThreadNum,                       SET, offsetof(Config, io_thread_num)                         },

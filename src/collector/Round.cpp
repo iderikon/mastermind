@@ -257,7 +257,7 @@ void Round::step3_prepare_metadata_download(void *arg)
 
     clock_stop(self.m_clock.finish_monitor_stats_and_jobs);
 
-    self.m_storage->update_group_structure();
+    self.m_storage->process_node_backends();
     self.m_storage->process_new_jobs();
 
     self.m_nr_groups = (self.m_type != FORCED_PARTIAL

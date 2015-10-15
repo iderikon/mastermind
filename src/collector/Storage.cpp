@@ -184,6 +184,20 @@ void Storage::save_new_jobs(std::vector<Job> new_jobs, uint64_t timestamp)
     m_jobs_timestamp = timestamp;
 }
 
+void Storage::process_node_backends()
+{
+    update_group_structure();
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
+        it->second.update_backend_status(m_app.get_config().node_backend_stat_stale_timeout);
+}
+
+void Storage::process_node_backends(std::vector<std::reference_wrapper<Node>> & nodes)
+{
+    update_group_structure();
+    for (Node & node : nodes)
+        node.update_backend_status(m_app.get_config().node_backend_stat_stale_timeout);
+}
+
 void Storage::update_group_structure()
 {
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Updating group structure");
