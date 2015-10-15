@@ -18,6 +18,7 @@
 
 #include "Config.h"
 #include "Discovery.h"
+#include "Host.h"
 #include "Round.h"
 #include "WorkerApplication.h"
 
@@ -129,27 +130,32 @@ void Discovery::resolve_nodes(Round & round)
     for (auto it = addresses.begin(); it != addresses.end(); ++it) {
         const dnet_addr & addr = *it;
 
-        const char *host = dnet_addr_host_string(&addr);
+        const char *host_addr = dnet_addr_host_string(&addr);
         int port = dnet_addr_port(&addr);
 
         Storage & storage = round.get_storage();
-        if (!storage.has_node(host, port, addr.family)) {
-            std::string dc;
-            char hostname[128];
+        Host & host = storage.get_host(host_addr);
 
+        if (host.get_name().empty()) {
+            char hostname[128];
             int rc = getnameinfo((const sockaddr *) addr.addr, addr.addr_len,
                     hostname, sizeof(hostname), nullptr, 0, 0);
 
             if (rc != 0) {
                 BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
                         "Failed to resolve hostname for node %s:%d:%d: %s",
-                        host, port, addr.family, gai_strerror(rc));
+                        host_addr, port, addr.family, gai_strerror(rc));
             } else {
-                dc = m_app.get_inventory().get_dc_by_host(hostname);
+                host.set_name(hostname);
             }
-
-            Node & node = storage.add_node(host, port, addr.family);
-            node.set_dc(dc);
         }
+
+        if (host.get_dc().empty() && !host.get_name().empty()) {
+            std::string dc = m_app.get_inventory().get_dc_by_host(host.get_name().c_str());
+            host.set_dc(dc);
+        }
+
+        if (!storage.has_node(host_addr, port, addr.family))
+            storage.add_node(host, port, addr.family);
     }
 }

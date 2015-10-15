@@ -444,7 +444,8 @@ CURL *Round::create_easy_handle(Node *node)
         return nullptr;
 
     std::ostringstream url;
-    url << "http://" << node->get_host() << ':' << get_app().get_config().monitor_port << "/?categories=80";
+    url << "http://" << node->get_host().get_addr() << ':'
+        << get_app().get_config().monitor_port << "/?categories=80";
 
     curl_easy_setopt(easy, CURLOPT_URL, url.str().c_str());
     curl_easy_setopt(easy, CURLOPT_PRIVATE, node);

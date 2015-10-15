@@ -21,6 +21,7 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
+#include "Host.h"
 #include "Namespace.h"
 #include "Node.h"
 
@@ -322,7 +323,7 @@ int Couple::check_dc_sharing()
             if (most_recent_backend_ts < backend_ts)
                 most_recent_backend_ts = backend_ts;
 
-            const std::string & dc = backend.get_node().get_dc();
+            const std::string & dc = backend.get_node().get_host().get_dc();
             if (dc.empty()) {
                 if (m_internal_status != BAD_DcResolveFailed) {
                     std::ostringstream ostr;

@@ -19,6 +19,7 @@
 #include "Backend.h"
 #include "Filter.h"
 #include "FS.h"
+#include "Host.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "WorkerApplication.h"
@@ -145,8 +146,8 @@ void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
     writer.EndObject();
 
-    writer.Key("host");
-    writer.String(m_node.get_host().c_str());
+    writer.Key("node");
+    writer.String(m_node.get_key().c_str());
     writer.Key("fsid");
     writer.Uint64(m_fsid);
     writer.Key("total_space");

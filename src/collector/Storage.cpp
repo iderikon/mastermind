@@ -105,25 +105,31 @@ Storage::Storage(const Storage & other)
 Storage::~Storage()
 {}
 
+Host & Storage::get_host(const std::string & addr)
+{
+    auto it = m_hosts.lower_bound(addr);
+    if (it == m_hosts.end() || it->first != addr)
+        it = m_hosts.insert(it, std::make_pair(addr, Host(addr)));
+    return it->second;
+}
+
 bool Storage::has_node(const char *host, int port, int family) const
 {
     auto it = m_nodes.lower_bound(Node::key(host, port, family));
     return (it != m_nodes.end());
 }
 
-Node & Storage::add_node(const char *host, int port, int family)
+void Storage::add_node(const Host & host, int port, int family)
 {
-    const std::string key = Node::key(host, port, family);
+    const std::string key = Node::key(host.get_addr().c_str(), port, family);
 
     auto it = m_nodes.lower_bound(key);
     if (it == m_nodes.end() || it->first != key) {
         BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", key.c_str());
-        it = m_nodes.insert(it, std::make_pair(key, Node(*this, host, port, family)));
+        m_nodes.insert(it, std::make_pair(key, Node(*this, host, port, family)));
     } else {
         BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", key.c_str());
     }
-
-    return it->second;
 }
 
 void Storage::handle_backend(Backend & backend)
@@ -421,11 +427,62 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
         have_newer = true;
 }
 
+void Storage::merge_nodes(const Storage & other_storage, bool & have_newer)
+{
+    auto my = m_nodes.begin();
+    auto other = other_storage.m_nodes.begin();
+
+    while (other != other_storage.m_nodes.end()) {
+        while (my != m_nodes.end() && my->first < other->first)
+            ++my;
+        if (my != m_nodes.end() && my->first == other->first) {
+            my->second.merge(other->second, have_newer);
+        } else {
+            auto host_it = m_hosts.find(other->second.get_host().get_addr());
+            if (host_it != m_hosts.end()) {
+                my = m_nodes.insert(my, std::make_pair(other->first, Node(*this, host_it->second)));
+                my->second.clone_from(other->second);
+            } else {
+                BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                        "Merge storage: internal inconsistency: "
+                        "have no Host for Node %s (other storage has host %s)!!!",
+                        other->first.c_str(), other->second.get_host().get_name().c_str());
+            }
+        }
+        ++other;
+    }
+
+    if (m_nodes.size() > other_storage.m_nodes.size())
+        have_newer = true;
+}
+
+void Storage::merge_hosts(const Storage & other, bool & have_newer)
+{
+    auto my = m_hosts.begin();
+    auto other_it = other.m_hosts.begin();
+
+    while (other_it != other.m_hosts.end()) {
+        while (my != m_hosts.end() && my->first < other_it->first)
+            ++my;
+
+        if (my != m_hosts.end() && my->first == other_it->first)
+            my->second.merge(other_it->second, have_newer);
+        else
+            my = m_hosts.insert(my, *other_it);
+
+        ++other_it;
+    }
+
+    if (m_hosts.size() > other.m_hosts.size())
+        have_newer = true;
+}
+
 void Storage::merge(const Storage & other, bool & have_newer)
 {
     have_newer = false;
 
-    merge_map(*this, m_nodes, other.m_nodes, have_newer);
+    merge_hosts(other, have_newer);
+    merge_nodes(other, have_newer);
     update_group_structure();
     merge_groups(other, have_newer);
     merge_jobs(other, have_newer);

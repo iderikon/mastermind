@@ -21,6 +21,7 @@
 
 #include "Couple.h"
 #include "Group.h"
+#include "Host.h"
 #include "Namespace.h"
 #include "Node.h"
 
@@ -58,8 +59,12 @@ public:
     WorkerApplication & get_app()
     { return m_app; }
 
+    Host & get_host(const std::string & addr);
+
     bool has_node(const char *host, int port, int family) const;
-    Node & add_node(const char *host, int port, int family);
+
+    // host must be owned by this Storage
+    void add_node(const Host & host, int port, int family);
 
     std::map<std::string, Node> & get_nodes()
     { return m_nodes; }
@@ -105,6 +110,8 @@ private:
     void merge_groups(const Storage & other_storage, bool & have_newer);
     void merge_jobs(const Storage & other_storage, bool & have_newer);
     void merge_couples(const Storage & other_storage, bool & have_newer);
+    void merge_nodes(const Storage & other_storage, bool & have_newer);
+    void merge_hosts(const Storage & other_storage, bool & have_newer);
 
     // find an intersection of sets of ResultItem objects
     // each of which is related to a set of SourceItem:s
@@ -149,9 +156,15 @@ public:
 private:
     WorkerApplication & m_app;
 
+    // host addr -> Host
+    std::map<std::string, Host> m_hosts;
+    // host:port:family -> Node
     std::map<std::string, Node> m_nodes;
+    // group id -> Group
     std::map<int, Group> m_groups;
+    // gid1:gid2:gid3 -> Couple
     std::map<std::string, Couple> m_couples;
+    // namespace -> Namespace
     std::map<std::string, Namespace> m_namespaces;
 
     // array of jobs received from MongoDB but not processed yet
