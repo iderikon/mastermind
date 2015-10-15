@@ -272,7 +272,9 @@ void Storage::update()
 
     // Complete couple and group updates
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
-        it->second.update_status(m_app.get_config().forbidden_unmatched_group_total_space);
+        it->second.update_status(
+                false, // forbidden_dc_sharing_among_groups
+                m_app.get_config().forbidden_unmatched_group_total_space);
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
 }

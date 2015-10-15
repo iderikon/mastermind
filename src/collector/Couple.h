@@ -42,8 +42,10 @@ class Couple
         BAD_GroupUninitialized,
         BAD_GroupBAD,
         BAD_ReadOnly,
+        BAD_DcResolveFailed,
         BAD_Unknown,
         BROKEN_UnequalTotalSpace,
+        BROKEN_DcSharing,
         BROKEN_GroupBROKEN,
         FROZEN_Frozen,
         FULL_Full,
@@ -82,7 +84,7 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void update_status(bool forbidden_unmatched_total);
+    void update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total);
 
     void merge(const Couple & other, bool & have_newer);
 
@@ -104,6 +106,7 @@ public:
 
 private:
     void account_job_in_status();
+    int check_dc_sharing();
 
 private:
     std::string m_key;
