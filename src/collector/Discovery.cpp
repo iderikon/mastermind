@@ -23,6 +23,8 @@
 
 #include <curl/curl.h>
 #include <mongo/client/dbclient.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
 #include <cstring>
 #include <set>
@@ -130,6 +132,24 @@ void Discovery::resolve_nodes(Round & round)
         const char *host = dnet_addr_host_string(&addr);
         int port = dnet_addr_port(&addr);
 
-        round.add_node(host, port, addr.family);
+        Storage & storage = round.get_storage();
+        if (!storage.has_node(host, port, addr.family)) {
+            std::string dc;
+            char hostname[128];
+
+            int rc = getnameinfo((const sockaddr *) addr.addr, addr.addr_len,
+                    hostname, sizeof(hostname), nullptr, 0, 0);
+
+            if (rc != 0) {
+                BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                        "Failed to resolve hostname for node %s:%d:%d: %s",
+                        host, port, addr.family, gai_strerror(rc));
+            } else {
+                dc = m_app.get_inventory().get_dc_by_host(hostname);
+            }
+
+            Node & node = storage.add_node(host, port, addr.family);
+            node.set_dc(dc);
+        }
     }
 }

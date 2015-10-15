@@ -33,12 +33,14 @@ WorkerApplication::WorkerApplication()
     :
     m_logger(nullptr),
     m_elliptics_logger(nullptr),
-    m_collector(*this)
+    m_collector(*this),
+    m_inventory(*this)
 {}
 
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
     :
-    m_collector(*this)
+    m_collector(*this),
+    m_inventory(*this)
 {
     init();
 
@@ -67,6 +69,12 @@ void WorkerApplication::init()
 
     if (m_collector.init())
         throw std::runtime_error("failed to initialize collector");
+
+    if (!m_config.collector_inventory.empty()) {
+        BH_LOG(get_logger(), DNET_LOG_INFO, "Opening inventory from %s",
+                m_config.collector_inventory.c_str());
+        m_inventory.open_shared_library(m_config.collector_inventory);
+    }
 }
 
 void WorkerApplication::start()

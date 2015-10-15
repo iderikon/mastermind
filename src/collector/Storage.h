@@ -58,7 +58,8 @@ public:
     WorkerApplication & get_app()
     { return m_app; }
 
-    void add_node(const char *host, int port, int family);
+    bool has_node(const char *host, int port, int family) const;
+    Node & add_node(const char *host, int port, int family);
 
     std::map<std::string, Node> & get_nodes()
     { return m_nodes; }

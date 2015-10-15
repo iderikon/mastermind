@@ -105,18 +105,25 @@ Storage::Storage(const Storage & other)
 Storage::~Storage()
 {}
 
-void Storage::add_node(const char *host, int port, int family)
+bool Storage::has_node(const char *host, int port, int family) const
+{
+    auto it = m_nodes.lower_bound(Node::key(host, port, family));
+    return (it != m_nodes.end());
+}
+
+Node & Storage::add_node(const char *host, int port, int family)
 {
     const std::string key = Node::key(host, port, family);
 
     auto it = m_nodes.lower_bound(key);
-    if (it != m_nodes.end() && it->first == key) {
+    if (it == m_nodes.end() || it->first != key) {
+        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", key.c_str());
+        it = m_nodes.insert(it, std::make_pair(key, Node(*this, host, port, family)));
+    } else {
         BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", key.c_str());
-        return;
     }
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", key.c_str());
-    m_nodes.insert(it, std::make_pair(key, Node(*this, host, port, family)));
+    return it->second;
 }
 
 void Storage::handle_backend(Backend & backend)
@@ -288,7 +295,7 @@ void Storage::update()
     // Complete couple and group updates
     for (auto it = m_couples.begin(); it != m_couples.end(); ++it)
         it->second.update_status(
-                false, // forbidden_dc_sharing_among_groups
+                m_app.get_config().forbidden_dc_sharing_among_groups,
                 m_app.get_config().forbidden_unmatched_group_total_space);
 
     BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
