@@ -36,8 +36,7 @@ Backend::Backend(Node & node)
     :
     m_node(node),
     m_fs(nullptr),
-    m_group(nullptr),
-    m_read_only(false)
+    m_group(nullptr)
 {
     std::memset(&m_calculated, 0, sizeof(m_calculated));
 }
@@ -54,8 +53,6 @@ void Backend::clone_from(const Backend & other)
 
     std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
     std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
-
-    m_read_only = other.m_read_only;
 }
 
 bool Backend::full() const
@@ -82,6 +79,15 @@ void Backend::update(const BackendStat & stat)
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
         m_calculated.max_write_rps = int(std::max(double(m_calculated.write_rps) /
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
+    }
+
+    uint64_t last_start_old = m_stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
+    uint64_t last_start_new = stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
+    if (last_start_old < last_start_new || m_stat.stat_commit_rofs_errors > stat.stat_commit_rofs_errors) {
+        m_calculated.stat_commit_rofs_errors_diff = 0;
+    } else {
+        uint64_t d = stat.stat_commit_rofs_errors - m_stat.stat_commit_rofs_errors;
+        m_calculated.stat_commit_rofs_errors_diff += d;
     }
 
     std::memcpy(&m_stat, &stat, sizeof(m_stat));
@@ -127,7 +133,7 @@ void Backend::update_status()
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
-    else if (m_read_only)
+    else if (m_stat.read_only || m_calculated.stat_commit_rofs_errors_diff)
         m_calculated.status = RO;
     else
         m_calculated.status = OK;
@@ -270,9 +276,23 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("status");
     writer.String(status_str(m_calculated.status));
 
-    // XXX
+    writer.Key("last_start");
+    writer.StartObject();
+    writer.Key("ts_sec");
+    writer.Uint64(m_stat.last_start_ts_sec);
+    writer.Key("ts_usec");
+    writer.Uint64(m_stat.last_start_ts_usec);
+    writer.EndObject();
+
     writer.Key("read_only");
-    writer.Bool(m_read_only);
+    writer.Bool(!!m_stat.read_only);
+    writer.Key("stat_commit_rofs_errors_diff");
+    writer.Uint64(m_calculated.stat_commit_rofs_errors_diff); // XXX
+
+    if (show_internals) {
+        writer.Key("stat_commit_rofs_errors");
+        writer.Uint64(m_stat.stat_commit_rofs_errors);
+    }
 
     writer.EndObject();
 }

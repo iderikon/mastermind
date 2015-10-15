@@ -23,16 +23,27 @@
 #include "Node.h"
 #include "Parser.h"
 
+#include <map>
+
 class StatsParser : public Parser
 {
     typedef Parser super;
 
 public:
     struct Data {
+        Data()
+            : stat_commit()
+        {}
+
         // backend is a currently processing object.
         // It will be put into m_backend_stats.
         BackendStat backend;
         NodeStat node;
+        struct {
+            unsigned int backend;
+            unsigned int err;
+            uint64_t count;
+        } stat_commit;
     };
 
     StatsParser();
@@ -43,12 +54,21 @@ public:
     NodeStat & get_node_stat()
     { return m_data.node; }
 
+    std::map<unsigned int, uint64_t> & get_rofs_errors()
+    { return m_rofs_errors; }
+
 public:
+    virtual bool Key(const char* str, rapidjson::SizeType length, bool copy);
+
     virtual bool EndObject(rapidjson::SizeType nr_members);
+
+    virtual bool Bool(bool b)
+    { return UInteger(b); }
 
 private:
     Data m_data;
     std::vector<BackendStat> m_backend_stats;
+    std::map<unsigned int, uint64_t> m_rofs_errors;
 };
 
 #endif
