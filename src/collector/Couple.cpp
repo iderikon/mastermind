@@ -41,7 +41,7 @@ Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
     }
 }
 
-void Couple::update_status(bool forbidden_unmatched_total)
+void Couple::update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total)
 {
     Stopwatch watch(m_update_status_duration);
 
@@ -101,6 +101,11 @@ void Couple::update_status(bool forbidden_unmatched_total)
                 group.set_coupled_status(true, m_modified_time);
         }
         return;
+    }
+
+    if (forbidden_dc_sharing) {
+        if (check_dc_sharing() != 0)
+            return;
     }
 
     if (size_t(std::count(statuses.begin(), statuses.end(), Group::COUPLED)) == statuses.size()) {
@@ -203,7 +208,7 @@ void Couple::update_status(bool forbidden_unmatched_total)
         }
     }
 
-    if (m_internal_status != BAD_Unknown) {
+    if (i == statuses.size() && m_internal_status != BAD_Unknown) {
         if (m_modified_time < most_recent)
             m_modified_time = most_recent;
 
@@ -301,6 +306,70 @@ void Couple::account_job_in_status()
     }
 }
 
+int Couple::check_dc_sharing()
+{
+    std::vector<std::string> all_dcs;
+    uint64_t most_recent_backend_ts = 0;
+
+    for (Group & group : m_groups) {
+        const auto & backends = group.get_backends();
+
+        std::vector<std::string> dcs;
+        dcs.reserve(backends.size());
+
+        for (const Backend & backend : backends) {
+            uint64_t backend_ts = backend.get_stat().get_timestamp() * 1000ULL;
+            if (most_recent_backend_ts < backend_ts)
+                most_recent_backend_ts = backend_ts;
+
+            const std::string & dc = backend.get_node().get_dc();
+            if (dc.empty()) {
+                if (m_internal_status != BAD_DcResolveFailed) {
+                    std::ostringstream ostr;
+                    ostr << "Group " << group.get_id() << ": Failed to resolve "
+                            "DC for node " << backend.get_node().get_key();
+
+                    m_internal_status = BAD_DcResolveFailed;
+                    m_status = BAD;
+                    m_status_text = ostr.str();
+
+                    if (m_modified_time < most_recent_backend_ts)
+                        m_modified_time = most_recent_backend_ts;
+                }
+
+                for (Group & group : m_groups)
+                    group.set_coupled_status(false, m_modified_time);
+
+                return -1;
+            }
+            dcs.push_back(dc);
+        }
+
+        std::sort(dcs.begin(), dcs.end());
+        auto it = std::unique(dcs.begin(), dcs.end());
+        if (it != dcs.end())
+            dcs.erase(it, dcs.end());
+        all_dcs.insert(all_dcs.end(), dcs.begin(), dcs.end());
+    }
+
+    auto it = std::unique(all_dcs.begin(), all_dcs.end());
+    if  (it != all_dcs.end()) {
+        if (m_internal_status != BROKEN_DcSharing) {
+            m_internal_status = BROKEN_DcSharing;
+            m_status = BROKEN;
+
+            m_status_text = "Couple has nodes sharing the same DC";
+
+            if (m_modified_time < most_recent_backend_ts)
+                m_modified_time = most_recent_backend_ts;
+
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, bool show_internals) const
 {
     writer.StartObject();
@@ -343,8 +412,12 @@ const char *Couple::internal_status_str(InternalStatus status)
         return "BAD_GroupBAD";
     case BAD_ReadOnly:
         return "BAD_ReadOnly";
+    case BAD_DcResolveFailed:
+        return "BAD_DcResolveFailed";
     case BAD_Unknown:
         return "BAD_Unknown";
+    case BROKEN_DcSharing:
+        return "BROKEN_DcSharing";
     case BROKEN_GroupBROKEN:
         return "BROKEN_GroupBROKEN";
     case BROKEN_UnequalTotalSpace:

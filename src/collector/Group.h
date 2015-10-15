@@ -89,6 +89,9 @@ public:
     Status get_status() const
     { return m_status; }
 
+    const Backends & get_backends() const
+    { return m_backends; }
+
     bool full() const;
 
     uint64_t get_total_space() const;
