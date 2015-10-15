@@ -22,7 +22,6 @@
 #include "Backend.h"
 
 #include <functional>
-#include <iostream>
 #include <map>
 #include <rapidjson/writer.h>
 #include <string>
@@ -30,6 +29,7 @@
 
 class Filter;
 class FS;
+class Host;
 class Node;
 class Storage;
 
@@ -51,14 +51,14 @@ struct NodeStat
 class Node
 {
 public:
-    Node(Storage & storage, const char *host, int port, int family);
-    Node(Storage & storage);
+    Node(Storage & storage, const Host & host, int port, int family);
+    Node(Storage & storage, const Host & host);
 
     static std::string key(const char *host, int port, int family);
 
     void clone_from(const Node & other);
 
-    const std::string & get_host() const
+    const Host & get_host() const
     { return m_host; }
 
     int get_port() const
@@ -133,7 +133,8 @@ private:
 private:
     Storage & m_storage;
 
-    std::string m_host;
+    const Host & m_host;
+
     int m_port;
     int m_family;
     std::string m_key;

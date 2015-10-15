@@ -82,9 +82,6 @@ public:
 
     void update_storage(Storage & storage, uint64_t version, bool & have_newer);
 
-    void add_node(const char *host, int port, int family)
-    { m_storage->add_node(host, port, family); }
-
     void start();
 
 private:

@@ -1,5 +1,5 @@
 add_executable(mastermind-collector
-    Discovery.cpp Node.cpp Parser.cpp
+    Discovery.cpp Node.cpp Parser.cpp Host.cpp
     StatsParser.cpp Metrics.cpp
     Storage.cpp Group.cpp Couple.cpp
     ConfigParser.cpp WorkerApplication.cpp CocaineHandlers.cpp
