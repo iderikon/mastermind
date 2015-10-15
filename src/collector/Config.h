@@ -39,6 +39,7 @@ struct Config
         wait_timeout(10),
         forbidden_dht_groups(0),
         forbidden_unmatched_group_total_space(0),
+        forbidden_dc_sharing_among_groups(0),
         reserved_space(112742891519),
         dnet_log_mask(3),
         net_thread_num(3),
@@ -51,6 +52,7 @@ struct Config
     uint64_t wait_timeout;
     uint64_t forbidden_dht_groups;
     uint64_t forbidden_unmatched_group_total_space;
+    uint64_t forbidden_dc_sharing_among_groups;
     uint64_t reserved_space;
     uint64_t dnet_log_mask;
     uint64_t net_thread_num;
@@ -60,6 +62,7 @@ struct Config
     std::string metadata_url;
     uint64_t metadata_connect_timeout_ms;
     std::string jobs_db;
+    std::string collector_inventory;
 
     void print(std::ostringstream & ostr) const
     {
@@ -68,6 +71,7 @@ struct Config
             "wait_timeout: "                          << wait_timeout << "\n"
             "forbidden_dht_groups: "                  << forbidden_dht_groups << "\n"
             "forbidden_unmatched_group_total_space: " << forbidden_unmatched_group_total_space << "\n"
+            "forbidden_dc_sharing_among_groups: "     << forbidden_dc_sharing_among_groups << "\n"
             "reserved_space: "                        << reserved_space << "\n"
             "dnet_log_mask: "                         << dnet_log_mask << "\n"
             "net_thread_num: "                        << net_thread_num << "\n"
@@ -76,6 +80,7 @@ struct Config
             "metadata_url: "                          << metadata_url << "\n"
             "metadata_connect_timeout_ms: "           << metadata_connect_timeout_ms << "\n"
             "jobs_db: "                               << jobs_db << "\n"
+            "collector_inventory: "                   << collector_inventory << "\n"
             "nodes:\n";
         for (const NodeInfo & node : nodes)
             ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';

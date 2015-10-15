@@ -40,11 +40,14 @@ enum ConfigKey
     Jobs                              = 0x4000,
     Db                                = 0x8000,
     Options                           = 0x10000,
-    ConnectTimeoutMS                  = 0x20000
+    ConnectTimeoutMS                  = 0x20000,
+    CollectorInventory                = 0x40000,
+    ForbiddenDcSharingAmongGroups     = 0x80000
 };
 
 Parser::Folder config_1[] = {
     { "elliptics",                             0, Elliptics                         },
+    { "forbidden_dc_sharing_among_groups",     0, ForbiddenDcSharingAmongGroups     },
     { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
     { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
     { "reserved_space",                        0, ReservedSpace                     },
@@ -53,6 +56,7 @@ Parser::Folder config_1[] = {
     { "io_thread_num",                         0, IoThreadNum                       },
     { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
     { "metadata",                              0, Metadata                          },
+    { "collector_inventory",                   0, CollectorInventory                },
     { NULL, 0, 0 }
 };
 
@@ -83,6 +87,7 @@ Parser::UIntInfo config_uint_info[] = {
     { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
+    { ForbiddenDcSharingAmongGroups,     SET, offsetof(Config, forbidden_dc_sharing_among_groups)     },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
     { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },
     { NetThreadNum,                      SET, offsetof(Config, net_thread_num)                        },
@@ -93,8 +98,9 @@ Parser::UIntInfo config_uint_info[] = {
 };
 
 Parser::StringInfo config_string_info[] = {
-    { Metadata|Url,     offsetof(Config, metadata_url) },
-    { Metadata|Jobs|Db, offsetof(Config, jobs_db)      },
+    { Metadata|Url,       offsetof(Config, metadata_url)        },
+    { Metadata|Jobs|Db,   offsetof(Config, jobs_db)             },
+    { CollectorInventory, offsetof(Config, collector_inventory) },
     { 0, 0 }
 };
 
