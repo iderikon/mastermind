@@ -65,6 +65,7 @@ public:
     void refresh(std::shared_ptr<on_refresh> handler);
 
 private:
+    static void step0_start_inventory(void *arg);
     static void step1_start_round(void *arg);
     static void step1_start_forced(void *arg);
     static void step1_start_refresh(void *arg);

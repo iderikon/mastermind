@@ -50,16 +50,24 @@ int Collector::init()
 
 void Collector::start()
 {
-    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting inventory");
-    m_inventory.start();
-
-    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: dispatching step 1");
-    dispatch_async_f(m_queue, this, &Collector::step1_start_round);
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: Dispatching step 0");
+    dispatch_async_f(m_queue, this, &Collector::step0_start_inventory);
 }
 
 void Collector::finalize_round(Round *round)
 {
     dispatch_barrier_async_f(m_queue, round, &Collector::step5_compare_and_swap);
+}
+
+void Collector::step0_start_inventory(void *arg)
+{
+    Collector & self = *static_cast<Collector*>(arg);
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: Starting inventory (initial download)");
+    self.m_inventory.download_initial();
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: Dispatching step 1");
+    dispatch_async_f(self.m_queue, &self, &Collector::step1_start_round);
 }
 
 void Collector::step1_start_round(void *arg)

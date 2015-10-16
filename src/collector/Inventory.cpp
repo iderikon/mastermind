@@ -49,7 +49,7 @@ int Inventory::init()
     return 0;
 }
 
-void Inventory::start()
+void Inventory::download_initial()
 {
     dispatch_sync_f(m_queue, this, &Inventory::execute_reload);
 }

@@ -39,7 +39,8 @@ public:
     ~Inventory();
 
     int init();
-    void start();
+
+    void download_initial();
 
     void close();
 
