@@ -182,7 +182,6 @@ private:
     } m_calculated;
 
     bool m_read_only;
-    bool m_disabled;
 };
 
 #endif
