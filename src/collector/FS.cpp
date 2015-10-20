@@ -19,6 +19,7 @@
 #include "Backend.h"
 #include "Filter.h"
 #include "FS.h"
+#include "Host.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "WorkerApplication.h"
@@ -131,6 +132,20 @@ void FS::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
 void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         bool show_internals) const
 {
+    // JSON looks like this:
+    // {
+    //     "timestamp": {
+    //         "tv_sec": 1445348936,
+    //         "tv_usec": 615421,
+    //         "user_friendly": "2015-10-20 16:48:56.615421"
+    //     },
+    //     "node": "::1:1025:10",
+    //     "fsid": 158919948,
+    //     "total_space": 983547510784,
+    //     "status": "OK",
+    //     "status_text": "Filesystem is OK"
+    // }
+
     writer.StartObject();
 
     writer.Key("timestamp");
@@ -145,8 +160,8 @@ void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     }
     writer.EndObject();
 
-    writer.Key("host");
-    writer.String(m_node.get_host().c_str());
+    writer.Key("node");
+    writer.String(m_node.get_key().c_str());
     writer.Key("fsid");
     writer.Uint64(m_fsid);
     writer.Key("total_space");

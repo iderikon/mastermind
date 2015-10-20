@@ -23,6 +23,7 @@
 #include "StatsParser.h"
 #include "Filter.h"
 #include "FS.h"
+#include "Host.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "WorkerApplication.h"
@@ -34,14 +35,14 @@ NodeStat::NodeStat()
     std::memset(this, 0, sizeof(*this));
 }
 
-Node::Node(Storage & storage, const char *host, int port, int family)
+Node::Node(Storage & storage, const Host & host, int port, int family)
     :
     m_storage(storage),
     m_host(host),
     m_port(port),
     m_family(family)
 {
-    m_key = key(host, port, family);
+    m_key = key(host.get_addr().c_str(), port, family);
 
     std::memset(&m_stat, 0, sizeof(m_stat));
     std::memset(&m_clock, 0, sizeof(m_clock));
@@ -49,9 +50,10 @@ Node::Node(Storage & storage, const char *host, int port, int family)
     m_download_data.reserve(4096);
 }
 
-Node::Node(Storage & storage)
+Node::Node(Storage & storage, const Host & host)
     :
     m_storage(storage),
+    m_host(host),
     m_port(0),
     m_family(0)
 {
@@ -70,7 +72,6 @@ std::string Node::key(const char *host, int port, int family)
 
 void Node::clone_from(const Node & other)
 {
-    m_host = other.m_host;
     m_port = other.m_port;
     m_family = other.m_family;
     m_key = other.m_key;
@@ -317,7 +318,8 @@ void Node::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.EndObject();
 
     writer.Key("host");
-    writer.String(m_host.c_str());
+    m_host.print_json(writer);
+
     writer.Key("port");
     writer.Uint64(m_port);
     writer.Key("family");

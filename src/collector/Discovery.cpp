@@ -18,6 +18,7 @@
 
 #include "Config.h"
 #include "Discovery.h"
+#include "Host.h"
 #include "Round.h"
 #include "WorkerApplication.h"
 
@@ -26,6 +27,9 @@
 
 #include <cstring>
 #include <set>
+
+#include <netdb.h>
+#include <sys/socket.h>
 
 using namespace ioremap;
 
@@ -124,10 +128,35 @@ void Discovery::resolve_nodes(Round & round)
     for (auto it = addresses.begin(); it != addresses.end(); ++it) {
         const dnet_addr & addr = *it;
 
-        const char *host = dnet_addr_host_string(&addr);
+        const char *host_addr = dnet_addr_host_string(&addr);
         int port = dnet_addr_port(&addr);
 
-        round.add_node(host, port, addr.family);
+        Storage & storage = round.get_storage();
+        Host & host = storage.get_host(host_addr);
+
+        if (host.get_name().empty()) {
+            char hostname[NI_MAXHOST];
+            int rc = getnameinfo((const sockaddr *) addr.addr, addr.addr_len,
+                    hostname, sizeof(hostname), nullptr, 0, 0);
+
+            if (rc != 0) {
+                BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                        "Failed to resolve hostname for node %s:%d:%d: %s",
+                        host_addr, port, addr.family, gai_strerror(rc));
+            } else {
+                host.set_name(hostname);
+            }
+        }
+
+#if 0 // Inventory is not implemented yet
+        if (host.get_dc().empty() && !host.get_name().empty()) {
+            std::string dc = m_app.get_inventory().get_dc_by_host(host.get_name().c_str());
+            host.set_dc(dc);
+        }
+#endif
+
+        if (!storage.has_node(host_addr, port, addr.family))
+            storage.add_node(host, port, addr.family);
     }
 }
 

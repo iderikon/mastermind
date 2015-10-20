@@ -88,6 +88,9 @@ public:
 
     void clone_from(const Backend & other);
 
+    const Node & get_node() const
+    { return m_node; }
+
     const std::string & get_key() const
     { return m_key; }
 

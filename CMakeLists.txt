@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 project(mastermind)
 
-add_definitions("-std=c++0x -Wall -O2 -g")
+add_definitions("-D_GNU_SOURCE -std=c++0x -Wall -O2 -g")
 
 find_package(Boost REQUIRED system program_options)
 
