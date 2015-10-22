@@ -42,7 +42,6 @@ class Group
         INIT_MetadataFailed,
         INIT_Uncoupled,
         BROKEN_DHTForbidden,
-        BAD_HaveBADBackends,
         BAD_HaveOther,
         BAD_ParseFailed,
         BAD_InconsistentCouple,

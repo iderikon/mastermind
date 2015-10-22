@@ -80,7 +80,6 @@ public:
         INIT = 0,
         OK,
         RO,
-        BAD,
         STALLED,
         BROKEN
     };

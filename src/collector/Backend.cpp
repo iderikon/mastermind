@@ -322,8 +322,6 @@ const char *Backend::status_str(Status status)
         return "OK";
     case RO:
         return "RO";
-    case BAD:
-        return "BAD";
     case STALLED:
         return "STALLED";
     case BROKEN:
