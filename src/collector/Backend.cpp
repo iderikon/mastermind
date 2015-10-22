@@ -139,6 +139,22 @@ void Backend::update_status()
         m_calculated.status = OK;
 }
 
+bool Backend::group_changed() const
+{
+    if (m_group == nullptr)
+        return false;
+
+    return (m_group->get_id() != int(m_stat.group));
+}
+
+int Backend::get_old_group_id() const
+{
+    if (m_group == nullptr)
+        return -1;
+
+    return m_group->get_id();
+}
+
 void Backend::set_group(Group & group)
 {
     m_group = &group;
