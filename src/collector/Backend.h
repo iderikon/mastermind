@@ -77,11 +77,11 @@ class Backend
 public:
     enum Status
     {
-        INIT = 0,
-        OK,
-        RO,
-        STALLED,
-        BROKEN
+        INIT = 0, // No updates yet
+        OK,       // Enabled, no errors
+        RO,       // Read-Only
+        STALLED,  // Disabled or information is outdated
+        BROKEN    // Misconfig
     };
 
     static const char *status_str(Status status);
