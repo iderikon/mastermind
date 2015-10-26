@@ -79,6 +79,7 @@ private:
     std::vector<HostInfo> load_hosts();
 
     // Functions below are executed in common queue.
+    struct GetDcData;
     static void execute_get_dc_by_host(void *arg);
     static void execute_reload(void *arg);
     struct SaveUpdateData;
