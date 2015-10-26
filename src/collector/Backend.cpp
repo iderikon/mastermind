@@ -221,6 +221,59 @@ void Backend::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) 
 void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         bool show_internals) const
 {
+    // JSON looks like this:
+    // {
+    //     "addr": "::1:1025:10/10",
+    //     "all_stat_commit_errors": 0,
+    //     "backend_id": 10,
+    //     "base_size": 2333049958,
+    //     "blob_size": 53687091200,
+    //     "blob_size_limit": 5368709120,
+    //     "defrag_state": 0,
+    //     "effective_free_space": 2728233006,
+    //     "effective_space": 5061282964,
+    //     "error": 0,
+    //     "fragmentation": 0.08474519068511643,
+    //     "free_space": 3035659162,
+    //     "fsid": 8323278684798404738,
+    //     "group": 83,
+    //     "last_start": {
+    //         "ts_sec": 1444498430,
+    //         "ts_usec": 864588
+    //     },
+    //     "max_blob_base_size": 2333049958,
+    //     "max_read_rps": 100,
+    //     "max_write_rps": 100,
+    //     "node": "::1:1025:10",
+    //     "read_ios": 89340,
+    //     "read_only": false,
+    //     "read_rps": 21,
+    //     "records": 27119,
+    //     "records_removed": 2511,
+    //     "records_removed_size": 258561169,
+    //     "records_total": 29630,
+    //     "stalled": 0,
+    //     "stat_commit_rofs_errors_diff": 0,
+    //     "state": 1,
+    //     "status": "OK",
+    //     "timestamp": {
+    //         "tv_sec": 1445866995,
+    //         "tv_usec": 468262,
+    //         "user_friendly": "2015-10-26 16:43:15.468262"
+    //     },
+    //     "total_space": 5368709120,
+    //     "used_space": 2333049958,
+    //     "vfs_bavail": 477906313,
+    //     "vfs_blocks": 480682466,
+    //     "vfs_bsize": 4096,
+    //     "vfs_free_space": 1957504258048,
+    //     "vfs_total_space": 1968875380736,
+    //     "vfs_used_space": 11371122688,
+    //     "want_defrag": 0,
+    //     "write_ios": 1632389,
+    //     "write_rps": 12
+    // }
+
     writer.StartObject();
 
     writer.Key("timestamp");
