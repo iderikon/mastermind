@@ -49,9 +49,13 @@ public:
 private:
     struct HostInfo
     {
-        HostInfo();
+        HostInfo()
+            : timestamp(0)
+        {}
 
-        int init(const mongo::BSONObj & obj);
+        HostInfo(const mongo::BSONObj & obj);
+
+        mongo::BSONObj obj() const;
 
         std::string host;
         std::string dc;
