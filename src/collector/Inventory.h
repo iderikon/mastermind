@@ -60,19 +60,31 @@ private:
 
     // Open shared object file containing C-linkage function
     // create_inventory(void) returning InventoryDriver*
-    int open_driver(const std::string & file_name);
+    void open_driver(const std::string & file_name);
 
     int cache_db_connect();
 
     void cache_db_update(const HostInfo & info, bool existing);
 
+    void dispatch_next_reload();
+
+    // Download host information from MongoDB.
     std::vector<HostInfo> load_cache_db();
 
+    // Prepare complete host information.
+    std::vector<HostInfo> load_hosts();
+
+    // Functions below are executed in common queue.
     static void execute_get_dc_by_host(void *arg);
-
     static void execute_reload(void *arg);
+    struct SaveUpdateData;
+    static void execute_save_update(void *arg);
 
-    std::string fetch_from_driver(const std::string & addr, bool update);
+    // Functions below are executed in update queue.
+    struct CacheDbUpdateData;
+    static void execute_cache_db_update(void *arg);
+
+    void fetch_from_driver(HostInfo & info, bool update);
 
 private:
     std::map<std::string, HostInfo> m_host_info;
@@ -84,7 +96,8 @@ private:
     std::string m_collection_name;
     double m_last_update_time;
 
-    dispatch_queue_t m_queue;
+    dispatch_queue_t m_common_queue;
+    dispatch_queue_t m_update_queue;
 };
 
 #endif
