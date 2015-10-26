@@ -22,6 +22,19 @@
 
 #include <dlfcn.h>
 
+struct Inventory::GetDcData
+{
+    GetDcData(Inventory & s, const std::string & h)
+        :
+        self(s),
+        host(h)
+    {}
+
+    Inventory & self;
+    const std::string & host;
+    std::string result;
+};
+
 struct Inventory::CacheDbUpdateData
 {
     CacheDbUpdateData(Inventory & s, const HostInfo & i, bool e)
@@ -70,7 +83,7 @@ int Inventory::init()
 {
     if (!app::config().collector_inventory.empty()) {
         BH_LOG(app::logger(), DNET_LOG_INFO, "Opening inventory driver at %s",
-                app::config().collector_inventory.c_str());
+                app::config().collector_inventory);
         open_driver(app::config().collector_inventory);
     }
     return 0;
@@ -165,7 +178,7 @@ void Inventory::open_driver(const std::string & file_name)
         const char *err = dlerror();
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Inventory: dlopen() failed for '%s': %s",
-                file_name.c_str(), (err != nullptr ? err : "unknown error"));
+                file_name, (err != nullptr ? err : "unknown error"));
         return;
     }
 
@@ -174,7 +187,7 @@ void Inventory::open_driver(const std::string & file_name)
         const char *err = dlerror();
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Inventory: Cannot find symbol 'create_inventory' in '%s': '%s'",
-                file_name.c_str(), (err != nullptr ? err : "unknown error"));
+                file_name, (err != nullptr ? err : "unknown error"));
         close();
         return;
     }
@@ -201,20 +214,6 @@ void Inventory::close()
     }
 }
 
-struct GetDcData
-{
-    // TODO: self
-    GetDcData(Inventory & i, const std::string & a)
-        :
-        inv(i),
-        addr(a)
-    {}
-
-    Inventory & inv;
-    const std::string & addr;
-    std::string result;
-};
-
 std::string Inventory::get_dc_by_host(const std::string & addr)
 {
     GetDcData data(*this, addr);
@@ -228,28 +227,28 @@ void Inventory::execute_get_dc_by_host(void *arg)
 
     GetDcData & data = *(GetDcData *) arg;
 
-    auto it = data.inv.m_host_info.find(data.addr);
-    if (it != data.inv.m_host_info.end()) {
+    auto it = data.self.m_host_info.find(data.host);
+    if (it != data.self.m_host_info.end()) {
         BH_LOG(app::logger(), DNET_LOG_DEBUG, "Inventory: Found host '%s' in map, DC is '%s'",
-                data.addr.c_str(), it->second.dc.c_str());
+                data.host, it->second.dc);
         data.result = it->second.dc;
         return;
     }
 
-    if (data.inv.m_driver.get() == nullptr) {
+    if (data.self.m_driver.get() == nullptr) {
         BH_LOG(app::logger(), DNET_LOG_NOTICE,
-                "Have no inventory driver, defaulting DC=host='%s'", data.addr.c_str());
-        data.result = data.addr;
+                "Have no inventory driver, defaulting DC=host='%s'", data.host);
+        data.result = data.host;
         return;
     }
 
     HostInfo info;
-    info.host = data.addr;
-    data.inv.fetch_from_driver(info, false);
+    info.host = data.host;
+    data.self.fetch_from_driver(info, false);
     data.result = info.dc;
 
     // update cache database in update queue
-    dispatch_async_f(data.inv.m_update_queue, new CacheDbUpdateData(data.inv, info, false),
+    dispatch_async_f(data.self.m_update_queue, new CacheDbUpdateData(data.self, info, false),
             &Inventory::execute_cache_db_update);
 }
 
@@ -323,7 +322,7 @@ int Inventory::cache_db_connect()
         mongo::ConnectionString cs = mongo::ConnectionString::parse(config.metadata.url, errmsg);
         if (!cs.isValid()) {
             BH_LOG(app::logger(), DNET_LOG_ERROR,
-                    "Mongo client ConnectionString error: %s", errmsg.c_str());
+                    "Mongo client ConnectionString error: %s", errmsg);
             return -1;
         }
 
@@ -331,7 +330,7 @@ int Inventory::cache_db_connect()
                 errmsg, double(config.metadata.options.connectTimeoutMS) / 1000.0));
         if (m_conn == nullptr) {
             BH_LOG(app::logger(), DNET_LOG_ERROR,
-                    "Connection failed: %s", errmsg.c_str());
+                    "Connection failed: %s", errmsg);
             return -1;
         }
 
@@ -423,7 +422,7 @@ void Inventory::cache_db_update(const HostInfo & info, bool existing)
 
     BH_LOG(app::logger(), DNET_LOG_INFO, "Adding host info to inventory database: "
             "host: '%s' DC: '%s' timestamp: %lu\n",
-            info.host.c_str(), info.dc.c_str(), info.timestamp);
+            info.host, info.dc, info.timestamp);
 
     try {
         mongo::BSONObj obj = info.obj();
