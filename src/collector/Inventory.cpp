@@ -22,12 +22,39 @@
 
 #include <dlfcn.h>
 
+struct Inventory::CacheDbUpdateData
+{
+    CacheDbUpdateData(Inventory & s, const HostInfo & i, bool e)
+        :
+        self(s),
+        info(i),
+        existing(e)
+    {}
+
+    Inventory & self;
+    HostInfo info;
+    bool existing;
+};
+
+struct Inventory::SaveUpdateData
+{
+    SaveUpdateData(Inventory & s, std::vector<Inventory::HostInfo> h)
+        :
+        self(s),
+        hosts(std::move(h))
+    {}
+
+    Inventory & self;
+    std::vector<Inventory::HostInfo> hosts;
+};
+
 Inventory::Inventory()
     :
     m_handle(nullptr),
     m_last_update_time(0.0)
 {
-    m_queue = dispatch_queue_create("inventory", 0);
+    m_common_queue = dispatch_queue_create("inv_common", 0);
+    m_update_queue = dispatch_queue_create("inv_update", DISPATCH_QUEUE_CONCURRENT);
 }
 
 Inventory::~Inventory()
@@ -35,7 +62,8 @@ Inventory::~Inventory()
     m_driver.reset();
     if (m_handle != nullptr)
         dlclose(m_handle);
-    dispatch_release(m_queue);
+    dispatch_release(m_common_queue);
+    dispatch_release(m_update_queue);
 }
 
 int Inventory::init()
@@ -43,49 +71,92 @@ int Inventory::init()
     if (!app::config().collector_inventory.empty()) {
         BH_LOG(app::logger(), DNET_LOG_INFO, "Opening inventory driver at %s",
                 app::config().collector_inventory.c_str());
-        if (open_driver(app::config().collector_inventory) == 0)
-            cache_db_connect();
+        open_driver(app::config().collector_inventory);
     }
     return 0;
 }
 
 void Inventory::download_initial()
 {
-    dispatch_sync_f(m_queue, this, &Inventory::execute_reload);
+    if (cache_db_connect() == 0) {
+        BH_LOG(app::logger(), DNET_LOG_INFO, "Performing initial download");
+        time_t download_start = ::time(nullptr);
+        std::vector<HostInfo> hosts = load_hosts();
+        for (HostInfo & info : hosts) {
+            m_host_info[info.host] = info;
+            if (info.timestamp >= download_start) {
+                // update cache database in update queue
+                dispatch_async_f(m_update_queue, new CacheDbUpdateData(*this, info, false),
+                        &Inventory::execute_cache_db_update);
+            }
+        }
+
+        dispatch_next_reload();
+    }
+}
+
+void Inventory::dispatch_next_reload()
+{
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Dispatching next reload");
+
+    dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW,
+                app::config().infrastructure_dc_cache_update_period * 1000000000ULL),
+            m_update_queue, this, &Inventory::execute_reload);
+}
+
+std::vector<Inventory::HostInfo> Inventory::load_hosts()
+{
+    std::vector<HostInfo> hosts = load_cache_db();
+    time_t now = ::time(nullptr);
+
+    for (HostInfo & info : hosts) {
+        if (now > info.timestamp &&
+                (now - info.timestamp) > app::config().infrastructure_dc_cache_valid_time)
+            fetch_from_driver(info, true);
+    }
+
+    return hosts;
+}
+
+void Inventory::execute_save_update(void *arg)
+{
+    std::unique_ptr<SaveUpdateData> data(static_cast<SaveUpdateData*>(arg));
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Saving update (%lu nodes)", data->hosts.size());
+
+    for (HostInfo & info : data->hosts)
+        data->self.m_host_info[info.host] = info;
 }
 
 void Inventory::execute_reload(void *arg)
 {
+    // executed in update queue
+
     BH_LOG(app::logger(), DNET_LOG_INFO, "Reloading cache");
 
     Inventory & self = *(Inventory *) arg;
 
-    std::vector<HostInfo> hosts = self.load_cache_db();
-    time_t now = ::time(nullptr);
+    time_t reload_start = ::time(nullptr);
+
+    std::vector<HostInfo> hosts = self.load_hosts();
 
     for (HostInfo & info : hosts) {
-        if (now > info.timestamp && (now - info.timestamp) > app::config().infrastructure_dc_cache_valid_time) {
-            std::string addr = info.host;
-            self.fetch_from_driver(addr, true);
-        } else {
-            self.m_host_info[info.host] = info;
-        }
+        if (info.timestamp >= reload_start)
+            self.cache_db_update(info, true);
     }
 
-    if (self.m_driver == nullptr)
-        return;
+    dispatch_async_f(self.m_common_queue, new SaveUpdateData(self, std::move(hosts)),
+            &Inventory::execute_save_update);
 
-    dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW,
-                app::config().infrastructure_dc_cache_update_period * 1000000000ULL),
-            self.m_queue, arg, &Inventory::execute_reload);
+    self.dispatch_next_reload();
 }
 
-int Inventory::open_driver(const std::string & file_name)
+void Inventory::open_driver(const std::string & file_name)
 {
     if (m_handle != nullptr) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Internal error: Inventory driver is already opened");
-        return -1;
+        return;
     }
 
     m_handle = dlopen(file_name.c_str(), RTLD_LAZY | RTLD_LOCAL);
@@ -95,7 +166,7 @@ int Inventory::open_driver(const std::string & file_name)
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Inventory: dlopen() failed for '%s': %s",
                 file_name.c_str(), (err != nullptr ? err : "unknown error"));
-        return -1;
+        return;
     }
 
     InventoryDriver *(*create_inventory)() = (InventoryDriver *(*)()) dlsym(m_handle, "create_inventory");
@@ -105,19 +176,20 @@ int Inventory::open_driver(const std::string & file_name)
                 "Inventory: Cannot find symbol 'create_inventory' in '%s': '%s'",
                 file_name.c_str(), (err != nullptr ? err : "unknown error"));
         close();
-        return -1;
+        return;
     }
 
     InventoryDriver *driver = create_inventory();
     if (driver == nullptr) {
         BH_LOG(app::logger(), DNET_LOG_ERROR, "Inventory: inventory_create() returned null");
         close();
-        return -1;
+        return;
     }
 
     m_driver.reset(driver);
 
-    return 0;
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Successfully loadded driver from %s", file_name);
+    return;
 }
 
 void Inventory::close()
@@ -131,6 +203,7 @@ void Inventory::close()
 
 struct GetDcData
 {
+    // TODO: self
     GetDcData(Inventory & i, const std::string & a)
         :
         inv(i),
@@ -145,12 +218,14 @@ struct GetDcData
 std::string Inventory::get_dc_by_host(const std::string & addr)
 {
     GetDcData data(*this, addr);
-    dispatch_sync_f(m_queue, &data, &Inventory::execute_get_dc_by_host);
+    dispatch_sync_f(m_common_queue, &data, &Inventory::execute_get_dc_by_host);
     return data.result;
 }
 
 void Inventory::execute_get_dc_by_host(void *arg)
 {
+    // executed in common queue
+
     GetDcData & data = *(GetDcData *) arg;
 
     auto it = data.inv.m_host_info.find(data.addr);
@@ -168,40 +243,39 @@ void Inventory::execute_get_dc_by_host(void *arg)
         return;
     }
 
-    data.result = data.inv.fetch_from_driver(data.addr, false);
+    HostInfo info;
+    info.host = data.addr;
+    data.inv.fetch_from_driver(info, false);
+    data.result = info.dc;
+
+    // update cache database in update queue
+    dispatch_async_f(data.inv.m_update_queue, new CacheDbUpdateData(data.inv, info, false),
+            &Inventory::execute_cache_db_update);
 }
 
-std::string Inventory::fetch_from_driver(const std::string & addr, bool update)
+void Inventory::fetch_from_driver(HostInfo & info, bool update)
 {
     if (m_driver == nullptr)
-        return std::string();
+        return;
 
-    BH_LOG(app::logger(), DNET_LOG_INFO,
-            "Fetching DC of host '%s' from driver", addr.c_str());
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Fetching DC of host '%s' from driver", info.host);
 
     std::string result;
     std::string error_text;
-    result = m_driver->get_dc_by_host(addr, error_text);
+    result = m_driver->get_dc_by_host(info.host, error_text);
 
+    // TODO: c_str
     if (result.empty()) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,
-                "Inventory: Cannot resolve DC for host '%s': %s",
-                addr.c_str(), error_text.c_str());
-        return std::string();
+                "Inventory: Cannot resolve DC for host '%s': %s", info.host, error_text);
+        return;
     } else {
         BH_LOG(app::logger(), DNET_LOG_DEBUG,
-                "Inventory: Resolved DC '%s' for host '%s'",
-                result.c_str(), addr.c_str());
+                "Inventory: Resolved DC '%s' for host '%s'", result, info.host);
     }
 
-    HostInfo & info = m_host_info[addr];
-    info.host = addr;
     info.dc = result;
     info.timestamp = ::time(nullptr);
-
-    cache_db_update(info, update);
-
-    return result;
 }
 
 Inventory::HostInfo::HostInfo()
@@ -334,8 +408,16 @@ std::vector<Inventory::HostInfo> Inventory::load_cache_db()
     return result;
 }
 
+void Inventory::execute_cache_db_update(void *arg)
+{
+    std::unique_ptr<CacheDbUpdateData> data(static_cast<CacheDbUpdateData*>(arg));
+    data->self.cache_db_update(data->info, data->existing);
+}
+
 void Inventory::cache_db_update(const HostInfo & info, bool existing)
 {
+    // executed in update queue
+
     if (m_conn == nullptr)
         return;
 
@@ -350,6 +432,7 @@ void Inventory::cache_db_update(const HostInfo & info, bool existing)
         builder.append("timestamp", double(info.timestamp));
         mongo::BSONObj obj = builder.obj();
 
+        // XXX
         if (!existing)
             m_conn->insert(m_collection_name, obj);
         else
