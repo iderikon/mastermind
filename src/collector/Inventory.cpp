@@ -278,43 +278,34 @@ void Inventory::fetch_from_driver(HostInfo & info, bool update)
     info.timestamp = ::time(nullptr);
 }
 
-Inventory::HostInfo::HostInfo()
-    : timestamp(0)
-{}
-
-int Inventory::HostInfo::init(const mongo::BSONObj & obj)
+Inventory::HostInfo::HostInfo(const mongo::BSONObj & obj)
 {
     for (mongo::BSONObj::iterator it = obj.begin(); it.more();) {
         mongo::BSONElement element = it.next();
         const char *field_name = element.fieldName();
 
-        try {
-            if (!std::strcmp(field_name, "host"))
-                this->host = element.String();
-            else if (!std::strcmp(field_name, "dc"))
-                this->dc = element.String();
-            else if (!std::strcmp(field_name, "timestamp"))
-                this->timestamp = element.Double();
-
-        } catch (const mongo::MsgAssertionException & e) {
-            BH_LOG(app::logger(), DNET_LOG_ERROR,
-                    "Initializing HostInfo from BSON: exception: '%s'", e.what());
-            return -1;
-        } catch (...) {
-            BH_LOG(app::logger(), DNET_LOG_ERROR,
-                    "Initializing HostInfo from BSON: unknown exception");
-            return -1;
-        }
+        if (!std::strcmp(field_name, "host"))
+            this->host = element.String();
+        else if (!std::strcmp(field_name, "dc"))
+            this->dc = element.String();
+        else if (!std::strcmp(field_name, "timestamp"))
+            this->timestamp = element.Double();
     }
 
     if (host.empty() || dc.empty() || !timestamp) {
-        BH_LOG(app::logger(), DNET_LOG_ERROR,
-                "Incomplete HostInfo from inventory DB: host='%s' dc='%s' timestamp=%lu",
-                host.c_str(), dc.c_str(), timestamp);
-        return -1;
+        std::ostringstream ostr;
+        ostr << "Incomplete HostInfo from inventory DB: host='" << host << "' dc='" << dc << "' timestamp=" << timestamp;
+        throw std::runtime_error(ostr.str());
     }
+}
 
-    return 0;
+mongo::BSONObj Inventory::HostInfo::obj() const
+{
+    mongo::BSONObjBuilder builder;
+    builder.append("host", host);
+    builder.append("dc", dc);
+    builder.append("timestamp", double(timestamp));
+    return builder.obj();
 }
 
 int Inventory::cache_db_connect()
@@ -383,12 +374,21 @@ std::vector<Inventory::HostInfo> Inventory::load_cache_db()
         while (cursor->more()) {
             mongo::BSONObj obj = cursor->next();
 
-            HostInfo info;
-            if (info.init(obj) == 0) {
+            try {
+                HostInfo info(obj);
                 BH_LOG(app::logger(), DNET_LOG_INFO, "Loaded DC '%s' for host '%s' (updated at %lu)",
-                        info.dc.c_str(), info.host.c_str(), info.timestamp);
+                        info.dc, info.host, info.timestamp);
 
                 result.emplace_back(info);
+            } catch (const mongo::MsgAssertionException & e) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Initializing HostInfo from BSON: msg assertion exception: '%s'", e.what());
+            } catch (const std::exception & e) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Initializing HostInfo from BSON: exception thrown: '%s'", e.what());
+            } catch (...) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Initializing HostInfo from BSON: unknown exception thrown");
             }
         }
 
@@ -426,11 +426,7 @@ void Inventory::cache_db_update(const HostInfo & info, bool existing)
             info.host.c_str(), info.dc.c_str(), info.timestamp);
 
     try {
-        mongo::BSONObjBuilder builder;
-        builder.append("host", info.host);
-        builder.append("dc", info.dc);
-        builder.append("timestamp", double(info.timestamp));
-        mongo::BSONObj obj = builder.obj();
+        mongo::BSONObj obj = info.obj();
 
         // XXX
         if (!existing)
