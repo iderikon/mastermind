@@ -42,7 +42,6 @@ class Group
         INIT_MetadataFailed,
         INIT_Uncoupled,
         BROKEN_DHTForbidden,
-        BAD_HaveBADBackends,
         BAD_HaveOther,
         BAD_ParseFailed,
         BAD_InconsistentCouple,
@@ -114,6 +113,7 @@ public:
     { return m_metadata.version; }
 
     void add_backend(Backend & backend);
+    void remove_backend(Backend & backend);
 
     void handle_metadata_download_failed(const std::string & why);
     void save_metadata(const char *metadata, size_t size, uint64_t timestamp);

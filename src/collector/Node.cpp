@@ -107,10 +107,16 @@ void Node::parse_stats(void *arg)
     self.update(node_stat);
 
     std::vector<BackendStat> & backend_stats = parser.get_backend_stats();
+    // map backend id -> error count
+    std::map<unsigned int, uint64_t> & rofs_errors = parser.get_rofs_errors();
     for (BackendStat & stat : backend_stats) {
         // Backend objects in JSON document don't have individual timestamps
         stat.ts_sec = node_stat.ts_sec;
         stat.ts_usec = node_stat.ts_usec;
+
+        auto it = rofs_errors.find(stat.backend_id);
+        if (it != rofs_errors.end())
+            stat.stat_commit_rofs_errors = it->second;
 
         self.handle_backend(stat);
     }
@@ -190,7 +196,15 @@ void Node::handle_backend(const BackendStat & new_stat)
 
     backend.recalculate(m_storage.get_app().get_config().reserved_space);
     new_fs.update(backend);
-    backend.update_status();
+}
+
+void Node::update_backend_status(uint64_t stale_timeout_sec)
+{
+    for (auto it = m_backends.begin(); it != m_backends.end(); ++it) {
+        Backend & backend = it->second;
+        backend.check_stalled(stale_timeout_sec);
+        backend.update_status();
+    }
 }
 
 void Node::update_filesystems()

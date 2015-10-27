@@ -64,6 +64,12 @@ struct BackendStat
     uint64_t max_blob_base_size;
     uint64_t blob_size;
     uint64_t group;
+
+    uint64_t read_only;
+    uint64_t last_start_ts_sec;
+    uint64_t last_start_ts_usec;
+
+    uint64_t stat_commit_rofs_errors;
 };
 
 class Backend
@@ -71,12 +77,11 @@ class Backend
 public:
     enum Status
     {
-        INIT = 0,
-        OK,
-        RO,
-        BAD,
-        STALLED,
-        BROKEN
+        INIT = 0, // No updates yet
+        OK,       // Enabled, no errors
+        RO,       // Read-Only
+        STALLED,  // Disabled or information is outdated
+        BROKEN    // Misconfig
     };
 
     static const char *status_str(Status status);
@@ -130,7 +135,16 @@ public:
     void update(const BackendStat & stat);
     void set_fs(FS & fs);
     void recalculate(uint64_t reserved_space);
+
+    void check_stalled(uint64_t stall_timeout_sec);
     void update_status();
+
+    // Returns true if bound Group object differs from one in a new stat.
+    // If group is unchanged or not bound, returns false.
+    bool group_changed() const;
+    // Id of currently bound Group.
+    int get_old_group_id() const;
+    // Bind current Group object
     void set_group(Group & group);
 
     void merge(const Backend & other, bool & have_newer);
@@ -181,10 +195,13 @@ private:
         int max_read_rps;
         int max_write_rps;
 
+        // Number of ROFS errors occurred since previous statistics update.
+        uint64_t stat_commit_rofs_errors_diff;
+
+        bool stalled;
+
         Status status;
     } m_calculated;
-
-    bool m_read_only;
 };
 
 #endif

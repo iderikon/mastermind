@@ -40,6 +40,7 @@ struct Config
         forbidden_dht_groups(0),
         forbidden_unmatched_group_total_space(0),
         reserved_space(112742891519),
+        node_backend_stat_stale_timeout(120),
         dnet_log_mask(3),
         net_thread_num(3),
         io_thread_num(3),
@@ -53,6 +54,7 @@ struct Config
     uint64_t forbidden_dht_groups;
     uint64_t forbidden_unmatched_group_total_space;
     uint64_t reserved_space;
+    uint64_t node_backend_stat_stale_timeout;
     uint64_t dnet_log_mask;
     uint64_t net_thread_num;
     uint64_t io_thread_num;
@@ -82,6 +84,7 @@ inline std::ostream & operator << (std::ostream & ostr, const Config & config)
         "forbidden_dht_groups: "                  << config.forbidden_dht_groups << "\n"
         "forbidden_unmatched_group_total_space: " << config.forbidden_unmatched_group_total_space << "\n"
         "reserved_space: "                        << config.reserved_space << "\n"
+        "node_backend_stat_stale_timeout: "       << config.node_backend_stat_stale_timeout << "\n"
         "dnet_log_mask: "                         << config.dnet_log_mask << "\n"
         "net_thread_num: "                        << config.net_thread_num << "\n"
         "io_thread_num: "                         << config.io_thread_num << "\n"

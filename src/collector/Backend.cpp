@@ -36,8 +36,7 @@ Backend::Backend(Node & node)
     :
     m_node(node),
     m_fs(nullptr),
-    m_group(nullptr),
-    m_read_only(false)
+    m_group(nullptr)
 {
     std::memset(&m_calculated, 0, sizeof(m_calculated));
 }
@@ -54,8 +53,6 @@ void Backend::clone_from(const Backend & other)
 
     std::memcpy(&m_stat, &other.m_stat, sizeof(m_stat));
     std::memcpy(&m_calculated, &other.m_calculated, sizeof(m_calculated));
-
-    m_read_only = other.m_read_only;
 }
 
 bool Backend::full() const
@@ -73,7 +70,10 @@ void Backend::update(const BackendStat & stat)
     double ts2 = double(stat.get_timestamp()) / 1000000.0;
     double d_ts = ts2 - ts1;
 
-    if (d_ts > 1.0) {
+    // Calculating only when d_ts is long enough to make result more smooth.
+    // With forced update we can get two updates within short interval.
+    // In reality, this situation is very rare.
+    if (d_ts > 1.0 && !stat.error) {
         m_calculated.read_rps = int(double(stat.read_ios - m_stat.read_ios) / d_ts);
         m_calculated.write_rps = int(double(stat.write_ios - m_stat.write_ios) / d_ts);
 
@@ -82,6 +82,15 @@ void Backend::update(const BackendStat & stat)
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
         m_calculated.max_write_rps = int(std::max(double(m_calculated.write_rps) /
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
+    }
+
+    uint64_t last_start_old = m_stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
+    uint64_t last_start_new = stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
+    if (last_start_old < last_start_new || m_stat.stat_commit_rofs_errors > stat.stat_commit_rofs_errors) {
+        m_calculated.stat_commit_rofs_errors_diff = 0;
+    } else {
+        uint64_t d = stat.stat_commit_rofs_errors - m_stat.stat_commit_rofs_errors;
+        m_calculated.stat_commit_rofs_errors_diff += d;
     }
 
     std::memcpy(&m_stat, &stat, sizeof(m_stat));
@@ -121,16 +130,46 @@ void Backend::recalculate(uint64_t reserved_space)
         std::max(m_calculated.free_space - (m_calculated.total_space - m_calculated.effective_space), 0L);
 }
 
+void Backend::check_stalled(uint64_t stall_timeout_sec)
+{
+    uint64_t ts_now = 0;
+    clock_get(ts_now);
+    ts_now /= 1000000000ULL;
+
+    if (ts_now <= m_stat.ts_sec) {
+        m_calculated.stalled = false;
+        return;
+    }
+
+    m_calculated.stalled = ((ts_now - m_stat.ts_sec) > stall_timeout_sec);
+}
+
 void Backend::update_status()
 {
-    if (m_stat.error || m_stat.state != DNET_BACKEND_ENABLED || m_fs == nullptr)
+    if (m_calculated.stalled || m_stat.state != DNET_BACKEND_ENABLED || m_fs == nullptr)
         m_calculated.status = STALLED;
     else if (m_fs->get_status() == FS::BROKEN)
         m_calculated.status = BROKEN;
-    else if (m_read_only)
+    else if (m_stat.read_only || m_calculated.stat_commit_rofs_errors_diff)
         m_calculated.status = RO;
     else
         m_calculated.status = OK;
+}
+
+bool Backend::group_changed() const
+{
+    if (m_group == nullptr)
+        return false;
+
+    return (m_group->get_id() != int(m_stat.group));
+}
+
+int Backend::get_old_group_id() const
+{
+    if (m_group == nullptr)
+        return -1;
+
+    return m_group->get_id();
 }
 
 void Backend::set_group(Group & group)
@@ -182,6 +221,59 @@ void Backend::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) 
 void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         bool show_internals) const
 {
+    // JSON looks like this:
+    // {
+    //     "addr": "::1:1025:10/10",
+    //     "all_stat_commit_errors": 0,
+    //     "backend_id": 10,
+    //     "base_size": 2333049958,
+    //     "blob_size": 53687091200,
+    //     "blob_size_limit": 5368709120,
+    //     "defrag_state": 0,
+    //     "effective_free_space": 2728233006,
+    //     "effective_space": 5061282964,
+    //     "error": 0,
+    //     "fragmentation": 0.08474519068511643,
+    //     "free_space": 3035659162,
+    //     "fsid": 8323278684798404738,
+    //     "group": 83,
+    //     "last_start": {
+    //         "ts_sec": 1444498430,
+    //         "ts_usec": 864588
+    //     },
+    //     "max_blob_base_size": 2333049958,
+    //     "max_read_rps": 100,
+    //     "max_write_rps": 100,
+    //     "node": "::1:1025:10",
+    //     "read_ios": 89340,
+    //     "read_only": false,
+    //     "read_rps": 21,
+    //     "records": 27119,
+    //     "records_removed": 2511,
+    //     "records_removed_size": 258561169,
+    //     "records_total": 29630,
+    //     "stalled": 0,
+    //     "stat_commit_rofs_errors_diff": 0,
+    //     "state": 1,
+    //     "status": "OK",
+    //     "timestamp": {
+    //         "tv_sec": 1445866995,
+    //         "tv_usec": 468262,
+    //         "user_friendly": "2015-10-26 16:43:15.468262"
+    //     },
+    //     "total_space": 5368709120,
+    //     "used_space": 2333049958,
+    //     "vfs_bavail": 477906313,
+    //     "vfs_blocks": 480682466,
+    //     "vfs_bsize": 4096,
+    //     "vfs_free_space": 1957504258048,
+    //     "vfs_total_space": 1968875380736,
+    //     "vfs_used_space": 11371122688,
+    //     "want_defrag": 0,
+    //     "write_ios": 1632389,
+    //     "write_rps": 12
+    // }
+
     writer.StartObject();
 
     writer.Key("timestamp");
@@ -270,9 +362,25 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Key("status");
     writer.String(status_str(m_calculated.status));
 
-    // XXX
+    writer.Key("last_start");
+    writer.StartObject();
+    writer.Key("ts_sec");
+    writer.Uint64(m_stat.last_start_ts_sec);
+    writer.Key("ts_usec");
+    writer.Uint64(m_stat.last_start_ts_usec);
+    writer.EndObject();
+
     writer.Key("read_only");
-    writer.Bool(m_read_only);
+    writer.Bool(!!m_stat.read_only);
+    writer.Key("stat_commit_rofs_errors_diff");
+    writer.Uint64(m_calculated.stat_commit_rofs_errors_diff); // XXX
+
+    if (show_internals) {
+        writer.Key("stat_commit_rofs_errors");
+        writer.Uint64(m_stat.stat_commit_rofs_errors);
+        writer.Key("stalled");
+        writer.Uint64(m_calculated.stalled);
+    }
 
     writer.EndObject();
 }
@@ -286,8 +394,6 @@ const char *Backend::status_str(Status status)
         return "OK";
     case RO:
         return "RO";
-    case BAD:
-        return "BAD";
     case STALLED:
         return "STALLED";
     case BROKEN:
