@@ -274,10 +274,10 @@ void Couple::push_items(std::vector<std::reference_wrapper<FS>> & filesystems) c
         group.push_items(filesystems);
 }
 
-void Couple::account_job_in_status()
+bool Couple::account_job_in_status()
 {
     if (m_status != BAD)
-        return;
+        return false;
 
     for (Group & group : m_groups) {
         if (group.has_active_job()) {
@@ -286,7 +286,7 @@ void Couple::account_job_in_status()
             Job::Status status = job.get_status();
 
             if (type != Job::MOVE_JOB && type != Job::RESTORE_GROUP_JOB)
-                return;
+                return false;
 
             if (status == Job::NEW || status == Job::EXECUTING) {
                 m_internal_status = SERVICE_ACTIVE_ServiceActive;
@@ -305,9 +305,11 @@ void Couple::account_job_in_status()
             if (m_modified_time < group.get_update_time())
                 m_modified_time = group.get_update_time();
 
-            break;
+            return true;
         }
     }
+
+    return false;
 }
 
 int Couple::check_dc_sharing()

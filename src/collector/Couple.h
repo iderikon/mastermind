@@ -105,7 +105,9 @@ public:
     { return m_update_status_duration; }
 
 private:
-    void account_job_in_status();
+    // Returns true if active job affected status.
+    bool account_job_in_status();
+
     int check_dc_sharing();
 
 private:
