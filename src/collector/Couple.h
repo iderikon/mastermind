@@ -35,27 +35,6 @@ class Storage;
 
 class Couple
 {
-    enum InternalStatus {
-        INIT_Init,
-        BAD_NoGroups,
-        BAD_DifferentMetadata,
-        BAD_GroupUninitialized,
-        BAD_GroupBAD,
-        BAD_ReadOnly,
-        BAD_DcResolveFailed,
-        BAD_Unknown,
-        BROKEN_UnequalTotalSpace,
-        BROKEN_DcSharing,
-        BROKEN_GroupBROKEN,
-        FROZEN_Frozen,
-        FULL_Full,
-        SERVICE_ACTIVE_ServiceActive,
-        SERVICE_STALLED_ServiceStalled,
-        OK_OK
-    };
-
-    static const char *internal_status_str(InternalStatus status);
-
 public:
     enum Status {
         INIT,

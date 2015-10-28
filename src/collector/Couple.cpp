@@ -336,45 +336,6 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, boo
     writer.EndObject();
 }
 
-const char *Couple::internal_status_str(InternalStatus status)
-{
-    switch (status) {
-    case INIT_Init:
-        return "INIT_Init";
-    case BAD_NoGroups:
-        return "BAD_NoGroups";
-    case BAD_DifferentMetadata:
-        return "BAD_DifferentMetadata";
-    case BAD_GroupUninitialized:
-        return "BAD_GroupUninitialized";
-    case BAD_GroupBAD:
-        return "BAD_GroupBAD";
-    case BAD_ReadOnly:
-        return "BAD_ReadOnly";
-    case BAD_DcResolveFailed:
-        return "BAD_DcResolveFailed";
-    case BAD_Unknown:
-        return "BAD_Unknown";
-    case BROKEN_DcSharing:
-        return "BROKEN_DcSharing";
-    case BROKEN_GroupBROKEN:
-        return "BROKEN_GroupBROKEN";
-    case BROKEN_UnequalTotalSpace:
-        return "BROKEN_UnequalTotalSpace";
-    case FROZEN_Frozen:
-        return "FROZEN_Frozen";
-    case FULL_Full:
-        return "FULL_Full";
-    case SERVICE_ACTIVE_ServiceActive:
-        return "SERVICE_ACTIVE_ServiceActive";
-    case SERVICE_STALLED_ServiceStalled:
-        return "SERVICE_STALLED_ServiceStalled";
-    case OK_OK:
-        return "OK_OK";
-    }
-    return "UNKNOWN";
-}
-
 const char *Couple::status_str(Status status)
 {
     switch (status)

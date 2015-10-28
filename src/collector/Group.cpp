@@ -661,47 +661,6 @@ void Group::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.EndObject();
 }
 
-    enum InternalStatus {
-    };
-
-const char *Group::internal_status_str(InternalStatus status)
-{
-    switch (status)
-    {
-    case INIT_Init:
-        return "INIT_Init";
-    case INIT_NoBackends:
-        return "INIT_NoBackends";
-    case INIT_MetadataFailed:
-        return "INIT_MetadataFailed";
-    case INIT_Uncoupled:
-        return "INIT_Uncoupled";
-    case BROKEN_DHTForbidden:
-        return "BROKEN_DHTForbidden";
-    case BAD_HaveOther:
-        return "BAD_HaveOther";
-    case BAD_ParseFailed:
-        return "BAD_ParseFailed";
-    case BAD_InconsistentCouple:
-        return "BAD_InconsistentCouple";
-    case BAD_DifferentMetadata:
-        return "BAD_DifferentMetadata";
-    case BAD_CoupleBAD:
-        return "BAD_CoupleBAD";
-    case BAD_NoActiveJob:
-        return "BAD_NoActiveJob";
-    case MIGRATING_ServiceMigrating:
-        return "MIGRATING_ServiceMigrating";
-    case RO_HaveROBackends:
-        return "RO_HaveROBackends";
-    case COUPLED_MetadataOK:
-        return "COUPLED_MetadataOK";
-    case COUPLED_Coupled:
-        return "COUPLED_Coupled";
-    }
-    return "UNKNOWN";
-}
-
 const char *Group::status_str(Status status)
 {
     switch (status)

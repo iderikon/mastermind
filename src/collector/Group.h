@@ -36,26 +36,6 @@ class Storage;
 
 class Group
 {
-    enum InternalStatus {
-        INIT_Init,
-        INIT_NoBackends,
-        INIT_MetadataFailed,
-        INIT_Uncoupled,
-        BROKEN_DHTForbidden,
-        BAD_HaveOther,
-        BAD_ParseFailed,
-        BAD_InconsistentCouple,
-        BAD_DifferentMetadata,
-        BAD_CoupleBAD,
-        BAD_NoActiveJob,
-        MIGRATING_ServiceMigrating,
-        RO_HaveROBackends,
-        COUPLED_MetadataOK,
-        COUPLED_Coupled
-    };
-
-    static const char *internal_status_str(InternalStatus status);
-
 public:
     enum Status {
         INIT,
