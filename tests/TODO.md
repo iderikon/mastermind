@@ -83,3 +83,75 @@ groups.
   5. *DHT groups #3*. This test makes sure that detection of wrong setup still
   works fine for DHT groups. Conflicting backends are checked in all
   combinations of sequence numbers within their groups.
+* **Couple status**. This test verifies status calculation for `Couple` (method
+  `Couple::update_status`). Each test case checks the resulting status under
+  certain conditions. Prerequisite of all cases is that none of previous
+  conditions are satisfied.
+  1. *Metadata conflict*. A pair of groups has different metadata (namespace,
+  type, ...). Result: `BAD`. Check different combinations of conflicting groups.
+  2. *Frozen*. Some groups(s) are `FROZEN`. Result: `FROZEN`.
+  3. *Unmatched total*. All groups are `COUPLED`, total space is unmatched.
+  Result: `BROKEN`.
+  4. *Full*. All groups are `COUPLED`, some group(s) are full. Result: `FULL`.
+  5. *OK*. All groups are `COUPLED`. Result: `OK`.
+  6. *Init #1*. Have group in state `INIT`. Result: `INIT`.
+  7. *Broken group*. Have group in state `BROKEN`. Result: `BROKEN`.
+  8. *Bad group*. Have group in state `BAD`. Result: `BAD`.
+  9. *Read-only group*. Have group in state `RO`, no active job. Result: `BAD`.
+  Repeat test for migrating group.
+  10. TODO: double check and extend this list after
+  https://github.com/yandex/mastermind/issues/31.
+  11. TODO: add separate test for `account_job_in_status()` in the same way as
+  for DC sharing.
+
+#### Group:
+
+* **Group type**. This test verifies if type of a group is determined correctly.
+  It depends on four conditions: metadata was downloaded or not (`md` / `!md`),
+  config option `cache_group_path_prefix` is specified (`conf` / `!conf`), have
+  backend with base path beginning with specified cache group path prefix
+  (`have_backend` / `!have_backend`), group type in metadata is `cache`
+  or other. The result of each test case is calculated type.
+  1. *Data #1*. `!md` && `!conf`. Result: `DATA`.
+  2. *Unmarked*. `!md` && `conf` && `have_backend`. Result: `UNMARKED`. The test
+  is repeated with different number of backends (1 and 3), trying each backend
+  having specified prefix.
+  3. *Data #2*. `!md` && `conf` && `!have_backend`. Result: `DATA`.
+  4. *Cache*. `md` && `type=="cache"`. Result: `CACHE`.
+  5. *Data #3*. `md` && `type==""`. Result: `DATA`.
+* **Group status**. This test verifies status calculation for `Group` (method
+  `Group::update_status`). Each test case checks the resulting status under
+  certain conditions. Prerequisite of all cases is that none of previous
+  conditions are satisfied.
+  1. *No backends*. Group has no backends. Result: `INIT`.
+  2. *Forbidden DHT*. DHT groups are forbidden, group has more than one
+  backends. Result: `BROKEN`.
+  3. *No metadata*. Metadata was not parsed. Result: `INIT`.
+  4. *Broken backend*. One or more backends are in state `BROKEN`. Result:
+  `BROKEN`. Test should be passed for different backend layouts (number of
+  backends, position of broken backend).
+  5. *Empty couple*. Group of type `DATA` has empty couple in metadata. Result:
+  `INIT`.
+  6. *Unbound couple*. Couple is defined, but no `Couple` object was bound to
+  the group (`Group::set_couple`). Result: `BAD`.
+  7. *Inconsistent couple #1*. Couple has different set of groups than group's
+  metadata. Result: `BAD`.
+  8. *Inconsistent couple #2*. Some of couple's groups has different couple
+  in metadata. Result: `BAD`.
+  9. *Empty namespace*. Metadata has empty namespace name. Result: `BAD`.
+  10. *Wrong couple*. Group identifier is not present in couple field of
+  metadata. Result: `BROKEN`.
+  11. *RO backend #1*. Have read-only backend, group is migrating (metadata
+  field), active job is bound and its id matches metadata. Result: `MIGRATING`.
+  12. *RO backend #2*. Have `RO` backend, group is migrating, no active job.
+  Result: `BAD`.
+  13. *RO backend #3*. Have `RO` backend, group is migrating, active job id
+  doesn't match metadata. Result: `BAD`.
+  14. *RO backend #4*. Have `RO` backend, group is not marked as migrating.
+  Result: `RO`.
+  15. *Other backend state*. Group has backend(s) in state `STALLED` or `INIT`.
+  Result: `BAD`.
+  16. *Coupled*. If none of conditions above are met, group must be in state
+  `COUPLED`.
+  17. TODO: double check and extend this list after
+  https://github.com/yandex/mastermind/issues/31.
