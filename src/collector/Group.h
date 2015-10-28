@@ -146,10 +146,10 @@ public:
     void clear_active_job();
 
     void update_status(bool forbidden_dht);
-    void set_coupled_status(bool ok, uint64_t timestamp);
+    void update_status_recursive(bool forbidden_dht,
+            bool forbidden_dc_sharing, bool forbidden_unmatched_total);
 
-    int check_couple_equals(const Group & other);
-    int check_metadata_equals(const Group & other);
+    bool have_metadata_conflict(const Group & other);
 
     void set_couple(Couple & couple);
 
@@ -172,6 +172,11 @@ public:
 
     uint64_t get_metadata_parse_duration() const
     { return m_metadata_parse_duration; }
+
+private:
+    void clear_metadata();
+
+    bool update_storage_group_status();
 
 private:
     int m_id;
@@ -206,7 +211,8 @@ private:
     // Pointers to a couple, active job, and a namespace of this group.
     // If the information is unknown, e.g. metadata was not loaded,
     // the values are set to nullptr. These objects shouldn't be modified
-    // directly but only used for status checks and by push_items().
+    // directly except that Couple::update_status() is invoked from
+    // update_status_recursive(); also items can be collected by push_items().
     Couple *m_couple;
     const Job *m_active_job;
     Namespace *m_namespace;
@@ -215,7 +221,6 @@ private:
 
     std::string m_status_text;
     Status m_status;
-    InternalStatus m_internal_status;
 };
 
 #endif

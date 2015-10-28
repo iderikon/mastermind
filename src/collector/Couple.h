@@ -84,7 +84,13 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+    void update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+
+    bool check_groups(const std::vector<int> & group_ids) const;
+
+    uint64_t get_effective_free_space() const;
+
+    bool full();
 
     void merge(const Couple & other, bool & have_newer);
 
@@ -114,7 +120,6 @@ private:
     std::string m_key;
     std::vector<std::reference_wrapper<Group>> m_groups;
 
-    InternalStatus m_internal_status;
     Status m_status;
     std::string m_status_text;
 
