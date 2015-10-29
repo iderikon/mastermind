@@ -36,26 +36,6 @@ class Storage;
 
 class Group
 {
-    enum InternalStatus {
-        INIT_Init,
-        INIT_NoBackends,
-        INIT_MetadataFailed,
-        INIT_Uncoupled,
-        BROKEN_DHTForbidden,
-        BAD_HaveOther,
-        BAD_ParseFailed,
-        BAD_InconsistentCouple,
-        BAD_DifferentMetadata,
-        BAD_CoupleBAD,
-        BAD_NoActiveJob,
-        MIGRATING_ServiceMigrating,
-        RO_HaveROBackends,
-        COUPLED_MetadataOK,
-        COUPLED_Coupled
-    };
-
-    static const char *internal_status_str(InternalStatus status);
-
 public:
     enum Status {
         INIT,
@@ -66,7 +46,15 @@ public:
         MIGRATING
     };
 
+    enum Type {
+        DATA,
+        CACHE,
+        UNMARKED
+    };
+
     static const char *status_str(Status status);
+
+    static const char *type_str(Type type);
 
     struct BackendLess
     {
@@ -84,6 +72,9 @@ public:
 
     int get_key() const
     { return m_id; }
+
+    Type get_type() const
+    { return m_type; }
 
     Status get_status() const
     { return m_status; }
@@ -118,6 +109,7 @@ public:
     void handle_metadata_download_failed(const std::string & why);
     void save_metadata(const char *metadata, size_t size, uint64_t timestamp);
     int parse_metadata();
+    void calculate_type(const std::string & cache_group_path_prefix);
 
     bool metadata_parsed() const
     { return m_metadata_parsed; }
@@ -134,10 +126,10 @@ public:
     void clear_active_job();
 
     void update_status(bool forbidden_dht);
-    void set_coupled_status(bool ok, uint64_t timestamp);
+    void update_status_recursive(bool forbidden_dht,
+            bool forbidden_dc_sharing, bool forbidden_unmatched_total);
 
-    int check_couple_equals(const Group & other);
-    int check_metadata_equals(const Group & other);
+    bool have_metadata_conflict(const Group & other);
 
     void set_couple(Couple & couple);
 
@@ -162,6 +154,11 @@ public:
     { return m_metadata_parse_duration; }
 
 private:
+    void clear_metadata();
+
+    bool update_storage_group_status();
+
+private:
     int m_id;
 
     // Set of references to backends serving this group. They shouldn't be
@@ -181,6 +178,7 @@ private:
         bool frozen;
         std::vector<int> couple;
         std::string namespace_name;
+        std::string type;
         struct {
             bool migrating;
             std::string job_id;
@@ -193,14 +191,16 @@ private:
     // Pointers to a couple, active job, and a namespace of this group.
     // If the information is unknown, e.g. metadata was not loaded,
     // the values are set to nullptr. These objects shouldn't be modified
-    // directly but only used for status checks and by push_items().
+    // directly except that Couple::update_status() is invoked from
+    // update_status_recursive(); also items can be collected by push_items().
     Couple *m_couple;
     const Job *m_active_job;
     Namespace *m_namespace;
 
+    Type m_type;
+
     std::string m_status_text;
     Status m_status;
-    InternalStatus m_internal_status;
 };
 
 #endif

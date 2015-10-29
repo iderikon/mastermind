@@ -35,27 +35,6 @@ class Storage;
 
 class Couple
 {
-    enum InternalStatus {
-        INIT_Init,
-        BAD_NoGroups,
-        BAD_DifferentMetadata,
-        BAD_GroupUninitialized,
-        BAD_GroupBAD,
-        BAD_ReadOnly,
-        BAD_DcResolveFailed,
-        BAD_Unknown,
-        BROKEN_UnequalTotalSpace,
-        BROKEN_DcSharing,
-        BROKEN_GroupBROKEN,
-        FROZEN_Frozen,
-        FULL_Full,
-        SERVICE_ACTIVE_ServiceActive,
-        SERVICE_STALLED_ServiceStalled,
-        OK_OK
-    };
-
-    static const char *internal_status_str(InternalStatus status);
-
 public:
     enum Status {
         INIT,
@@ -84,7 +63,13 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void update_status(bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+    void update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+
+    bool check_groups(const std::vector<int> & group_ids) const;
+
+    uint64_t get_effective_free_space() const;
+
+    bool full();
 
     void merge(const Couple & other, bool & have_newer);
 
@@ -105,14 +90,15 @@ public:
     { return m_update_status_duration; }
 
 private:
-    void account_job_in_status();
+    // Returns true if active job affected status.
+    bool account_job_in_status();
+
     int check_dc_sharing();
 
 private:
     std::string m_key;
     std::vector<std::reference_wrapper<Group>> m_groups;
 
-    InternalStatus m_internal_status;
     Status m_status;
     std::string m_status_text;
 

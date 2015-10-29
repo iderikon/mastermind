@@ -59,6 +59,7 @@ struct Config
     uint64_t net_thread_num;
     uint64_t io_thread_num;
     uint64_t nonblocking_io_thread_num;
+    std::string cache_group_path_prefix;
     std::vector<NodeInfo> nodes;
 
     struct {
@@ -98,6 +99,7 @@ inline std::ostream & operator << (std::ostream & ostr, const Config & config)
         "    db: "                                << config.metadata.jobs.db << "\n"
         "  }\n"
         "}\n"
+        "cache_group_path_prefix: "               << config.cache_group_path_prefix << "\n"
         "nodes:\n";
     for (const Config::NodeInfo & node : config.nodes)
         ostr << "  " << node.host << ':' << node.port << ':' << node.family << '\n';
