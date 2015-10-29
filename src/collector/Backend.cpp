@@ -36,6 +36,7 @@ BackendStat::BackendStat()
     vfs_blocks(0),
     vfs_bavail(0),
     vfs_bsize(0),
+    vfs_error(0),
     records_total(0),
     records_removed(0),
     records_removed_size(0),
@@ -45,7 +46,11 @@ BackendStat::BackendStat()
     want_defrag(0),
     read_ios(0),
     write_ios(0),
-    error(0),
+    read_ticks(0),
+    write_ticks(0),
+    io_ticks(0),
+    read_sectors(0),
+    dstat_error(0),
     blob_size_limit(0),
     max_blob_base_size(0),
     blob_size(0),
@@ -97,7 +102,7 @@ void Backend::update(const BackendStat & stat)
     // Calculating only when d_ts is long enough to make result more smooth.
     // With forced update we can get two updates within short interval.
     // In reality, this situation is very rare.
-    if (d_ts > 1.0 && !stat.error) {
+    if (d_ts > 1.0 && !stat.dstat_error) {
         m_calculated.read_rps = int(double(stat.read_ios - m_stat.read_ios) / d_ts);
         m_calculated.write_rps = int(double(stat.write_ios - m_stat.write_ios) / d_ts);
 
@@ -353,8 +358,8 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_stat.read_ios);
     writer.Key("write_ios");
     writer.Uint64(m_stat.write_ios);
-    writer.Key("error");
-    writer.Uint64(m_stat.error);
+    writer.Key("dstat_error");
+    writer.Uint64(m_stat.dstat_error);
     writer.Key("blob_size_limit");
     writer.Uint64(m_stat.blob_size_limit);
     writer.Key("max_blob_base_size");

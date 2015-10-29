@@ -74,10 +74,10 @@ const uint64_t LastStartTvSec     = 0x800000000000ULL;
 const uint64_t LastStartTvUsec    = 0x1000000000000ULL;
 const uint64_t DataPath           = 0x2000000000000ULL;
 const uint64_t FilePath           = 0x4000000000000ULL;
-//                                = 0x8000000000000ULL;
-//                                = 0x10000000000000ULL;
-//                                = 0x20000000000000ULL;
-//                                = 0x40000000000000ULL;
+const uint64_t ReadTicks          = 0x8000000000000ULL;
+const uint64_t WriteTicks         = 0x10000000000000ULL;
+const uint64_t IoTicks            = 0x20000000000000ULL;
+const uint64_t ReadSectors        = 0x40000000000000ULL;
 //                                = 0x80000000000000ULL;
 //                                = 0x100000000000000ULL;
 //                                = 0x200000000000000ULL;
@@ -127,10 +127,15 @@ std::vector<Parser::FolderVector> backend_folders = {
         { "read_ios",             Backends|BackendFolder|Backend|Dstat,        ReadIos            },
         { "write_ios",            Backends|BackendFolder|Backend|Dstat,        WriteIos           },
         { "error",                Backends|BackendFolder|Backend|Dstat,        Error              },
+        { "read_ticks",           Backends|BackendFolder|Backend|Dstat,        ReadTicks          },
+        { "write_ticks",          Backends|BackendFolder|Backend|Dstat,        WriteTicks         },
+        { "io_ticks",             Backends|BackendFolder|Backend|Dstat,        IoTicks            },
+        { "read_sectors",         Backends|BackendFolder|Backend|Dstat,        ReadSectors        },
         { "blocks",               Backends|BackendFolder|Backend|Vfs,          Blocks             },
         { "bavail",               Backends|BackendFolder|Backend|Vfs,          Bavail             },
         { "bsize",                Backends|BackendFolder|Backend|Vfs,          Bsize              },
         { "fsid",                 Backends|BackendFolder|Backend|Vfs,          Fsid               },
+        { "error",                Backends|BackendFolder|Backend|Vfs,          Error              },
         { "records_total",        Backends|BackendFolder|Backend|SummaryStats, RecordsTotal       },
         { "records_removed",      Backends|BackendFolder|Backend|SummaryStats, RecordsRemoved     },
         { "records_removed_size", Backends|BackendFolder|Backend|SummaryStats, RecordsRemovedSize },
@@ -162,11 +167,16 @@ Parser::UIntInfoVector backend_uint_info = {
     { Backends|BackendFolder|BackendId,                                   SET, BOFF(backend_id)           },
     { Backends|BackendFolder|Backend|Dstat|ReadIos,                       SET, BOFF(read_ios)             },
     { Backends|BackendFolder|Backend|Dstat|WriteIos,                      SET, BOFF(write_ios)            },
-    { Backends|BackendFolder|Backend|Dstat|Error,                         SET, BOFF(error)                },
+    { Backends|BackendFolder|Backend|Dstat|ReadTicks,                     SET, BOFF(read_ticks)           },
+    { Backends|BackendFolder|Backend|Dstat|WriteTicks,                    SET, BOFF(write_ticks)          },
+    { Backends|BackendFolder|Backend|Dstat|IoTicks,                       SET, BOFF(io_ticks)             },
+    { Backends|BackendFolder|Backend|Dstat|ReadSectors,                   SET, BOFF(read_sectors)         },
+    { Backends|BackendFolder|Backend|Dstat|Error,                         SET, BOFF(dstat_error)          },
     { Backends|BackendFolder|Backend|Vfs|Blocks,                          SET, BOFF(vfs_blocks)           },
     { Backends|BackendFolder|Backend|Vfs|Bavail,                          SET, BOFF(vfs_bavail)           },
     { Backends|BackendFolder|Backend|Vfs|Bsize,                           SET, BOFF(vfs_bsize)            },
     { Backends|BackendFolder|Backend|Vfs|Fsid,                            SET, BOFF(fsid)                 },
+    { Backends|BackendFolder|Backend|Vfs|Error,                           SET, BOFF(vfs_error)            },
     { Backends|BackendFolder|Backend|SummaryStats|RecordsTotal,           SET, BOFF(records_total)        },
     { Backends|BackendFolder|Backend|SummaryStats|RecordsRemoved,         SET, BOFF(records_removed)      },
     { Backends|BackendFolder|Backend|SummaryStats|RecordsRemovedSize,     SET, BOFF(records_removed_size) },
