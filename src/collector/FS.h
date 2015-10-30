@@ -26,8 +26,8 @@
 #include <string>
 #include <vector>
 
-class Backend;
-class BackendStat;
+#include "Backend.h"
+
 class Filter;
 class Node;
 class Storage;
@@ -75,6 +75,8 @@ public:
 
         double disk_read_rate;
         double disk_write_rate;
+
+        CommandStat command_stat;
     };
 
 public:
@@ -103,6 +105,7 @@ public:
 
     void update(const Backend & backend);
     void update_status();
+    void update_command_stat();
 
     void merge(const FS & other, bool & have_newer);
 

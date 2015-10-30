@@ -153,6 +153,15 @@ void FS::update_status()
     }
 }
 
+void FS::update_command_stat()
+{
+    m_calculated.command_stat.clear();
+    for (Backend & backend : m_backends) {
+        if (backend.get_calculated().status == Backend::OK)
+            m_calculated.command_stat += backend.get_calculated().command_stat;
+    }
+}
+
 void FS::merge(const FS & other, bool & have_newer)
 {
     uint64_t my_ts = m_stat.ts_sec * 1000000 + m_stat.ts_usec;
@@ -258,6 +267,15 @@ void FS::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Double(m_calculated.disk_read_rate);
     writer.Key("disk_write_rate");
     writer.Double(m_calculated.disk_write_rate);
+
+    writer.Key("disk_read_rate");
+    writer.Double(m_calculated.command_stat.disk_read_rate);
+    writer.Key("disk_write_rate");
+    writer.Double(m_calculated.command_stat.disk_write_rate);
+    writer.Key("net_read_rate");
+    writer.Double(m_calculated.command_stat.net_read_rate);
+    writer.Key("net_write_rate");
+    writer.Double(m_calculated.command_stat.net_write_rate);
 
     writer.EndObject();
 }

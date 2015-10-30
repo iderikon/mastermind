@@ -89,6 +89,21 @@ struct BackendStat
     std::string file_path;
 };
 
+struct CommandStat
+{
+    CommandStat();
+
+    void calculate(const BackendStat & old_stat, const BackendStat & new_stat);
+
+    void clear();
+    CommandStat & operator += (const CommandStat & other);
+
+    double disk_read_rate;
+    double disk_write_rate;
+    double net_read_rate;
+    double net_write_rate;
+};
+
 class Backend
 {
 public:
@@ -131,6 +146,8 @@ public:
         Status status;
 
         std::string base_path;
+
+        CommandStat command_stat;
     };
 
 public:

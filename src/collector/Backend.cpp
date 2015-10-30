@@ -69,6 +69,53 @@ BackendStat::BackendStat()
     ell_disk_read_time(0)
 {}
 
+CommandStat::CommandStat()
+{
+    clear();
+}
+
+void CommandStat::calculate(const BackendStat & old_stat, const BackendStat & new_stat)
+{
+    double dt = new_stat.get_timestamp() / 1000000.0 - old_stat.get_timestamp() / 1000000.0;
+    if (dt <= 1.0)
+        return;
+
+    int64_t disk_read = int64_t(new_stat.ell_disk_read_size) - int64_t(old_stat.ell_disk_read_size);
+    int64_t disk_written = int64_t(new_stat.ell_disk_write_size) - int64_t(old_stat.ell_disk_write_size);
+    int64_t cache_read = int64_t(new_stat.ell_cache_read_size) - int64_t(old_stat.ell_cache_read_size);
+    int64_t cache_written = int64_t(new_stat.ell_cache_write_size) - int64_t(old_stat.ell_cache_write_size);
+
+    if (disk_read > 0) {
+        disk_read_rate = double(disk_read) / dt;
+        if (cache_read > 0)
+            net_read_rate = double(disk_read + cache_read) / dt;
+    }
+
+    if (disk_written > 0) {
+        disk_write_rate = double(disk_written) / dt;
+        if (cache_written > 0)
+            net_write_rate = double(disk_written + cache_written) / dt;
+    }
+}
+
+void CommandStat::clear()
+{
+    disk_read_rate = 0.0;
+    disk_write_rate = 0.0;
+    net_read_rate = 0.0;
+    net_write_rate = 0.0;
+}
+
+CommandStat & CommandStat::operator += (const CommandStat & other)
+{
+    disk_read_rate += other.disk_read_rate;
+    disk_write_rate += other.disk_write_rate;
+    net_read_rate += other.net_read_rate;
+    net_write_rate += other.net_write_rate;
+
+    return *this;
+}
+
 Backend::Backend(Node & node)
     :
     m_node(node),
@@ -120,6 +167,8 @@ void Backend::update(const BackendStat & stat)
         m_calculated.max_write_rps = int(std::max(double(m_calculated.write_rps) /
                     std::max(m_node.get_stat().load_average, 0.01), 100.0));
     }
+
+    m_calculated.command_stat.calculate(m_stat, stat);
 
     uint64_t last_start_old = m_stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
     uint64_t last_start_new = stat.last_start_ts_sec * 1000000ULL + stat.last_start_ts_usec;
@@ -432,6 +481,15 @@ void Backend::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
     writer.Uint64(m_stat.ell_disk_read_size);
     writer.Key("ell_disk_read_time");
     writer.Uint64(m_stat.ell_disk_read_time);
+
+    writer.Key("disk_read_rate");
+    writer.Double(m_calculated.command_stat.disk_read_rate);
+    writer.Key("disk_write_rate");
+    writer.Double(m_calculated.command_stat.disk_write_rate);
+    writer.Key("net_read_rate");
+    writer.Double(m_calculated.command_stat.net_read_rate);
+    writer.Key("net_write_rate");
+    writer.Double(m_calculated.command_stat.net_write_rate);
 
     writer.Key("read_only");
     writer.Bool(!!m_stat.read_only);
