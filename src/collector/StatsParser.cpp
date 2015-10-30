@@ -64,6 +64,19 @@ const uint64_t Backends                           = 2ULL;
             const uint64_t LastStart              = 0x200ULL;
                 const uint64_t LastStartTvSec     = 0x400ULL;
                 const uint64_t LastStartTvUsec    = 0x800ULL;
+        const uint64_t Commands                   = 0x40ULL;
+            const uint64_t Write                  = 0x80ULL;
+//                             Cache              = 0x200ULL;
+//                             Disk               = 0x400ULL;
+//                                 CommandSource  = 0x800ULL;
+//                                     Size       = 0x1000ULL;
+//                                     Time       = 0x2000ULL;
+            const uint64_t NotWrite               = 0x100ULL;
+                const uint64_t Cache              = 0x200ULL;
+                const uint64_t Disk               = 0x400ULL;
+                    const uint64_t CommandSource  = 0x800ULL;
+                        const uint64_t Size       = 0x1000ULL;
+                        const uint64_t Time       = 0x2000ULL;
 
 const uint64_t Timestamp  = 4ULL;
     const uint64_t TvSec  = 8ULL;
@@ -103,21 +116,24 @@ std::vector<Parser::FolderVector> backend_folders = {
         { "backend",        Backends|BackendFolder, Backend       },
         { "backend_id",     Backends|BackendFolder, BackendId     },
         { "status",         Backends|BackendFolder, Status        },
+        { "commands",       Backends|BackendFolder, Commands      },
         { "la",             Procfs|Vm,              La            },
         { "net_interfaces", Procfs|Net,             NetInterfaces },
         { "count",          Stats|StatName,         Count         }
     },
     {
-        { "dstat",         Backends|BackendFolder|Backend, Dstat            },
-        { "vfs",           Backends|BackendFolder|Backend, Vfs              },
-        { "summary_stats", Backends|BackendFolder|Backend, SummaryStats     },
-        { "config",        Backends|BackendFolder|Backend, Config           },
-        { "base_stats",    Backends|BackendFolder|Backend, BaseStats        },
-        { "defrag_state",  Backends|BackendFolder|Status,  DefragState      },
-        { "state",         Backends|BackendFolder|Status,  State            },
-        { "read_only",     Backends|BackendFolder|Status,  ReadOnly         },
-        { "last_start",    Backends|BackendFolder|Status,  LastStart        },
-        { NOT_MATCH "lo",  Procfs|Net|NetInterfaces,       NetInterfaceName }
+        { "dstat",           Backends|BackendFolder|Backend,  Dstat            },
+        { "vfs",             Backends|BackendFolder|Backend,  Vfs              },
+        { "summary_stats",   Backends|BackendFolder|Backend,  SummaryStats     },
+        { "config",          Backends|BackendFolder|Backend,  Config           },
+        { "base_stats",      Backends|BackendFolder|Backend,  BaseStats        },
+        { "defrag_state",    Backends|BackendFolder|Status,   DefragState      },
+        { "state",           Backends|BackendFolder|Status,   State            },
+        { "read_only",       Backends|BackendFolder|Status,   ReadOnly         },
+        { "last_start",      Backends|BackendFolder|Status,   LastStart        },
+        { "WRITE",           Backends|BackendFolder|Commands, Write            },
+        { NOT_MATCH "WRITE", Backends|BackendFolder|Commands, NotWrite         },
+        { NOT_MATCH "lo",    Procfs|Net|NetInterfaces,        NetInterfaceName }
     },
     {
         { "read_ios",             Backends|BackendFolder|Backend|Dstat,        ReadIos            },
@@ -145,13 +161,31 @@ std::vector<Parser::FolderVector> backend_folders = {
         { MATCH_ANY,              Backends|BackendFolder|Backend|BaseStats,    BlobFilename       },
         { "tv_sec",               Backends|BackendFolder|Status|LastStart,     LastStartTvSec     },
         { "tv_usec",              Backends|BackendFolder|Status|LastStart,     LastStartTvUsec    },
+        { "cache",                Backends|BackendFolder|Commands|Write,       Cache              },
+        { "disk",                 Backends|BackendFolder|Commands|Write,       Disk               },
+        { "cache",                Backends|BackendFolder|Commands|NotWrite,    Cache              },
+        { "disk",                 Backends|BackendFolder|Commands|NotWrite,    Disk               },
         { "receive",              Procfs|Net|NetInterfaces|NetInterfaceName,   Receive            },
         { "transmit",             Procfs|Net|NetInterfaces|NetInterfaceName,   Transmit           }
     },
     {
-        { "base_size", Backends|BackendFolder|Backend|BaseStats|BlobFilename, BlobBaseSize },
-        { "bytes",     Procfs|Net|NetInterfaces|NetInterfaceName|Receive,     Bytes        },
-        { "bytes",     Procfs|Net|NetInterfaces|NetInterfaceName|Transmit,    Bytes        }
+        { "base_size", Backends|BackendFolder|Backend|BaseStats|BlobFilename, BlobBaseSize  },
+        { "bytes",     Procfs|Net|NetInterfaces|NetInterfaceName|Receive,     Bytes         },
+        { "bytes",     Procfs|Net|NetInterfaces|NetInterfaceName|Transmit,    Bytes         },
+        { MATCH_ANY,   Backends|BackendFolder|Commands|Write|Cache,           CommandSource },
+        { MATCH_ANY,   Backends|BackendFolder|Commands|Write|Disk,            CommandSource },
+        { MATCH_ANY,   Backends|BackendFolder|Commands|NotWrite|Cache,        CommandSource },
+        { MATCH_ANY,   Backends|BackendFolder|Commands|NotWrite|Disk,         CommandSource }
+    },
+    {
+        { "size", Backends|BackendFolder|Commands|Write|Cache|CommandSource,    Size },
+        { "time", Backends|BackendFolder|Commands|Write|Cache|CommandSource,    Time },
+        { "size", Backends|BackendFolder|Commands|Write|Disk|CommandSource,     Size },
+        { "time", Backends|BackendFolder|Commands|Write|Disk|CommandSource,     Time },
+        { "size", Backends|BackendFolder|Commands|NotWrite|Cache|CommandSource, Size },
+        { "time", Backends|BackendFolder|Commands|NotWrite|Cache|CommandSource, Time },
+        { "size", Backends|BackendFolder|Commands|NotWrite|Disk|CommandSource,  Size },
+        { "time", Backends|BackendFolder|Commands|NotWrite|Disk|CommandSource,  Time }
     }
 };
 
@@ -187,6 +221,14 @@ Parser::UIntInfoVector backend_uint_info = {
     { Backends|BackendFolder|Status|ReadOnly,                             SET, BOFF(read_only)            },
     { Backends|BackendFolder|Status|LastStart|LastStartTvSec,             SET, BOFF(last_start_ts_sec)    },
     { Backends|BackendFolder|Status|LastStart|LastStartTvUsec,            SET, BOFF(last_start_ts_usec)   },
+    { Backends|BackendFolder|Commands|Write|Cache|CommandSource|Size,     SUM, BOFF(ell_cache_write_size) },
+    { Backends|BackendFolder|Commands|Write|Cache|CommandSource|Time,     SUM, BOFF(ell_cache_write_time) },
+    { Backends|BackendFolder|Commands|Write|Disk|CommandSource|Size,      SUM, BOFF(ell_disk_write_size)  },
+    { Backends|BackendFolder|Commands|Write|Disk|CommandSource|Time,      SUM, BOFF(ell_disk_write_time)  },
+    { Backends|BackendFolder|Commands|NotWrite|Cache|CommandSource|Size,  SUM, BOFF(ell_cache_read_size)  },
+    { Backends|BackendFolder|Commands|NotWrite|Cache|CommandSource|Time,  SUM, BOFF(ell_cache_read_time)  },
+    { Backends|BackendFolder|Commands|NotWrite|Disk|CommandSource|Size,   SUM, BOFF(ell_disk_read_size)   },
+    { Backends|BackendFolder|Commands|NotWrite|Disk|CommandSource|Time,   SUM, BOFF(ell_disk_read_time)   },
     { Timestamp|TvSec,                                                    SET, NOFF(ts_sec)               },
     { Timestamp|TvUsec,                                                   SET, NOFF(ts_usec)              },
     { Procfs|Vm|La,                                                       SET, NOFF(la1)                  },
