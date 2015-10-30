@@ -46,6 +46,7 @@ struct BackendStat
     uint64_t vfs_blocks;
     uint64_t vfs_bavail;
     uint64_t vfs_bsize;
+    uint64_t vfs_error;
 
     uint64_t records_total;
     uint64_t records_removed;
@@ -58,7 +59,11 @@ struct BackendStat
 
     uint64_t read_ios;
     uint64_t write_ios;
-    uint64_t error;
+    uint64_t read_ticks;
+    uint64_t write_ticks;
+    uint64_t io_ticks;
+    uint64_t read_sectors;
+    uint64_t dstat_error;
 
     uint64_t blob_size_limit;
     uint64_t max_blob_base_size;
@@ -71,8 +76,32 @@ struct BackendStat
 
     uint64_t stat_commit_rofs_errors;
 
+    uint64_t ell_cache_write_size;
+    uint64_t ell_cache_write_time;
+    uint64_t ell_disk_write_size;
+    uint64_t ell_disk_write_time;
+    uint64_t ell_cache_read_size;
+    uint64_t ell_cache_read_time;
+    uint64_t ell_disk_read_size;
+    uint64_t ell_disk_read_time;
+
     std::string data_path;
     std::string file_path;
+};
+
+struct CommandStat
+{
+    CommandStat();
+
+    void calculate(const BackendStat & old_stat, const BackendStat & new_stat);
+
+    void clear();
+    CommandStat & operator += (const CommandStat & other);
+
+    double disk_read_rate;
+    double disk_write_rate;
+    double net_read_rate;
+    double net_write_rate;
 };
 
 class Backend
@@ -88,6 +117,38 @@ public:
     };
 
     static const char *status_str(Status status);
+
+    struct Calculated
+    {
+        uint64_t vfs_free_space;
+        uint64_t vfs_total_space;
+        uint64_t vfs_used_space;
+
+        uint64_t records;
+
+        int64_t free_space;
+        int64_t total_space;
+        int64_t used_space;
+        int64_t effective_space;
+        int64_t effective_free_space;
+
+        double fragmentation;
+
+        int read_rps;
+        int write_rps;
+        int max_read_rps;
+        int max_write_rps;
+
+        uint64_t stat_commit_rofs_errors_diff;
+
+        bool stalled;
+
+        Status status;
+
+        std::string base_path;
+
+        CommandStat command_stat;
+    };
 
 public:
     Backend(Node & node);
@@ -108,30 +169,8 @@ public:
     Status get_status() const
     { return m_calculated.status; }
 
-    uint64_t get_vfs_free_space() const
-    { return m_calculated.vfs_free_space; }
-    uint64_t get_vfs_total_space() const
-    { return m_calculated.vfs_total_space; }
-    uint64_t get_vfs_used_space() const
-    { return m_calculated.vfs_used_space; }
-
-    uint64_t get_free_space() const
-    { return m_calculated.free_space; }
-    uint64_t get_total_space() const
-    { return m_calculated.total_space; }
-    uint64_t get_used_space() const
-    { return m_calculated.used_space; }
-    uint64_t get_effective_space() const
-    { return m_calculated.effective_space; }
-
-    double get_fragmentation() const
-    { return m_calculated.fragmentation; }
-
-    int get_read_rps() const
-    { return m_calculated.read_rps; }
-
-    int get_write_rps() const
-    { return m_calculated.write_rps; }
+    const Calculated & get_calculated() const
+    { return m_calculated; }
 
     const std::string & get_base_path() const
     { return m_calculated.base_path; }
@@ -184,35 +223,7 @@ private:
 
     BackendStat m_stat;
 
-    struct {
-        uint64_t vfs_free_space;
-        uint64_t vfs_total_space;
-        uint64_t vfs_used_space;
-
-        uint64_t records;
-
-        int64_t free_space;
-        int64_t total_space;
-        int64_t used_space;
-        int64_t effective_space;
-        int64_t effective_free_space;
-
-        double fragmentation;
-
-        int read_rps;
-        int write_rps;
-        int max_read_rps;
-        int max_write_rps;
-
-        // Number of ROFS errors occurred since previous statistics update.
-        uint64_t stat_commit_rofs_errors_diff;
-
-        bool stalled;
-
-        Status status;
-
-        std::string base_path;
-    } m_calculated;
+    Calculated m_calculated;
 };
 
 #endif

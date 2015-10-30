@@ -26,16 +26,25 @@
 #include <string>
 #include <vector>
 
-class Backend;
+#include "Backend.h"
+
 class Filter;
 class Node;
 class Storage;
 
 struct FSStat
 {
+    uint64_t get_timestamp() const
+    { return ts_sec * 1000000ULL + ts_usec; }
+
+    void reset(const BackendStat & bstat);
+
     uint64_t ts_sec;
     uint64_t ts_usec;
-    uint64_t total_space;
+    uint64_t read_ticks;
+    uint64_t write_ticks;
+    uint64_t read_sectors;
+    uint64_t io_ticks;
 };
 
 class FS
@@ -54,6 +63,21 @@ public:
         { return &b1 < &b2; }
     };
     typedef std::set<std::reference_wrapper<Backend>, BackendLess> Backends;
+
+    struct Calculated
+    {
+        uint64_t total_space;
+        uint64_t free_space;
+
+        double disk_util;
+        double disk_util_read;
+        double disk_util_write;
+
+        double disk_read_rate;
+        double disk_write_rate;
+
+        CommandStat command_stat;
+    };
 
 public:
     FS(Node & node, uint64_t fsid);
@@ -81,6 +105,7 @@ public:
 
     void update(const Backend & backend);
     void update_status();
+    void update_command_stat();
 
     void merge(const FS & other, bool & have_newer);
 
@@ -108,6 +133,7 @@ private:
     Backends m_backends;
 
     FSStat m_stat;
+    Calculated m_calculated;
 
     Status m_status;
     std::string m_status_text;

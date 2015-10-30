@@ -60,6 +60,16 @@ functional unit or feature. The format of list is as follows:
   Update backend from previous test case with fresh stat.
   3. *Disabled backend*. Having backend in state `OK`, change `status/state`
   to `0` (`DNET_BACKEND_DISABLED`). State must become `STALLED`.
+* **CommandStat**. This test verifies calculation of disk and net RW rates.
+  Information is taken from `DNET_MONITOR_COMMANDS` statistic. Result is checked
+  after a new `BackendStat` was passed to `Backend::update`.
+  1. *Update #1*. This test checks numbers after the first update received.
+  They must not change (remain zeroes).
+  2. *Update #2*. This test checks numbers after second update coming 1 minute
+  after the first one. Values must be checked according to formulas
+  (**TODO**: docs).
+  3. *Immediate update*. Make sure update coming less than one second after
+  previous one doesn't affect values.
 
 #### Couple:
 
@@ -155,3 +165,27 @@ groups.
   `COUPLED`.
   17. TODO: double check and extend this list after
   https://github.com/yandex/mastermind/issues/31.
+
+#### Filesystem:
+
+* **CommandStat summation**. This test checks whether aggregate disk and net RW
+  rates are correctly calculated for filesystems.
+  1. *No updates*. Check initial state. When backends were received only once
+  `FS` calculated values of RW rates must be zero.
+  2. *Updated status*. Basic functionality check. After series of updates `FS`
+  calculated values must be sum for all backends stored on this filesystem.
+* **I/O rates**. This test checks calculation of `disk_util`, `disk_util_read`,
+  `disk_util_write`, `disk_read_rate`, `disk_write_rate`.
+  1. *Update #1*. Basic functionality check. Process two updates with time
+  difference of 60 seconds. Check calculated values according to formula
+  (**TODO**: docs).
+  2. *Immediate update*. Add update with time difference less than 1 second.
+  Values must be unchanged.
+  3. *Update with errors*. Check whether updates are ignored when `dstat/error`
+  or `vfs/error` is non-zero.
+
+#### Node:
+
+* **CommandStat summation**. This test checks whether aggregate disk and net RW
+  rates are correctly calculated for nodes. Test cases are the same as in
+  Filesystem's test **CommandStat summation**.
