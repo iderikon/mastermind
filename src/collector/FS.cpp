@@ -71,7 +71,7 @@ void FS::update_status()
         Backend::Status status = backend.get_status();
         if (status != Backend::OK && status != Backend::BROKEN)
             continue;
-        total_space += backend.get_total_space();
+        total_space += backend.get_calculated().total_space;
     }
 
     if (total_space <= m_stat.total_space) {
