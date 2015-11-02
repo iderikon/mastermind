@@ -179,9 +179,9 @@ public:
 
     void update(const BackendStat & stat);
     void set_fs(FS & fs);
-    void recalculate(uint64_t reserved_space);
+    void recalculate();
 
-    void check_stalled(uint64_t stall_timeout_sec);
+    void check_stalled();
     void update_status();
 
     // Returns true if bound Group object differs from one in a new stat.

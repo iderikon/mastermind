@@ -38,33 +38,24 @@ public:
     void start();
     void stop();
 
-    ioremap::elliptics::logger_base & get_logger()
-    { return *m_logger; }
-
-    void set_logger(ioremap::elliptics::logger_base *logger)
-    { m_logger.reset(logger); }
-
-    ioremap::elliptics::logger_base & get_elliptics_logger()
-    { return *m_elliptics_logger; }
-
-    Config & get_config()
-    { return m_config; }
-
     Collector & get_collector()
     { return m_collector; }
 
 private:
-    void load_config();
-
-private:
-    std::unique_ptr<ioremap::elliptics::logger_base> m_logger;
-    std::unique_ptr<ioremap::elliptics::logger_base> m_elliptics_logger;
-
-    Config m_config;
     Collector m_collector;
 
     bool m_initialized;
 };
+
+namespace app
+{
+
+ioremap::elliptics::logger_base & logger();
+ioremap::elliptics::logger_base & elliptics_logger();
+
+const Config & config();
+
+}
 
 #endif
 

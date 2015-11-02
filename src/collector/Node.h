@@ -51,8 +51,8 @@ struct NodeStat
 class Node
 {
 public:
-    Node(Storage & storage, const Host & host, int port, int family);
-    Node(Storage & storage, const Host & host);
+    Node(const Host & host, int port, int family);
+    Node(const Host & host);
 
     static std::string key(const char *host, int port, int family);
 
@@ -94,7 +94,7 @@ public:
     std::vector<std::reference_wrapper<Backend>> pick_new_backends()
     { return std::move(m_new_backends); }
 
-    void update_backend_status(uint64_t stale_timeout_sec);
+    void update_backend_status();
 
     void update_filesystems();
 
@@ -133,8 +133,6 @@ private:
     void merge_backends(const Node & other_node, bool & have_newer);
 
 private:
-    Storage & m_storage;
-
     const Host & m_host;
 
     int m_port;

@@ -87,15 +87,13 @@ void Storage::Entries::sort()
     std::sort(filesystems.begin(), filesystems.end(), RefLess<FS>());
 }
 
-Storage::Storage(WorkerApplication & app)
+Storage::Storage()
     :
-    m_app(app),
     m_jobs_timestamp(0)
 {}
 
 Storage::Storage(const Storage & other)
     :
-    m_app(other.m_app),
     m_jobs_timestamp(0)
 {
     bool have_newer;
@@ -109,7 +107,7 @@ Host & Storage::get_host(const std::string & addr)
 {
     auto it = m_hosts.lower_bound(addr);
     if (it == m_hosts.end() || it->first != addr) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New host %s", addr);
+        BH_LOG(app::logger(), DNET_LOG_INFO, "New host %s", addr);
         it = m_hosts.insert(it, std::make_pair(addr, Host(addr)));
     }
     return it->second;
@@ -127,10 +125,10 @@ void Storage::add_node(const Host & host, int port, int family)
 
     auto it = m_nodes.lower_bound(key);
     if (it == m_nodes.end() || it->first != key) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "New node %s", key.c_str());
-        m_nodes.insert(it, std::make_pair(key, Node(*this, host, port, family)));
+        BH_LOG(app::logger(), DNET_LOG_INFO, "New node %s", key);
+        m_nodes.insert(it, std::make_pair(key, Node(host, port, family)));
     } else {
-        BH_LOG(m_app.get_logger(), DNET_LOG_DEBUG, "Node %s already exists", key.c_str());
+        BH_LOG(app::logger(), DNET_LOG_DEBUG, "Node %s already exists", key);
         return;
     }
 }
@@ -150,13 +148,13 @@ void Storage::handle_backend(Backend & backend)
         int old_id = backend.get_old_group_id();
         auto it_old = m_groups.find(old_id);
         if (it_old != m_groups.end()) {
-            BH_LOG(m_app.get_logger(), DNET_LOG_INFO,
+            BH_LOG(app::logger(), DNET_LOG_INFO,
                     "Backend %s has moved from group %d to group %d",
                     backend.get_key().c_str(), old_id, int(backend.get_stat().group));
 
             it_old->second.remove_backend(backend);
         } else {
-            BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+            BH_LOG(app::logger(), DNET_LOG_ERROR,
                     "Internal inconsistency: Backend %s has moved from group %d to group %d "
                     "but there is no old group in Storage", backend.get_key().c_str(),
                     old_id, int(backend.get_stat().group));
@@ -169,7 +167,7 @@ void Storage::handle_backend(Backend & backend)
 void Storage::save_new_jobs(std::vector<Job> new_jobs, uint64_t timestamp)
 {
     if (m_jobs_timestamp > timestamp) {
-        BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+        BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Storage: Internal error: New jobs have timestamp in the past (%lu > %lu)",
                 m_jobs_timestamp, timestamp);
         return;
@@ -188,19 +186,19 @@ void Storage::process_node_backends()
 {
     update_group_structure();
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
-        it->second.update_backend_status(m_app.get_config().node_backend_stat_stale_timeout);
+        it->second.update_backend_status();
 }
 
 void Storage::process_node_backends(std::vector<std::reference_wrapper<Node>> & nodes)
 {
     update_group_structure();
     for (Node & node : nodes)
-        node.update_backend_status(m_app.get_config().node_backend_stat_stale_timeout);
+        node.update_backend_status();
 }
 
 void Storage::update_group_structure()
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Updating group structure");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Updating group structure");
 
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
         Node & node = it->second;
@@ -226,7 +224,7 @@ Namespace & Storage::get_namespace(const std::string & name)
 
 void Storage::update()
 {
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Storage: updating filesystems, groups, and couples");
 
     // Create/update filesystems depending on backend stats.
     for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it)
@@ -234,7 +232,7 @@ void Storage::update()
 
     // Update group status, first pass.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        it->second.update_status(m_app.get_config().forbidden_dht_groups);
+        it->second.update_status();
 
     // Process group metadata and jobs.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
@@ -251,7 +249,7 @@ void Storage::update()
         if (group.parse_metadata() != 0)
             continue;
 
-        group.calculate_type(m_app.get_config().cache_group_path_prefix);
+        group.calculate_type();
 
         const std::string & new_namespace_name = group.get_namespace_name();
         if (old_namespace_name != new_namespace_name) {
@@ -285,7 +283,7 @@ void Storage::update()
                     git = m_groups.insert(git, std::make_pair(id, Group(id)));
 
                     // result must be status=INIT, status_text="No node backends"
-                    git->second.update_status(m_app.get_config().forbidden_dht_groups);
+                    git->second.update_status();
                 }
                 groups.push_back(git->second);
             }
@@ -312,11 +310,9 @@ void Storage::update()
     }
 
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it)
-        it->second.update_status_recursive(m_app.get_config().forbidden_dht_groups,
-                false, // forbidden_dc_sharing
-                m_app.get_config().forbidden_unmatched_group_total_space);
+        it->second.update_status_recursive();
 
-    BH_LOG(m_app.get_logger(), DNET_LOG_INFO, "Storage update completed");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Storage update completed");
 }
 
 void Storage::merge_groups(const Storage & other_storage, bool & have_newer)
@@ -433,7 +429,7 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
                 if (gr != m_groups.end()) {
                     my_groups.push_back(gr->second);
                 } else {
-                    BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                    BH_LOG(app::logger(), DNET_LOG_ERROR,
                             "Merge storage: internal inconsistency: have no group %d for couple", id);
                 }
             }
@@ -473,11 +469,11 @@ void Storage::merge_nodes(const Storage & other_storage, bool & have_newer)
             auto host_it = m_hosts.find(other->second.get_host().get_addr());
             if (host_it != m_hosts.end()) {
                 // Create and insert a new Node
-                my = m_nodes.insert(my, std::make_pair(other->first, Node(*this, host_it->second)));
+                my = m_nodes.insert(my, std::make_pair(other->first, Node(host_it->second)));
                 my->second.clone_from(other->second);
             } else {
                 // Hosts must have been merged before nodes
-                BH_LOG(m_app.get_logger(), DNET_LOG_ERROR,
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
                         "Merge storage: internal inconsistency: "
                         "have no Host for Node %s (other storage has host %s)!!!",
                         other->first.c_str(), other->second.get_host().get_name().c_str());
@@ -511,6 +507,8 @@ void Storage::merge_hosts(const Storage & other, bool & have_newer)
 
 void Storage::merge(const Storage & other, bool & have_newer)
 {
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Merging storage");
+
     have_newer = false;
 
     merge_hosts(other, have_newer);
@@ -519,6 +517,10 @@ void Storage::merge(const Storage & other, bool & have_newer)
     merge_groups(other, have_newer);
     merge_jobs(other, have_newer);
     merge_couples(other, have_newer);
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Merge done, %s",
+            (have_newer ? "this instance has some more recent data"
+                        : "source instance is up-to-date"));
 }
 
 template<typename SourceItem, typename ResultItem>

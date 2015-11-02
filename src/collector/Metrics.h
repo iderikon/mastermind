@@ -22,87 +22,28 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
-#include <sstream>
+#include <vector>
 
 #include <time.h>
 
 #define MSEC(nsec) (double(nsec) / 1000000.0)
 
-template<typename COUNT>
 class Distribution
 {
 public:
-    Distribution()
-    {
-        for (size_t i = 0; i < sizeof(m_count)/sizeof(m_count[0]); ++i)
-            m_count[i] = 0;
-    }
+    Distribution(int nr_bins = 10);
+    ~Distribution();
 
-    void add_sample(uint64_t nsec)
-    {
-        if (!nsec)
-            return;
-        if (nsec < 1000)
-            ++m_count[0];
-        else if (nsec < 10000)
-            ++m_count[1];
-        else if (nsec < 100000)
-            ++m_count[2];
-        else if (nsec < 1000000)
-            ++m_count[3];
-        else if (nsec < 10000000)
-            ++m_count[4];
-        else if (nsec < 100000000)
-            ++m_count[5];
-        else if (nsec < 1000000000)
-            ++m_count[6];
-        else if (nsec < 10000000000)
-            ++m_count[7];
-        else if (nsec < 100000000000)
-            ++m_count[8];
-        else
-            ++m_count[9];
-    }
+    void add_sample(uint64_t sample);
 
-    bool empty() const
-    {
-        for (size_t i = 0; i < sizeof(m_count)/sizeof(m_count[0]); ++i) {
-            if (m_count[i])
-                return false;
-        }
-        return true;
-    }
+    bool empty() const;
 
-    std::string str() const
-    {
-        static const char * const order[] = {
-            "  1 us: ",
-            " 10 us: ",
-            "100 us: ",
-            "  1 ms: ",
-            " 10 ms: ",
-            "100 ms: ",
-            "  1  s: ",
-            " 10  s: ",
-            "100  s: ",
-            "   inf: "
-        };
-
-        std::ostringstream ostr;
-        for (size_t i = 0; i < sizeof(m_count)/sizeof(m_count[0]); ++i) {
-            if (m_count[i])
-                ostr << order[i] << m_count[i] << '\n';
-        }
-
-        return ostr.str();
-    }
+    std::string str();
 
 private:
-    COUNT m_count[10];
+    struct Bin;
+    std::vector<Bin> m_bins;
 };
-
-typedef Distribution<int> SerialDistribution;
-typedef Distribution<std::atomic<int>> ConcurrentDistribution;
 
 inline void clock_get(uint64_t & value)
 {

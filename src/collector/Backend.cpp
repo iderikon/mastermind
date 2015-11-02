@@ -188,7 +188,7 @@ void Backend::set_fs(FS & fs)
     m_fs = &fs;
 }
 
-void Backend::recalculate(uint64_t reserved_space)
+void Backend::recalculate()
 {
     m_calculated.vfs_total_space = m_stat.vfs_blocks * m_stat.vfs_bsize;
     m_calculated.vfs_free_space = m_stat.vfs_bavail * m_stat.vfs_bsize;
@@ -210,14 +210,14 @@ void Backend::recalculate(uint64_t reserved_space)
     }
 
     double share = double(m_calculated.total_space) / double(m_calculated.vfs_total_space);
-    int64_t free_space_req_share = std::ceil(double(reserved_space) * share);
+    int64_t free_space_req_share = std::ceil(double(app::config().reserved_space) * share);
     m_calculated.effective_space = std::max(0L, m_calculated.total_space - free_space_req_share);
 
     m_calculated.effective_free_space =
         std::max(m_calculated.free_space - (m_calculated.total_space - m_calculated.effective_space), 0L);
 }
 
-void Backend::check_stalled(uint64_t stall_timeout_sec)
+void Backend::check_stalled()
 {
     uint64_t ts_now = 0;
     clock_get(ts_now);
@@ -228,7 +228,7 @@ void Backend::check_stalled(uint64_t stall_timeout_sec)
         return;
     }
 
-    m_calculated.stalled = ((ts_now - m_stat.ts_sec) > stall_timeout_sec);
+    m_calculated.stalled = ((ts_now - m_stat.ts_sec) > app::config().node_backend_stat_stale_timeout);
 }
 
 void Backend::update_status()

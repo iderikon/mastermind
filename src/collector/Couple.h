@@ -63,7 +63,7 @@ public:
     Status get_status() const
     { return m_status; }
 
-    void update_status(bool forbidden_dht, bool forbidden_dc_sharing, bool forbidden_unmatched_total);
+    void update_status();
 
     bool check_groups(const std::vector<int> & group_ids) const;
 
