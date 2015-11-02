@@ -18,6 +18,100 @@
 
 #include "Metrics.h"
 
+#include <algorithm>
+#include <sstream>
+
+// Histogram building algorithm is described in a paper
+// "A Streaming Parallel Decision Tree Algorithm"
+// Yael Ben-Haim, Elad Tom-Tov. 2010.
+// http://jmlr.org/papers/volume11/ben-haim10a/ben-haim10a.pdf
+
+struct Distribution::Bin
+{
+    Bin()
+        :
+        value(),
+        count()
+    {}
+
+    bool operator < (const Bin & other) const
+    { return value < other.value; }
+
+    uint64_t value;
+    uint64_t count;
+};
+
+Distribution::Distribution(int nr_bins)
+    :
+    m_bins(nr_bins + 1)
+{}
+
+Distribution::~Distribution()
+{}
+
+void Distribution::add_sample(uint64_t sample)
+{
+    m_bins.back().value = sample;
+    m_bins.back().count = 1;
+
+    std::sort(m_bins.begin(), m_bins.end());
+
+    uint64_t min_diff = m_bins[1].value - m_bins[0].value;
+    int idx_min = 0;
+    for (int i = 1; i < (m_bins.size() - 1); ++i) {
+        uint64_t cur_diff = m_bins[i].value - m_bins[i + 1].value;
+        if (cur_diff < min_diff) {
+            min_diff = cur_diff;
+            idx_min = i;
+        }
+    }
+
+    uint64_t vi = m_bins[idx_min].value;
+    uint64_t vi1 = m_bins[idx_min + 1].value;
+    uint64_t ci = m_bins[idx_min].count;
+    uint64_t ci1 = m_bins[idx_min + 1].count;
+
+    if ((ci + ci1) > 0)
+        m_bins[idx_min].value = (vi * ci + vi1 * ci1) / (ci + ci1);
+    else
+        m_bins[idx_min].value = 0;
+    m_bins[idx_min].count = (ci + ci1);
+
+    m_bins.erase(m_bins.begin() + idx_min + 1);
+    m_bins.push_back(Bin());
+}
+
+bool Distribution::empty() const
+{
+    for (const Bin & bin : m_bins) {
+        if (bin.count)
+            return false;
+    }
+    return true;
+}
+
+std::string Distribution::str()
+{
+    if (empty())
+        return std::string("<empty>\n");
+
+    std::ostringstream ostr;
+    for (size_t i = 0; i < (m_bins.size() - 1); ++i) {
+        uint64_t value = m_bins[i].value;
+        uint64_t count = m_bins[i].count;
+
+        if (value < 1000ULL)
+            ostr << value << " ns: " << count << '\n';
+        else if (value < 1000000ULL)
+            ostr << value / 1000ULL << " us: " << count << '\n';
+        else if (value < 10000000000ULL)
+            ostr << value / 1000000ULL << " ms: " << count << '\n';
+        else
+            ostr << value / 1000000000ULL << " s " << value % 1000000000ULL << " ms: " << count << '\n';
+    }
+    return ostr.str();
+}
+
 std::string timeval_user_friendly(time_t sec, int usec)
 {
     struct tm tm_buf;
