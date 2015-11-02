@@ -26,21 +26,6 @@
 // Yael Ben-Haim, Elad Tom-Tov. 2010.
 // http://jmlr.org/papers/volume11/ben-haim10a/ben-haim10a.pdf
 
-struct Distribution::Bin
-{
-    Bin()
-        :
-        value(),
-        count()
-    {}
-
-    bool operator < (const Bin & other) const
-    { return value < other.value; }
-
-    uint64_t value;
-    uint64_t count;
-};
-
 Distribution::Distribution(int nr_bins)
     :
     m_bins(nr_bins + 1)

@@ -41,7 +41,21 @@ public:
     std::string str();
 
 private:
-    struct Bin;
+    struct Bin
+    {
+        Bin()
+            :
+            value(),
+            count()
+        {}
+
+        bool operator < (const Bin & other) const
+        { return value < other.value; }
+
+        uint64_t value;
+        uint64_t count;
+    };
+
     std::vector<Bin> m_bins;
 };
 
