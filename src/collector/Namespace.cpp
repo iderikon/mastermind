@@ -23,6 +23,12 @@
 #include "Namespace.h"
 #include "Node.h"
 
+Namespace::Namespace(const std::string & id)
+    :
+    m_id(id),
+    m_default_settings(true)
+{}
+
 void Namespace::add_couple(Couple & couple)
 {
     m_couples.insert(couple);
