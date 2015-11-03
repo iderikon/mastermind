@@ -29,9 +29,10 @@
 
 #include <algorithm>
 
-Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
+Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups, Namespace & ns)
     :
     m_groups(groups),
+    m_namespace(ns),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
@@ -197,8 +198,7 @@ void Couple::push_items(std::vector<std::reference_wrapper<Group>> & groups) con
 
 void Couple::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    if (!m_groups.empty())
-        m_groups.front().get().push_items(namespaces);
+    namespaces.push_back(m_namespace.get());
 }
 
 void Couple::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const

@@ -19,75 +19,55 @@
 #ifndef __3eb3aef5_b268_43d7_b417_44b800716ce3
 #define __3eb3aef5_b268_43d7_b417_44b800716ce3
 
+#include <rapidjson/writer.h>
+
 #include <set>
 #include <string>
 #include <vector>
 
+class Backend;
+class Couple;
+class FS;
 class Group;
+class Node;
 
 class Namespace
 {
 public:
-    struct GroupLess
+    struct CoupleLess
     {
-        bool operator () (const Group & a, const Group & b) const
+        bool operator () (const Couple & a, const Couple & b) const
         { return &a < &b; }
     };
-    typedef std::set<std::reference_wrapper<Group>, GroupLess> Groups;
+    typedef std::set<std::reference_wrapper<Couple>, CoupleLess> Couples;
 
 public:
-    Namespace(const std::string & name)
-        : m_name(name)
+    Namespace(const std::string & id)
+        : m_id(id)
     {}
 
-    const std::string & get_name() const
-    { return m_name; }
+    void add_couple(Couple & couple);
 
-    void add_group(Group & group)
-    { m_groups.insert(group); }
-
-    void remove_group(Group & group)
-    { m_groups.erase(group); }
+    void remove_couple(Couple & couple);
 
     // Obtain a list of items of certain types related to this namespace,
     // e.g. couples, their groups. References to objects will be pushed
     // into specified vector.
     // Note that some items may be duplicated.
-    void push_items(std::vector<std::reference_wrapper<Group>> & groups) const
-    {
-        groups.insert(groups.end(), m_groups.begin(), m_groups.end());
-    }
+    void push_items(std::vector<std::reference_wrapper<Group>> & groups) const;
+    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const;
+    void push_items(std::vector<std::reference_wrapper<Backend>> & backends) const;
+    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const;
+    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const;
 
-    void push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
-    {
-        for (Group & group : m_groups)
-            group.push_items(nodes);
-    }
-
-    void push_items(std::vector<std::reference_wrapper<Backend>> & backends) const
-    {
-        for (Group & group : m_groups)
-            group.push_items(backends);
-    }
-
-    void push_items(std::vector<std::reference_wrapper<FS>> & filesystems) const
-    {
-        for (Group & group : m_groups)
-            group.push_items(filesystems);
-    }
-
-    void push_items(std::vector<std::reference_wrapper<Couple>> & couples) const
-    {
-        for (Group & group : m_groups)
-            group.push_items(couples);
-    }
+    void print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer) const;
 
 private:
-    const std::string m_name;
+    const std::string m_id;
 
-    // Set of references to groups in this namespace. The objects shouldn't be
+    // Set of references to couples in this namespace. The objects shouldn't be
     // modified directly but only used by push_items().
-    Groups m_groups;
+    Couples m_couples;
 };
 
 #endif

@@ -24,6 +24,7 @@
 #include <iostream>
 #include <rapidjson/writer.h>
 #include <vector>
+#include <functional>
 
 class Backend;
 class Filter;
@@ -52,7 +53,7 @@ public:
     static const char *status_str(Status status);
 
 public:
-    Couple(const std::vector<std::reference_wrapper<Group>> & groups);
+    Couple(const std::vector<std::reference_wrapper<Group>> & groups, Namespace & ns);
 
     const std::string & get_key() const
     { return m_key; }
@@ -98,6 +99,8 @@ private:
 private:
     std::string m_key;
     std::vector<std::reference_wrapper<Group>> m_groups;
+
+    std::reference_wrapper<Namespace> m_namespace;
 
     Status m_status;
     std::string m_status_text;
