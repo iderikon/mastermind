@@ -96,9 +96,9 @@ Parser::UIntInfoVector config_uint_info = {
 };
 
 Parser::StringInfoVector config_string_info = {
-    { Metadata|Url,     offsetof(Config, metadata.url)                 },
-    { Metadata|History|Db, offsetof(Config, metadata.history.db)       },
-    { Metadata|Jobs|Db, offsetof(Config, metadata.jobs.db)             },
+    { Metadata|Url,          offsetof(Config, metadata.url)            },
+    { Metadata|History|Db,   offsetof(Config, metadata.history.db)     },
+    { Metadata|Jobs|Db,      offsetof(Config, metadata.jobs.db)        },
     { Cache|GroupPathPrefix, offsetof(Config, cache_group_path_prefix) }
 };
 
