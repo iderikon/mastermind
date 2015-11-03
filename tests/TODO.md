@@ -70,6 +70,10 @@ functional unit or feature. The format of list is as follows:
   (**TODO**: docs).
   3. *Immediate update*. Make sure update coming less than one second after
   previous one doesn't affect values.
+* **Full check**. This test checks `Backend::full()` method. **TODO: docs**.
+  1. *Default settings*. No reserved space. Check result with empty, non-empty,
+  and full backend.
+  2. *Non-zero reserved space*. Repeat calculations with reserved space 0.5.
 
 #### Couple:
 
@@ -113,6 +117,20 @@ groups.
   https://github.com/yandex/mastermind/issues/31.
   11. TODO: add separate test for `account_job_in_status()` in the same way as
   for DC sharing.
+* **Namespace without settings**. This test checks whether Couple is reported
+  `BROKEN` when no namespace settings found.
+  1. *Correct setup*. Having couple in namespace which is set up
+  `update_status` must set state `OK`.
+  2. *Incorrect setup*. Check if couple detects misconfig: having namespace with
+  default settings make sure that state is reported as `BROKEN`.
+* **Effective space calculation**. Verify `Couple::get_effective_space()`.
+  **TODO**: docs.
+  1. *Default settings*. Check returned value with namespace with default
+  settings.
+  2. *Configured namespace*. Repeat check with NS reserved space set to 0.0,
+  and to 0.5.
+* **Full check**. Verify calculation of `Couple::full()`. Test cases as the
+  same as for test **Effective space calculation**.
 
 #### Group:
 
@@ -165,6 +183,9 @@ groups.
   `COUPLED`.
   17. TODO: double check and extend this list after
   https://github.com/yandex/mastermind/issues/31.
+* **Effective space**. Veryfy calculations of `get_free_space()` and
+  `get_effective_space()`. Test cases are the same as for Couple's test
+  **Effective space**. **TODO**: docs.
 
 #### Filesystem:
 
@@ -189,3 +210,10 @@ groups.
 * **CommandStat summation**. This test checks whether aggregate disk and net RW
   rates are correctly calculated for nodes. Test cases are the same as in
   Filesystem's test **CommandStat summation**.
+
+#### Namespace:
+
+* **Inconsistent metadata**. Check whether all namespaces are created if groups
+  in couple have different namespace in metadata.
+* **Storage merge**. Check whether all namespaces are cloned in
+  `Storage::merge()`.
