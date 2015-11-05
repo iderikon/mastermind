@@ -226,11 +226,10 @@ void Round::step2_1_jobs_and_history(void *arg)
 
         // History
 
-        // time_t group_history_ts = ::time(nullptr);
+        time_t group_history_ts = ::time(nullptr);
+        double previous_ts = self.m_storage->get_group_history_ts();
 
         std::vector<GroupHistoryEntry> group_history;
-
-        double previous_ts = /* self.m_storage->get_group_history_ts() */ 0.0;
 
         cursor = conn->query(config.metadata.history.db + ".history",
                 MONGO_QUERY("nodes.timestamp" << mongo::GT << previous_ts).readPref(
@@ -261,7 +260,7 @@ void Round::step2_1_jobs_and_history(void *arg)
             }
         }
 
-        // self.m_storage->save_group_history(std::move(group_history), group_history_ts);
+        self.m_storage->save_group_history(std::move(group_history), group_history_ts);
 
     } catch (const mongo::DBException & e) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,

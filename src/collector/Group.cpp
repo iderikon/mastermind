@@ -24,6 +24,7 @@
 #include "Filter.h"
 #include "FS.h"
 #include "Group.h"
+#include "GroupHistoryEntry.h"
 #include "Metrics.h"
 #include "Node.h"
 #include "Storage.h"
@@ -135,6 +136,27 @@ void Group::add_backend(Backend & backend)
 void Group::remove_backend(Backend & backend)
 {
     m_backends.erase(backend);
+}
+
+void Group::apply(const GroupHistoryEntry & entry)
+{
+    auto & backends = entry.get_backends();
+    bool changed = false;
+    for (Backends::iterator it = m_backends.begin(); it != m_backends.end();) {
+        const std::string & key = it->get().get_key();
+        if (backends.find(key) == backends.end()) {
+            m_backends.erase(it++);
+            changed = true;
+        } else {
+            ++it;
+        }
+    }
+    if (changed) {
+        if (double(m_update_time) < entry.get_timestamp())
+            m_update_time = entry.get_timestamp();
+        else
+            clock_get_real(m_update_time);
+    }
 }
 
 void Group::handle_metadata_download_failed(const std::string & why)
@@ -533,6 +555,16 @@ void Group::merge(const Group & other, bool & have_newer)
 
     if (m_update_time == other.m_update_time)
         return;
+
+    for (Backends::iterator it = m_backends.begin(); it != m_backends.end();) {
+        const std::string & key = it->get().get_key();
+        auto oth_it = std::find_if(other.m_backends.begin(), other.m_backends.end(),
+                [key] (const Backend & backend) { return backend.get_key() == key; });
+        if (oth_it == other.m_backends.end())
+            m_backends.erase(it++);
+        else
+            ++it;
+    }
 
     m_clean = other.m_clean;
     m_metadata_file = other.m_metadata_file;

@@ -80,6 +80,13 @@ public:
     // save jobs received from MongoDB
     void save_new_jobs(std::vector<Job> new_jobs, uint64_t timestamp);
 
+    // save group history received from MongoDB
+    void save_group_history(std::vector<GroupHistoryEntry> history, time_t timestamp);
+
+    // last group history update
+    time_t get_group_history_ts() const
+    { return m_group_history_ts; }
+
     // process new backends, check if some backends are stalled, update backend statuses
     void process_node_backends();
     void process_node_backends(std::vector<std::reference_wrapper<Node>> & nodes);
@@ -174,6 +181,10 @@ private:
     std::map<int, Job> m_new_jobs;
     // time database query was completed
     uint64_t m_jobs_timestamp;
+
+    // group history received from MongoDB
+    std::vector<GroupHistoryEntry> m_group_history;
+    time_t m_group_history_ts;
 };
 
 #endif
