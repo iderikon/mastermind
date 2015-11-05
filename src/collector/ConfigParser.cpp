@@ -43,7 +43,8 @@ enum ConfigKey
     ConnectTimeoutMS                  = 0x20000,
     NodeBackendStatStaleTimeout       = 0x40000,
     Cache                             = 0x80000,
-    GroupPathPrefix                   = 0x100000
+    GroupPathPrefix                   = 0x100000,
+    ForbiddenNsWithoutSettings        = 0x200000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -51,6 +52,7 @@ std::vector<Parser::FolderVector> config_folders = {
         { "elliptics",                             0, Elliptics                         },
         { "forbidden_dht_groups",                  0, ForbiddenDhtGroups                },
         { "forbidden_unmatched_group_total_space", 0, ForbiddenUnmatchedGroupTotalSpace },
+        { "forbidden_ns_without_settings",         0, ForbiddenNsWithoutSettings        },
         { "reserved_space",                        0, ReservedSpace                     },
         { "node_backend_stat_stale_timeout",       0, NodeBackendStatStaleTimeout       },
         { "dnet_log_mask",                         0, DnetLogMask                       },
@@ -80,6 +82,7 @@ Parser::UIntInfoVector config_uint_info = {
     { Elliptics|WaitTimeout,             SET, offsetof(Config, wait_timeout)                          },
     { ForbiddenDhtGroups,                SET, offsetof(Config, forbidden_dht_groups)                  },
     { ForbiddenUnmatchedGroupTotalSpace, SET, offsetof(Config, forbidden_unmatched_group_total_space) },
+    { ForbiddenNsWithoutSettings,        SET, offsetof(Config, forbidden_ns_without_settings)         },
     { ReservedSpace,                     SET, offsetof(Config, reserved_space)                        },
     { NodeBackendStatStaleTimeout,       SET, offsetof(Config, node_backend_stat_stale_timeout)       },
     { DnetLogMask,                       SET, offsetof(Config, dnet_log_mask)                         },

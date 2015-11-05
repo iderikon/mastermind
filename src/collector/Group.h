@@ -82,9 +82,13 @@ public:
     const Backends & get_backends() const
     { return m_backends; }
 
-    bool full() const;
+    bool full(double reserved_space = 0.0) const;
 
     uint64_t get_total_space() const;
+
+    uint64_t get_free_space() const;
+
+    uint64_t get_effective_space() const;
 
     bool has_active_job() const;
 
@@ -119,8 +123,6 @@ public:
 
     // the most recently updated backend
     uint64_t get_backend_update_time() const;
-
-    void set_namespace(Namespace & ns);
 
     void set_active_job(const Job & job);
     void clear_active_job();
@@ -194,7 +196,6 @@ private:
     // update_status_recursive(); also items can be collected by push_items().
     Couple *m_couple;
     const Job *m_active_job;
-    Namespace *m_namespace;
 
     Type m_type;
 

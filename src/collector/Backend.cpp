@@ -139,9 +139,9 @@ void Backend::clone_from(const Backend & other)
     m_calculated = other.m_calculated;
 }
 
-bool Backend::full() const
+bool Backend::full(double reserved_space) const
 {
-    if (m_calculated.used_space >= m_calculated.effective_space)
+    if (m_calculated.used_space >= int64_t(double(m_calculated.effective_space) * (1.0 - reserved_space)))
         return true;
     if (m_calculated.effective_free_space <= 0)
         return true;

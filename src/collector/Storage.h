@@ -109,6 +109,7 @@ private:
 
     void merge_groups(const Storage & other_storage, bool & have_newer);
     void merge_jobs(const Storage & other_storage, bool & have_newer);
+    void merge_namespaces(const Storage & other_storage, bool & have_newer);
     void merge_couples(const Storage & other_storage, bool & have_newer);
     void merge_nodes(const Storage & other_storage, bool & have_newer);
     void merge_hosts(const Storage & other_storage, bool & have_newer);

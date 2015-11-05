@@ -29,9 +29,10 @@
 
 #include <algorithm>
 
-Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups)
+Couple::Couple(const std::vector<std::reference_wrapper<Group>> & groups, Namespace & ns)
     :
     m_groups(groups),
+    m_namespace(ns),
     m_status(INIT),
     m_modified_time(0),
     m_update_status_duration(0)
@@ -51,6 +52,22 @@ void Couple::update_status()
         group.update_status();
 
     std::ostringstream ostr;
+
+    for (const Group & group : m_groups) {
+        if (!group.get_version()) {
+            m_status = BAD;
+            ostr << "Group " << group.get_id() << " has empty metadata.";
+            m_status_text = ostr.str();
+            return;
+        }
+        if (m_namespace.get().get_id() != group.get_namespace_name()) {
+            m_status = BAD;
+            ostr << "Couple's namespace '" << m_namespace.get().get_id() << "' doesn't match group's "
+                    "namespace '" << group.get_namespace_name() << "'.";
+            m_status_text = ostr.str();
+            return;
+        }
+    }
 
     for (size_t i = 1; i < m_groups.size(); ++i) {
         if (m_groups[0].get().have_metadata_conflict(m_groups[i].get())) {
@@ -80,10 +97,15 @@ void Couple::update_status()
             return;
     }
 
-    //// TODO: Add check for namespaces without settings.
-    //// It will be available as soon as support for namespace settings in mongo is added.
-    // if (app::config().forbidden_ns_without_settings) {
-    // }
+    if (app::config().forbidden_ns_without_settings) {
+        if (m_namespace.get().default_settings()) {
+            m_status = BROKEN;
+            ostr << "Couple " << m_key << " is assigned to namespace '"
+                 << m_namespace.get().get_id() << "' which is not set up";
+            m_status_text = ostr.str();
+            return;
+        }
+    }
 
     size_t nr_coupled = std::count_if(m_groups.begin(), m_groups.end(),
             [] (const Group & group) { return group.get_status() == Group::COUPLED; });
@@ -197,8 +219,7 @@ void Couple::push_items(std::vector<std::reference_wrapper<Group>> & groups) con
 
 void Couple::push_items(std::vector<std::reference_wrapper<Namespace>> & namespaces) const
 {
-    if (!m_groups.empty())
-        m_groups.front().get().push_items(namespaces);
+    namespaces.push_back(m_namespace.get());
 }
 
 void Couple::push_items(std::vector<std::reference_wrapper<Node>> & nodes) const
@@ -299,16 +320,61 @@ int Couple::check_dc_sharing()
     return 0;
 }
 
+uint64_t Couple::get_effective_space() const
+{
+    if (m_groups.empty())
+        return 0;
+
+    uint64_t group_effective_space = m_groups[0].get().get_effective_space();
+    for (size_t i = 1; i < m_groups.size(); ++i) {
+        const Group & group = m_groups[i].get();
+        uint64_t eff = group.get_effective_space();
+        if (eff < group_effective_space)
+            group_effective_space = eff;
+    }
+
+    double ns_reserved = m_namespace.get().get_settings().reserved_space;
+    return uint64_t(std::floor(double(group_effective_space) * (1.0 - ns_reserved)));
+}
+
+uint64_t Couple::get_effective_free_space() const
+{
+    if (m_groups.empty())
+        return 0;
+
+    int64_t group_free_space = m_groups[0].get().get_free_space();
+    int64_t group_total_space = m_groups[0].get().get_total_space();
+
+    for (size_t i = 1; i < m_groups.size(); ++i) {
+        const Group & group = m_groups[i].get();
+        int64_t free = group.get_free_space();
+        int64_t total = group.get_total_space();
+
+        if (free < group_free_space)
+            group_free_space = free;
+        if (total < group_total_space)
+            group_total_space = total;
+    }
+
+    int64_t eff = get_effective_space();
+
+    if (group_free_space > (group_total_space - eff))
+        return group_free_space - (group_total_space - eff);
+
+    return 0;
+}
+
 bool Couple::full()
 {
+    double ns_reserved = m_namespace.get().get_settings().reserved_space;
+
     for (const Group & group : m_groups) {
-        if (group.full())
+        if (group.full(ns_reserved))
             return true;
     }
 
-    // TODO
-    // if (get_effective_free_space() <= 0)
-    //    return true;
+    if (!get_effective_free_space())
+        return true;
 
     return false;
 }
@@ -325,6 +391,11 @@ void Couple::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer, boo
     for (Group & group : m_groups)
         writer.Uint64(group.get_id());
     writer.EndArray();
+
+    writer.Key("effective_space");
+    writer.Uint64(get_effective_space());
+    writer.Key("effective_free_space");
+    writer.Uint64(get_effective_free_space());
 
     writer.Key("status");
     writer.String(status_str(m_status));

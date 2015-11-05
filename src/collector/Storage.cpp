@@ -237,7 +237,6 @@ void Storage::update()
     // Process group metadata and jobs.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
-        std::string old_namespace_name = group.get_namespace_name();
 
         // Bind or clear an active job.
         auto jit = m_jobs.find(group.get_id());
@@ -250,16 +249,13 @@ void Storage::update()
             continue;
 
         group.calculate_type();
+    }
 
-        const std::string & new_namespace_name = group.get_namespace_name();
-        if (old_namespace_name != new_namespace_name) {
-            if (!old_namespace_name.empty())
-                get_namespace(old_namespace_name).remove_group(group);
-
-            Namespace & new_ns = get_namespace(new_namespace_name);
-            new_ns.add_group(group);
-            group.set_namespace(new_ns);
-        }
+    // Create namespaces.
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
+        const std::string & ns_name = it->second.get_namespace_name();
+        if (!ns_name.empty())
+            get_namespace(ns_name);
     }
 
     // Create/update couples depending on changes in group metadata and structure
@@ -303,9 +299,28 @@ void Storage::update()
         std::string key = CoupleKey(group_ids);
         auto cit = m_couples.lower_bound(key);
         if (cit == m_couples.end() || cit->first != key) {
-            cit = m_couples.insert(cit, std::make_pair(key, Couple(groups)));
+            std::string ns_name;
+            for (const Group & g : groups) {
+                if (!g.get_namespace_name().empty()) {
+                    ns_name = g.get_namespace_name();
+                    break;
+                }
+            }
+
+            if (ns_name.empty()) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "All groups in couple %s have empty namespace", ns_name);
+                continue;
+            }
+
+            Namespace & ns = get_namespace(ns_name);
+            cit = m_couples.insert(cit, std::make_pair(key, Couple(groups, ns)));
+
+            Couple & couple = cit->second;
+            ns.add_couple(couple);
+
             for (Group & group : groups)
-                group.set_couple(cit->second);
+                group.set_couple(couple);
         }
     }
 
@@ -406,6 +421,30 @@ void Storage::merge_jobs(const std::map<int, Job> & new_jobs, bool *have_newer)
     }
 }
 
+void Storage::merge_namespaces(const Storage & other_storage, bool & have_newer)
+{
+    // Merge two sets of namespaces.
+
+    auto my = m_namespaces.begin();
+    auto other = other_storage.m_namespaces.begin();
+
+    for (; other != other_storage.m_namespaces.end(); ++other) {
+        // Skip next few old namespaces which are not present in other_storage.
+        while (my != m_namespaces.end() && my->first < other->first)
+            ++my;
+
+        // TODO: update existing namespace settings, copy new settings from other storage.
+        // It must be done as soon as fetching namespace settings is implemented.
+
+        if (my == m_namespaces.end() || my->first != other->first)
+            get_namespace(other->first);
+    }
+
+    // If some namespaces are absent in other_storage, we definitely have something new.
+    if (m_namespaces.size() > other_storage.m_namespaces.size())
+        have_newer = true;
+}
+
 void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
 {
     auto my = m_couples.begin();
@@ -434,8 +473,25 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
                 }
             }
 
-            my = m_couples.insert(my, std::make_pair(other_couple.get_key(), Couple(my_groups)));
+            std::string ns_name;
+            for (const Group & group : my_groups) {
+                if (!group.get_namespace_name().empty()) {
+                    ns_name = group.get_namespace_name();
+                    break;
+                }
+            }
+
+            if (ns_name.empty()) {
+                // User was already warned in Storage::update()
+                // so we should silently skip this couple.
+                continue;
+            }
+
+            Namespace & my_ns = get_namespace(ns_name);
+            my = m_couples.insert(my, std::make_pair(other_couple.get_key(), Couple(my_groups, my_ns)));
+
             Couple & my_couple = my->second;
+            my_ns.add_couple(my_couple);
 
             for (Group & group : my_groups)
                 group.set_couple(my_couple);
@@ -516,6 +572,7 @@ void Storage::merge(const Storage & other, bool & have_newer)
     update_group_structure();
     merge_groups(other, have_newer);
     merge_jobs(other, have_newer);
+    merge_namespaces(other, have_newer);
     merge_couples(other, have_newer);
 
     BH_LOG(app::logger(), DNET_LOG_INFO, "Merge done, %s",
@@ -835,7 +892,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("namespaces");
         writer.StartArray();
         for (Namespace & ns : entries.namespaces)
-            writer.String(ns.get_name().c_str());
+            ns.print_json(writer);
         writer.EndArray();
     }
 }
@@ -875,7 +932,7 @@ void Storage::print_json(rapidjson::Writer<rapidjson::StringBuffer> & writer,
         writer.Key("namespaces");
         writer.StartArray();
         for (auto it = m_namespaces.begin(); it != m_namespaces.end(); ++it)
-            writer.String(it->first.c_str());
+            it->second.print_json(writer);
         writer.EndArray();
     }
 
