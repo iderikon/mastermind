@@ -253,7 +253,7 @@ void Storage::update()
 
     // Create namespaces.
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
-        const std::string & ns_name = it->second.get_namespace_name();
+        const std::string & ns_name = it->second.get_metadata().namespace_name;
         if (!ns_name.empty())
             get_namespace(ns_name);
     }
@@ -264,7 +264,7 @@ void Storage::update()
         if (!group.metadata_parsed())
             continue;
 
-        const std::vector<int> & group_ids = group.get_couple_group_ids();
+        const std::vector<int> & group_ids = group.get_metadata().couple;
         if (group_ids.empty())
             continue;
 
@@ -301,8 +301,8 @@ void Storage::update()
         if (cit == m_couples.end() || cit->first != key) {
             std::string ns_name;
             for (const Group & g : groups) {
-                if (!g.get_namespace_name().empty()) {
-                    ns_name = g.get_namespace_name();
+                if (!g.get_metadata().namespace_name.empty()) {
+                    ns_name = g.get_metadata().namespace_name;
                     break;
                 }
             }
@@ -475,8 +475,8 @@ void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
 
             std::string ns_name;
             for (const Group & group : my_groups) {
-                if (!group.get_namespace_name().empty()) {
-                    ns_name = group.get_namespace_name();
+                if (!group.get_metadata().namespace_name.empty()) {
+                    ns_name = group.get_metadata().namespace_name;
                     break;
                 }
             }

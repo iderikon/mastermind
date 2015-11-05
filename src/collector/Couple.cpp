@@ -54,16 +54,16 @@ void Couple::update_status()
     std::ostringstream ostr;
 
     for (const Group & group : m_groups) {
-        if (!group.get_version()) {
+        if (!group.get_metadata().version) {
             m_status = BAD;
             ostr << "Group " << group.get_id() << " has empty metadata.";
             m_status_text = ostr.str();
             return;
         }
-        if (m_namespace.get().get_id() != group.get_namespace_name()) {
+        if (m_namespace.get().get_id() != group.get_metadata().namespace_name) {
             m_status = BAD;
             ostr << "Couple's namespace '" << m_namespace.get().get_id() << "' doesn't match group's "
-                    "namespace '" << group.get_namespace_name() << "'.";
+                    "namespace '" << group.get_metadata().namespace_name << "'.";
             m_status_text = ostr.str();
             return;
         }
@@ -82,7 +82,7 @@ void Couple::update_status()
     }
 
     auto it = std::find_if(m_groups.begin(), m_groups.end(),
-            [] (const Group & group) { return group.get_frozen(); });
+            [] (const Group & group) { return group.get_metadata().frozen; });
 
     if (it != m_groups.end()) {
         m_status = FROZEN;

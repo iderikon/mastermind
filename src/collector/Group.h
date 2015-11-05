@@ -63,6 +63,21 @@ public:
     };
     typedef std::set<std::reference_wrapper<Backend>, BackendLess> Backends;
 
+    struct Metadata
+    {
+        void clear();
+
+        int version;
+        bool frozen;
+        std::vector<int> couple;
+        std::string namespace_name;
+        std::string type;
+        struct {
+            bool migrating;
+            std::string job_id;
+        } service;
+    };
+
 public:
     Group(int id);
     Group();
@@ -95,17 +110,8 @@ public:
     // have_active_job() must be checked first
     const Job & get_active_job() const;
 
-    const std::string & get_namespace_name() const
-    { return m_metadata.namespace_name; }
-
-    const std::vector<int> & get_couple_group_ids() const
-    { return m_metadata.couple; }
-
-    bool get_frozen() const
-    { return m_metadata.frozen; }
-
-    int get_version() const
-    { return m_metadata.version; }
+    const Metadata & get_metadata() const
+    { return m_metadata; }
 
     void add_backend(Backend & backend);
     void remove_backend(Backend & backend);
@@ -155,8 +161,6 @@ public:
     { return m_metadata_parse_duration; }
 
 private:
-    void clear_metadata();
-
     bool update_storage_group_status();
 
 private:
@@ -174,17 +178,7 @@ private:
     uint64_t m_update_time;
 
     // values extracted from file
-    struct {
-        int version;
-        bool frozen;
-        std::vector<int> couple;
-        std::string namespace_name;
-        std::string type;
-        struct {
-            bool migrating;
-            std::string job_id;
-        } service;
-    } m_metadata;
+    Metadata m_metadata;
 
     bool m_metadata_parsed;
     uint64_t m_metadata_parse_duration;
