@@ -251,6 +251,13 @@ void Storage::update()
         group.calculate_type();
     }
 
+    // Create namespaces.
+    for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
+        const std::string & ns_name = it->second.get_namespace_name();
+        if (!ns_name.empty())
+            get_namespace(ns_name);
+    }
+
     // Create/update couples depending on changes in group metadata and structure
     for (auto it = m_groups.begin(); it != m_groups.end(); ++it) {
         Group & group = it->second;
@@ -414,6 +421,30 @@ void Storage::merge_jobs(const std::map<int, Job> & new_jobs, bool *have_newer)
     }
 }
 
+void Storage::merge_namespaces(const Storage & other_storage, bool & have_newer)
+{
+    // Merge two sets of namespaces.
+
+    auto my = m_namespaces.begin();
+    auto other = other_storage.m_namespaces.begin();
+
+    for (; other != other_storage.m_namespaces.end(); ++other) {
+        // Skip next few old namespaces which are not present in other_storage.
+        while (my != m_namespaces.end() && my->first < other->first)
+            ++my;
+
+        // TODO: update existing namespace settings, copy new settings from other storage.
+        // It must be done as soon as fetching namespace settings is implemented.
+
+        if (my == m_namespaces.end() || my->first != other->first)
+            get_namespace(other->first);
+    }
+
+    // If some namespaces are absent in other_storage, we definitely have something new.
+    if (m_namespaces.size() > other_storage.m_namespaces.size())
+        have_newer = true;
+}
+
 void Storage::merge_couples(const Storage & other_storage, bool & have_newer)
 {
     auto my = m_couples.begin();
@@ -541,6 +572,7 @@ void Storage::merge(const Storage & other, bool & have_newer)
     update_group_structure();
     merge_groups(other, have_newer);
     merge_jobs(other, have_newer);
+    merge_namespaces(other, have_newer);
     merge_couples(other, have_newer);
 
     BH_LOG(app::logger(), DNET_LOG_INFO, "Merge done, %s",
