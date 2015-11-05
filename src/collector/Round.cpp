@@ -192,7 +192,7 @@ void Round::step2_1_jobs(void *arg)
                 0, 0, &fields).release());
 
         uint64_t ts = 0;
-        clock_get(ts);
+        clock_get_real(ts);
         std::vector<Job> jobs;
         size_t count = 0;
 
