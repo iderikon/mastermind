@@ -183,9 +183,26 @@ groups.
   `COUPLED`.
   17. TODO: double check and extend this list after
   https://github.com/yandex/mastermind/issues/31.
-* **Effective space**. Veryfy calculations of `get_free_space()` and
+* **Effective space**. Verify calculations of `get_free_space()` and
   `get_effective_space()`. Test cases are the same as for Couple's test
   **Effective space**. **TODO**: docs.
+* **History**. Verify applying of `GroupHistoryEntry` coming from history
+  database. If some of group backends are absent in history entry, they
+  must be removed from Group's set of backends. Actions are performed in
+  `Group::apply(const GroupHistoryEntry &)`. Test cases should be checked
+  for entries of type `manual` and `job`.
+  1. *No changes #1*. Apply entry with the same set of backends. Nothing must
+  change.
+  2. *No changes #2*. Apply entry with the same set of backends plus new
+  backends. Nothing must change.
+  3. *One backend removed*. Apply entry with one backend absent. It must
+  disappear from the list of Group's backends.
+  4. *All backends removed #1*. Apply entry with empty set of backends.
+  List of Group's backends must become empty.
+  5. *All backends removed #2*. Apply entry with totally different set
+  of backends. List of Group's backends must become empty.
+  6. *Automatic history entries*. Make sure entries of type `automatic`
+  are getting skipped.
 
 #### Filesystem:
 
@@ -217,3 +234,18 @@ groups.
   in couple have different namespace in metadata.
 * **Storage merge**. Check whether all namespaces are cloned in
   `Storage::merge()`.
+
+#### GroupHistoryEntry:
+
+* **Initialization from BSONObj**. This test checks `GroupHistoryEntry`
+  construction. See `GroupHistoryEntry.h` for details of BSONObj format.
+  1. *Empty history*. Check object with empty `nodes` and non-zero group id.
+  2. *No group id*. Try to construct object from BSON with no group id.
+  Exception (`std::runtime_error`) must be thrown.
+  3. *One backend*. Try BSON with a single complete backend description.
+  4. *Wrong backend*. Try single backend with number of fields lacking.
+  Repeat test with fields of wrong type.
+  5. *Several backends*. Try BSON with several backends, first all correct,
+  then with one incorrect (lacking fields/wrong field type).
+  6. *Two and three nodes*. Try 2 and 3 audit records and check whether
+  the most recent record is selected.
