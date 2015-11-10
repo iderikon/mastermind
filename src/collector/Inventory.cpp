@@ -66,7 +66,7 @@ void Inventory::execute_reload(void *arg)
     for (HostInfo & info : hosts) {
         if (now > info.timestamp && (now - info.timestamp) > app::config().infrastructure_dc_cache_valid_time) {
             std::string addr = info.host;
-            self.fetch_from_driver(addr);
+            self.fetch_from_driver(addr, true);
         } else {
             self.m_host_info[info.host] = info;
         }
@@ -168,10 +168,10 @@ void Inventory::execute_get_dc_by_host(void *arg)
         return;
     }
 
-    data.result = data.inv.fetch_from_driver(data.addr);
+    data.result = data.inv.fetch_from_driver(data.addr, false);
 }
 
-std::string Inventory::fetch_from_driver(const std::string & addr)
+std::string Inventory::fetch_from_driver(const std::string & addr, bool update)
 {
     if (m_driver == nullptr)
         return std::string();
@@ -199,7 +199,7 @@ std::string Inventory::fetch_from_driver(const std::string & addr)
     info.dc = result;
     info.timestamp = ::time(nullptr);
 
-    cache_db_add(info);
+    cache_db_update(info, update);
 
     return result;
 }
@@ -334,7 +334,7 @@ std::vector<Inventory::HostInfo> Inventory::load_cache_db()
     return result;
 }
 
-void Inventory::cache_db_add(const HostInfo & info)
+void Inventory::cache_db_update(const HostInfo & info, bool existing)
 {
     if (m_conn == nullptr)
         return;
@@ -350,7 +350,10 @@ void Inventory::cache_db_add(const HostInfo & info)
         builder.append("timestamp", double(info.timestamp));
         mongo::BSONObj obj = builder.obj();
 
-        m_conn->insert(m_collection_name, obj);
+        if (!existing)
+            m_conn->insert(m_collection_name, obj);
+        else
+            m_conn->update(m_collection_name, MONGO_QUERY("host" << info.host), obj, 0);
 
     } catch (const mongo::DBException & e) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,
