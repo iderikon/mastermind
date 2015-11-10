@@ -47,9 +47,9 @@ struct dnet_addr_compare
 
 } // unnamed namespace
 
-Discovery::Discovery(WorkerApplication & app)
+Discovery::Discovery(Collector & collector)
     :
-    m_app(app),
+    m_collector(collector),
     m_resolve_nodes_duration(0)
 {}
 
@@ -154,8 +154,8 @@ void Discovery::resolve_nodes(Round & round)
             }
         }
 
-        if (host.get_dc().empty() && !host.get_name().empty()) {
-            std::string dc = m_app.get_inventory().get_dc_by_host(host.get_name().c_str());
+        if (!host.get_name().empty()) {
+            std::string dc = m_collector.get_inventory().get_dc_by_host(host.get_name().c_str());
             host.set_dc(dc);
         }
 

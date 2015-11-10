@@ -26,7 +26,7 @@
 
 Collector::Collector(WorkerApplication & app)
     :
-    m_discovery(app),
+    m_discovery(*this),
     m_storage_version(1)
 {
     m_queue = dispatch_queue_create("collector", DISPATCH_QUEUE_CONCURRENT);
@@ -49,6 +49,12 @@ int Collector::init()
             break;
         }
 
+        if (m_inventory.init()) {
+            m_discovery.stop_mongo();
+            m_discovery.stop_elliptics();
+            break;
+        }
+
         return 0;
     }
     while (0);
@@ -59,7 +65,10 @@ int Collector::init()
 
 void Collector::start()
 {
-    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting");
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: starting inventory");
+    m_inventory.start();
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Collector: dispatching step 1");
     dispatch_async_f(m_queue, this, &Collector::step1_start_round);
 }
 
@@ -70,6 +79,7 @@ void Collector::finalize_round(Round *round)
 
 void Collector::stop()
 {
+    m_inventory.close();
     m_discovery.stop_mongo();
     m_discovery.stop_elliptics();
     m_discovery.stop_curl();
