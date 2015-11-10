@@ -19,6 +19,7 @@
 #include "Couple.h"
 #include "Filter.h"
 #include "FS.h"
+#include "GroupHistoryEntry.h"
 #include "Node.h"
 #include "WorkerApplication.h"
 
@@ -89,12 +90,14 @@ void Storage::Entries::sort()
 
 Storage::Storage()
     :
-    m_jobs_timestamp(0)
+    m_jobs_timestamp(0),
+    m_group_history_ts(0)
 {}
 
 Storage::Storage(const Storage & other)
     :
-    m_jobs_timestamp(0)
+    m_jobs_timestamp(0),
+    m_group_history_ts(0)
 {
     bool have_newer;
     merge(other, have_newer);
@@ -182,6 +185,12 @@ void Storage::save_new_jobs(std::vector<Job> new_jobs, uint64_t timestamp)
     m_jobs_timestamp = timestamp;
 }
 
+void Storage::save_group_history(std::vector<GroupHistoryEntry> history, uint64_t timestamp)
+{
+    m_group_history = std::move(history);
+    m_group_history_ts = timestamp;
+}
+
 void Storage::process_node_backends()
 {
     update_group_structure();
@@ -205,6 +214,16 @@ void Storage::update_group_structure()
         std::vector<std::reference_wrapper<Backend>> backends = node.pick_new_backends();
         for (Backend & backend : backends)
             handle_backend(backend);
+    }
+
+    for (const GroupHistoryEntry & entry : m_group_history) {
+        auto it = m_groups.find(entry.get_group_id());
+        if (it != m_groups.end()) {
+            it->second.apply(entry);
+        } else {
+            BH_LOG(app::logger(), DNET_LOG_DEBUG, "History database contains record for "
+                    "unknown group %d", entry.get_group_id());
+        }
     }
 }
 
