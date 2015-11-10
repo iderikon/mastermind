@@ -310,7 +310,7 @@ void Collector::execute_summary(void *arg)
 
     ostr << "Round metrics:\n"
             "  Total time: " << MSEC(self.m_round_clock.total) << " ms\n"
-            "  Jobs database: " << MSEC(self.m_round_clock.jobs_database) << " ms\n"
+            "  Jobs & history databases: " << MSEC(self.m_round_clock.mongo) << " ms\n"
             "  HTTP download time: " << MSEC(self.m_round_clock.perform_download) << " ms\n"
             "  Remaining JSON parsing and jobs processing after HTTP download completed: "
                 << MSEC(self.m_round_clock.finish_monitor_stats_and_jobs) << " ms\n"
