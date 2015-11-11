@@ -249,3 +249,14 @@ groups.
   then with one incorrect (lacking fields/wrong field type).
   6. *Two and three nodes*. Try 2 and 3 audit records and check whether
   the most recent record is selected.
+
+#### Inventory:
+* **TODO**: Primarily tests should cover interaction of Inventory and
+  Driver; communication with MongoDB; scheduling.
+  **Interaction with driver**. Driver must be called if a) host is not
+  present in cache b) cache is expired.
+  **Communication with MongoDB**. Connectivity, object interpretation,
+  creating and updating new entries. Entries which were not present in
+  cache should be added. Check for duplicates.
+  **Scheduling**. Check if events are properly scheduled: a) re-collection
+  of items b) update of expired records.
