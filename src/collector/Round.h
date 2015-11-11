@@ -82,7 +82,7 @@ public:
     void start();
 
 private:
-    static void step2_1_jobs(void *arg);
+    static void step2_1_jobs_and_history(void *arg);
     static void step2_2_curl_download(void *arg);
     static void step3_prepare_metadata_download(void *arg);
     static void step4_perform_update(void *arg);
@@ -116,7 +116,7 @@ public:
         ClockStat & operator = (const ClockStat & other);
 
         uint64_t total;
-        uint64_t jobs_database;
+        uint64_t mongo;
         uint64_t perform_download;
         uint64_t finish_monitor_stats_and_jobs;
         uint64_t metadata_download;

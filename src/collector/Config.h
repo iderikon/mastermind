@@ -71,6 +71,9 @@ struct Config
         } options;
         struct {
             std::string db;
+        } history;
+        struct {
+            std::string db;
         } jobs;
     } metadata;
 
@@ -97,6 +100,9 @@ inline std::ostream & operator << (std::ostream & ostr, const Config & config)
         "  url: "                                 << config.metadata.url << "\n"
         "  options: {\n"
         "    metadata_connect_timeout_ms: "       << config.metadata.options.connectTimeoutMS << "\n"
+        "  }\n"
+        "  history: {\n"
+        "    db: "                                << config.metadata.history.db << "\n"
         "  }\n"
         "  jobs: {\n"
         "    db: "                                << config.metadata.jobs.db << "\n"

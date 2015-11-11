@@ -18,6 +18,7 @@
 
 #include "CocaineHandlers.h"
 #include "FS.h"
+#include "GroupHistoryEntry.h"
 #include "Metrics.h"
 #include "Round.h"
 #include "WorkerApplication.h"
@@ -143,15 +144,15 @@ void Round::start()
             (m_type == REGULAR) ? "regular" : (m_type == FORCED_FULL) ? "forced full" : "forced partial",
             (m_type == FORCED_PARTIAL ? m_entries.nodes.size() : m_storage->get_nodes().size()));
 
-    dispatch_async_f(m_queue, this, &Round::step2_1_jobs);
+    dispatch_async_f(m_queue, this, &Round::step2_1_jobs_and_history);
     dispatch_async_f(m_queue, this, &Round::step2_2_curl_download);
 }
 
-void Round::step2_1_jobs(void *arg)
+void Round::step2_1_jobs_and_history(void *arg)
 {
     Round & self = *static_cast<Round*>(arg);
 
-    Stopwatch watch(self.m_clock.jobs_database);
+    Stopwatch watch(self.m_clock.mongo);
 
     try {
         const Config & config = app::config();
@@ -178,21 +179,23 @@ void Round::step2_1_jobs(void *arg)
             return;
         }
 
+        // Jobs
+
         mongo::BSONObjBuilder builder;
         builder.append("id", 1);
         builder.append("status", 1);
         builder.append("group", 1);
         builder.append("type", 1);
-        mongo::BSONObj fields = builder.obj();
+        mongo::BSONObj jobs_fields = builder.obj();
 
         std::unique_ptr<mongo::DBClientCursor> cursor(conn->query(config.metadata.jobs.db + ".jobs",
                 MONGO_QUERY("status" << mongo::NE << "completed"
                          << "status" << mongo::NE << "cancelled").readPref(
                              mongo::ReadPreference_PrimaryOnly, mongo::BSONArray()),
-                0, 0, &fields).release());
+                0, 0, &jobs_fields).release());
 
         uint64_t ts = 0;
-        clock_get(ts);
+        clock_get_real(ts);
         std::vector<Job> jobs;
         size_t count = 0;
 
@@ -220,6 +223,48 @@ void Round::step2_1_jobs(void *arg)
                 "Successfully processed %lu of %lu active jobs", jobs.size(), count);
 
         self.m_storage->save_new_jobs(std::move(jobs), ts);
+
+        // History
+
+        uint64_t group_history_ts = 0;
+        clock_get_real(group_history_ts);
+        double previous_ts = self.m_storage->get_group_history_ts() / 1000000000ULL;
+
+        std::vector<GroupHistoryEntry> group_history;
+
+        // Load all entries newer than previously examined.
+        cursor = conn->query(config.metadata.history.db + ".history",
+                MONGO_QUERY("nodes.timestamp" << mongo::GT << previous_ts).readPref(
+                        mongo::ReadPreference_PrimaryOnly, mongo::BSONArray()));
+
+        while (cursor->more()) {
+            mongo::BSONObj obj = cursor->next();
+
+            try {
+                GroupHistoryEntry entry(obj);
+                if (!entry.empty()) {
+                    BH_LOG(app::logger(), DNET_LOG_INFO,
+                            "Loaded group history entry:\n%s", entry.to_string());
+                    group_history.emplace_back(std::move(entry));
+                }
+            } catch (const mongo::MsgAssertionException & e) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Failed to parse history database record: %s\nBSON object: %s",
+                        e.what(), obj.jsonString(mongo::Strict, 1));
+            } catch (const std::exception & e) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Failed to initialize history entry: %s\nBSON object: %s",
+                        e.what(), obj.jsonString(mongo::Strict, 1));
+            } catch (...) {
+                BH_LOG(app::logger(), DNET_LOG_ERROR,
+                        "Initializing history entry: Unknown exception thrown\nBSON object: %s",
+                        obj.jsonString(mongo::Strict, 1));
+            }
+        }
+
+        BH_LOG(app::logger(), DNET_LOG_INFO, "Loaded %lu group history entries", group_history.size());
+
+        self.m_storage->save_group_history(std::move(group_history), group_history_ts);
 
     } catch (const mongo::DBException & e) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,

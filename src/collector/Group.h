@@ -31,6 +31,7 @@
 class Backend;
 class Couple;
 class Filter;
+class GroupHistoryEntry;
 class Namespace;
 class Storage;
 
@@ -115,6 +116,10 @@ public:
 
     void add_backend(Backend & backend);
     void remove_backend(Backend & backend);
+
+    // Apply history entry from history database.
+    // Group backends which are absent in entry will be removed.
+    void apply(const GroupHistoryEntry & entry);
 
     void handle_metadata_download_failed(const std::string & why);
     void save_metadata(const char *metadata, size_t size, uint64_t timestamp);
