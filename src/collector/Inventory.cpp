@@ -134,9 +134,11 @@ void Inventory::dispatch_next_reload()
 
 std::vector<Inventory::HostInfo> Inventory::load_hosts()
 {
+    // Download from mongo cache.
     std::vector<HostInfo> hosts = load_cache_db();
     time_t now = ::time(nullptr);
 
+    // Update expired hosts.
     for (HostInfo & info : hosts) {
         if (now > info.timestamp &&
                 (now - info.timestamp) > app::config().infrastructure_dc_cache_valid_time)
@@ -170,11 +172,13 @@ void Inventory::execute_reload(void *arg)
 
     std::vector<HostInfo> hosts = self.load_hosts();
 
+    // Save updated entries to database.
     for (HostInfo & info : hosts) {
         if (info.timestamp >= reload_start)
             self.cache_db_update(info, true);
     }
 
+    // We're running in update queue, so we cannot directly access m_host_info here.
     dispatch_async_f(self.m_common_queue, new SaveUpdateData(self, std::move(hosts)),
             &Inventory::execute_save_update);
 
@@ -188,6 +192,7 @@ void Inventory::stop()
 
 std::string Inventory::get_dc_by_host(const std::string & addr)
 {
+    // We can access m_host_info only in common queue.
     GetDcData data(*this, addr);
     dispatch_sync_f(m_common_queue, &data, &Inventory::execute_get_dc_by_host);
     return data.result;
