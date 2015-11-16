@@ -251,12 +251,20 @@ groups.
   the most recent record is selected.
 
 #### Inventory:
-* **TODO**: Primarily tests should cover interaction of Inventory and
-  Driver; communication with MongoDB; scheduling.
-  **Interaction with driver**. Driver must be called if a) host is not
-  present in cache b) cache is expired.
+* **TODO**: Primarily tests should cover communication with MongoDB,
+  and scheduling.
   **Communication with MongoDB**. Connectivity, object interpretation,
   creating and updating new entries. Entries which were not present in
   cache should be added. Check for duplicates.
   **Scheduling**. Check if events are properly scheduled: a) re-collection
   of items b) update of expired records.
+* **Cocaine client**. Test should check whether cocaine worker is properly
+  requested.
+  1. *Cold start*. No cache in MongoDB, first call. Inventory should call
+  cocaine.
+  2. *Subsequent requests*. Ask for the same host after previous test.
+  Application should not call cocaine.
+  3. *Cached by MongoDB*. Application should not go to cocaine when host
+  information is up-to-date.
+  4. *Expired*. DB has a record expired by
+  'infrastructure_dc_cache_valid_time'. Application should call cocaine.
