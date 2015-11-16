@@ -64,7 +64,7 @@ Inventory::Inventory()
     :
     m_last_update_time(0.0)
 {
-    m_common_queue = dispatch_queue_create("inv_common", 0);
+    m_common_queue = dispatch_queue_create("inv_common", DISPATCH_QUEUE_SERIAL);
     m_update_queue = dispatch_queue_create("inv_update", DISPATCH_QUEUE_CONCURRENT);
 }
 
