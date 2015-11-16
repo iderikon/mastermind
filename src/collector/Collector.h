@@ -38,7 +38,7 @@ class on_summary;
 class Collector
 {
 public:
-    Collector(WorkerApplication & app);
+    Collector();
 
     Discovery & get_discovery()
     { return m_discovery; }

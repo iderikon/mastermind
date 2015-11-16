@@ -62,13 +62,10 @@ void load_config()
 
 WorkerApplication::WorkerApplication()
     :
-    m_collector(*this),
     m_initialized(false)
 {}
 
 WorkerApplication::WorkerApplication(cocaine::framework::dispatch_t & d)
-    :
-    m_collector(*this)
 {
     init();
 

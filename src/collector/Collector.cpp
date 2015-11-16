@@ -24,7 +24,7 @@
 
 #include "Job.h"
 
-Collector::Collector(WorkerApplication & app)
+Collector::Collector()
     :
     m_discovery(*this),
     m_storage_version(1)
