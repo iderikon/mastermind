@@ -231,6 +231,7 @@ void Inventory::fetch_from_cocaine(HostInfo & info)
     msgpack::object obj;
 
     try {
+        // TODO: add timeout, handle reconnects (service.py:11).
         auto g = m_service->enqueue("get_dc_by_host", info.host);
         std::string data = g.next();
 
