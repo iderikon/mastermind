@@ -181,7 +181,7 @@ void Inventory::execute_reload(void *arg)
     self.dispatch_next_reload();
 }
 
-void Inventory::close()
+void Inventory::stop()
 {
     m_service.reset();
 }

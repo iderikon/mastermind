@@ -36,7 +36,7 @@ public:
 
     void download_initial();
 
-    void close();
+    void stop();
 
     std::string get_dc_by_host(const std::string & addr);
 
