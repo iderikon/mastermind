@@ -74,7 +74,7 @@ void Collector::finalize_round(Round *round)
 
 void Collector::stop()
 {
-    m_inventory.close();
+    m_inventory.stop();
     m_discovery.stop_mongo();
     m_discovery.stop_elliptics();
     m_discovery.stop_curl();
