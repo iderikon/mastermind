@@ -88,12 +88,12 @@ int Inventory::init()
     try {
         m_service = m_manager->get_service<cocaine::framework::app_service_t>(service_name);
     } catch (std::exception & e) {
-        BH_LOG(app::logger(), DNET_LOG_WARNING, "Failed to connect to service %s: %s",
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: %s",
                 service_name, e.what());
         m_service.reset();
         return -1;
     } catch (...) {
-        BH_LOG(app::logger(), DNET_LOG_WARNING, "Failed to connect to service %s: "
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: "
                 "unknown exception thrown", service_name);
         m_service.reset();
         return -1;
