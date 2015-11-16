@@ -37,30 +37,28 @@ Collector::Collector()
 
 int Collector::init()
 {
-    do {
-        if (m_discovery.init_curl())
-            return -1;
+    if (m_discovery.init_curl())
+        return -1;
 
-        if (m_discovery.init_elliptics())
-            break;
-
-        if (m_discovery.init_mongo()) {
-            m_discovery.stop_elliptics();
-            break;
-        }
-
-        if (m_inventory.init()) {
-            m_discovery.stop_mongo();
-            m_discovery.stop_elliptics();
-            break;
-        }
-
-        return 0;
+    if (m_discovery.init_elliptics()) {
+        m_discovery.stop_curl();
+        return -1;
     }
-    while (0);
 
-    m_discovery.stop_curl();
-    return -1;
+    if (m_discovery.init_mongo()) {
+        m_discovery.stop_elliptics();
+        m_discovery.stop_curl();
+        return -1;
+    }
+
+    if (m_inventory.init()) {
+        m_discovery.stop_mongo();
+        m_discovery.stop_elliptics();
+        m_discovery.stop_curl();
+        return -1;
+    }
+
+    return 0;
 }
 
 void Collector::start()
