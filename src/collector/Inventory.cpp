@@ -76,12 +76,6 @@ Inventory::~Inventory()
 
 int Inventory::init()
 {
-    if (app::config().app_name.empty()) {
-        BH_LOG(app::logger(), DNET_LOG_WARNING, "No 'app_name' specified in config. "
-                "Inventory will not connect to cocaine worker");
-        return 0;
-    }
-
     m_manager = cocaine::framework::service_manager_t::create(
             cocaine::framework::service_manager_t::endpoint_t("localhost", 10053));
 
