@@ -125,6 +125,8 @@ void Inventory::dispatch_next_reload()
 {
     BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Dispatching next reload");
 
+    // Config option 'infrastructure_dc_cache_update_period' is specified in seconds.
+    // dispatch_time() accepts nanoseconds.
     dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW,
                 app::config().infrastructure_dc_cache_update_period * 1000000000ULL),
             m_update_queue, this, &Inventory::execute_reload);
