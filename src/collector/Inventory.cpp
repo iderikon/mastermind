@@ -43,16 +43,14 @@ struct Inventory::GetDcData
 
 struct Inventory::CacheDbUpdateData
 {
-    CacheDbUpdateData(Inventory & s, const HostInfo & i, bool e)
+    CacheDbUpdateData(Inventory & s, const HostInfo & i)
         :
         self(s),
-        info(i),
-        existing(e)
+        info(i)
     {}
 
     Inventory & self;
     HostInfo info;
-    bool existing;
 };
 
 struct Inventory::SaveUpdateData
@@ -97,7 +95,7 @@ void Inventory::download_initial()
             m_host_info[info.host] = info;
             if (info.timestamp >= download_start) {
                 // Update cache database in update queue.
-                dispatch_async_f(m_update_queue, new CacheDbUpdateData(*this, info, false),
+                dispatch_async_f(m_update_queue, new CacheDbUpdateData(*this, info),
                         &Inventory::execute_cache_db_update);
             }
         }
@@ -173,7 +171,7 @@ void Inventory::execute_reload(void *arg)
     // Save updated entries to database.
     for (HostInfo & info : hosts) {
         if (info.timestamp >= reload_start)
-            self.cache_db_update(info, true);
+            self.cache_db_update(info);
     }
 
     // We're running in update queue, so we cannot directly access m_host_info here.
@@ -229,7 +227,7 @@ void Inventory::execute_get_dc_by_host(void *arg)
     data.result = info.dc;
 
     // Update cache database in update queue.
-    dispatch_async_f(data.self.m_update_queue, new CacheDbUpdateData(data.self, info, false),
+    dispatch_async_f(data.self.m_update_queue, new CacheDbUpdateData(data.self, info),
             &Inventory::execute_cache_db_update);
 }
 
@@ -417,10 +415,10 @@ void Inventory::execute_cache_db_update(void *arg)
     // Executed in update queue.
 
     std::unique_ptr<CacheDbUpdateData> data(static_cast<CacheDbUpdateData*>(arg));
-    data->self.cache_db_update(data->info, data->existing);
+    data->self.cache_db_update(data->info);
 }
 
-void Inventory::cache_db_update(const HostInfo & info, bool existing)
+void Inventory::cache_db_update(const HostInfo & info)
 {
     if (m_conn == nullptr)
         return;
@@ -430,14 +428,9 @@ void Inventory::cache_db_update(const HostInfo & info, bool existing)
             info.host, info.dc, info.timestamp);
 
     try {
-        mongo::BSONObj obj = info.obj();
-
-        // XXX
-        if (!existing)
-            m_conn->insert(m_collection_name, obj);
-        else
-            m_conn->update(m_collection_name, MONGO_QUERY("host" << info.host), obj, 0);
-
+        // Update database record. The fourth argument ('upsert') indicates
+        // that the entry must be created or updated if already exists.
+        m_conn->update(m_collection_name, MONGO_QUERY("host" << info.host), info.obj(), 1);
     } catch (const mongo::DBException & e) {
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Cannot update cache db: Inventory DB thrown exception: %s", e.what());

@@ -61,8 +61,7 @@ private:
     int cache_db_connect();
 
     // Update host entry in database.
-    // If 'existing' is true, update() is used, and insert() is used otherwise.
-    void cache_db_update(const HostInfo & info, bool existing);
+    void cache_db_update(const HostInfo & info);
 
     void dispatch_next_reload();
 
