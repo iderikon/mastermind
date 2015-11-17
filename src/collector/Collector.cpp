@@ -51,12 +51,7 @@ int Collector::init()
         return -1;
     }
 
-    if (m_inventory.init()) {
-        m_discovery.stop_mongo();
-        m_discovery.stop_elliptics();
-        m_discovery.stop_curl();
-        return -1;
-    }
+    m_inventory.init();
 
     return 0;
 }
