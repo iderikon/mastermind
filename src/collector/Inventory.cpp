@@ -288,6 +288,12 @@ void Inventory::fetch_from_cocaine(HostInfo & info)
 
 Inventory::HostInfo::HostInfo(const mongo::BSONObj & obj)
 {
+    // Object example:
+    // { "_id"       : ObjectId("560e93e3ed11b0e38e5e25bc"),
+    //   "host"      : "node1.example.com",
+    //   "dc"        : "changbu",
+    //   "timestamp" : 1445852463 }
+
     for (mongo::BSONObj::iterator it = obj.begin(); it.more();) {
         mongo::BSONElement element = it.next();
         const char *field_name = element.fieldName();
