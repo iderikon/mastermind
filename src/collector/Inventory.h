@@ -32,7 +32,7 @@ public:
     Inventory();
     ~Inventory();
 
-    int init();
+    void init();
 
     void download_initial();
 
