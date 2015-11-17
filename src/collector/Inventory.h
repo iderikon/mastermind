@@ -56,6 +56,8 @@ private:
         time_t timestamp;
     };
 
+    void cocaine_connect();
+
     int cache_db_connect();
 
     // Update host entry in database.

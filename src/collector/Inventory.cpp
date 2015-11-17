@@ -76,25 +76,7 @@ Inventory::~Inventory()
 
 void Inventory::init()
 {
-    std::string service_name = app::config().app_name + "-inventory";
-    try {
-        m_manager = cocaine::framework::service_manager_t::create(
-                cocaine::framework::service_manager_t::endpoint_t("localhost", 10053));
-
-        if (!m_manager)
-            throw std::runtime_error("Failed to create service manager");
-
-        m_service = m_manager->get_service<cocaine::framework::app_service_t>(service_name);
-        m_service->set_timeout(app::config().inventory_worker_timeout);
-    } catch (std::exception & e) {
-        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: %s",
-                service_name, e.what());
-        m_service.reset();
-    } catch (...) {
-        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: "
-                "unknown exception thrown", service_name);
-        m_service.reset();
-    }
+    cocaine_connect();
 }
 
 void Inventory::download_initial()
@@ -161,9 +143,14 @@ void Inventory::execute_reload(void *arg)
 
     Inventory & self = *(Inventory *) arg;
 
+    if (!self.m_service) {
+        // Previous attempt to connect to the cocaine worker failed. Try again.
+        BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Trying to connect to cocaine worker");
+        self.cocaine_connect();
+    }
+
     if (!self.m_conn) {
         // Previous attempt to connect to the database failed. Try again.
-
         BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Trying to connect to database");
         if (self.cache_db_connect() != 0)
             return;
@@ -215,7 +202,7 @@ void Inventory::execute_get_dc_by_host(void *arg)
         return;
     }
 
-    if (data.self.m_service.get() == nullptr) {
+    if (!data.self.m_service) {
         BH_LOG(app::logger(), DNET_LOG_NOTICE,
                 "Have no connection to cocaine inventory, defaulting DC=host='%s'", data.host);
         data.result = data.host;
@@ -238,7 +225,6 @@ void Inventory::fetch_from_cocaine(HostInfo & info)
     msgpack::object obj;
 
     try {
-        // TODO: add timeout, handle reconnects (service.py:11).
         auto g = m_service->enqueue("get_dc_by_host", info.host);
         std::string data = g.next();
 
@@ -290,6 +276,27 @@ mongo::BSONObj Inventory::HostInfo::obj() const
     builder.append("dc", dc);
     builder.append("timestamp", double(timestamp));
     return builder.obj();
+}
+
+void Inventory::cocaine_connect()
+{
+    std::string service_name = app::config().app_name + "-inventory";
+    try {
+        m_manager = cocaine::framework::service_manager_t::create(
+                cocaine::framework::service_manager_t::endpoint_t("localhost", 10053));
+
+        if (!m_manager)
+            throw std::runtime_error("Failed to create service manager");
+
+        m_service = m_manager->get_service<cocaine::framework::app_service_t>(service_name);
+        m_service->set_timeout(app::config().inventory_worker_timeout);
+    } catch (std::exception & e) {
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: %s",
+                service_name, e.what());
+    } catch (...) {
+        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: "
+                "unknown exception thrown", service_name);
+    }
 }
 
 int Inventory::cache_db_connect()
