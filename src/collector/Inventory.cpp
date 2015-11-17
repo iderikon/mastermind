@@ -111,9 +111,9 @@ void Inventory::download_initial()
                         &Inventory::execute_cache_db_update);
             }
         }
-
-        dispatch_next_reload();
     }
+
+    dispatch_next_reload();
 }
 
 void Inventory::dispatch_next_reload()
@@ -159,9 +159,17 @@ void Inventory::execute_reload(void *arg)
 {
     // Executed in update queue.
 
-    BH_LOG(app::logger(), DNET_LOG_INFO, "Reloading cache");
-
     Inventory & self = *(Inventory *) arg;
+
+    if (!self.m_conn) {
+        // Previous attempt to connect to the database failed. Try again.
+
+        BH_LOG(app::logger(), DNET_LOG_INFO, "Inventory: Trying to connect to database");
+        if (self.cache_db_connect() != 0)
+            return;
+    }
+
+    BH_LOG(app::logger(), DNET_LOG_INFO, "Reloading cache");
 
     time_t reload_start = ::time(nullptr);
 
@@ -325,6 +333,8 @@ int Inventory::cache_db_connect()
         BH_LOG(app::logger(), DNET_LOG_ERROR,
                 "Unknown exception thrown while connecting to inventory database");
     }
+
+    m_conn.reset();
 
     return -1;
 }
