@@ -76,16 +76,15 @@ Inventory::~Inventory()
 
 int Inventory::init()
 {
-    m_manager = cocaine::framework::service_manager_t::create(
-            cocaine::framework::service_manager_t::endpoint_t("localhost", 10053));
-
-    if (!m_manager) {
-        BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to create cocaine service manager");
-        return -1;
-    }
-
     std::string service_name = app::config().app_name + "-inventory";
+
     try {
+        m_manager = cocaine::framework::service_manager_t::create(
+                cocaine::framework::service_manager_t::endpoint_t("localhost", 10053));
+
+        if (!m_manager)
+            throw std::runtime_error("Failed to create service manager");
+
         m_service = m_manager->get_service<cocaine::framework::app_service_t>(service_name);
     } catch (std::exception & e) {
         BH_LOG(app::logger(), DNET_LOG_ERROR, "Failed to connect to service %s: %s",
@@ -218,7 +217,6 @@ void Inventory::execute_get_dc_by_host(void *arg)
         data.result = data.host;
         return;
     }
-
 
     HostInfo info;
     info.host = data.host;
