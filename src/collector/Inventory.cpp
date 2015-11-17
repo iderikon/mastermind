@@ -316,7 +316,7 @@ int Inventory::cache_db_connect()
             return -1;
         }
 
-        m_collection_name = config.metadata.inventory.db + ".inventory";
+        m_collection_name = config.metadata.inventory.db + ".hostname_to_dc";
 
         BH_LOG(app::logger(), DNET_LOG_INFO, "Successfully connected to inventory database");
         return 0;
@@ -347,7 +347,8 @@ std::vector<Inventory::HostInfo> Inventory::load_cache_db()
 
     try {
         std::auto_ptr<mongo::DBClientCursor> cursor = m_conn->query(m_collection_name,
-                MONGO_QUERY("timestamp" << mongo::GT << m_last_update_time));
+                MONGO_QUERY("timestamp" << mongo::GT << m_last_update_time).readPref(
+                    mongo::ReadPreference_PrimaryPreferred, mongo::BSONArray()));
 
         while (cursor->more()) {
             mongo::BSONObj obj = cursor->next();
