@@ -98,6 +98,8 @@ private:
 
     dispatch_queue_t m_common_queue;
     dispatch_queue_t m_update_queue;
+
+    bool m_stopped;
 };
 
 #endif

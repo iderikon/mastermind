@@ -21,6 +21,13 @@
 
 #include <msgpack.hpp>
 
+namespace {
+
+void empty_func(void *)
+{}
+
+} // unnamed namespace
+
 struct Inventory::GetDcData
 {
     GetDcData(Inventory & s, const std::string & h)
@@ -62,7 +69,8 @@ struct Inventory::SaveUpdateData
 
 Inventory::Inventory()
     :
-    m_last_update_time(0.0)
+    m_last_update_time(0.0),
+    m_stopped(false)
 {
     m_common_queue = dispatch_queue_create("inv_common", DISPATCH_QUEUE_SERIAL);
     m_update_queue = dispatch_queue_create("inv_update", DISPATCH_QUEUE_CONCURRENT);
@@ -172,11 +180,17 @@ void Inventory::execute_reload(void *arg)
     dispatch_async_f(self.m_common_queue, new SaveUpdateData(self, std::move(hosts)),
             &Inventory::execute_save_update);
 
+    if (self.m_stopped)
+        return;
+
     self.dispatch_next_reload();
 }
 
 void Inventory::stop()
 {
+    m_stopped = true;
+    dispatch_sync_f(m_update_queue, nullptr, empty_func);
+    dispatch_sync_f(m_common_queue, nullptr, empty_func);
     m_service.reset();
 }
 
