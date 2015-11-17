@@ -357,7 +357,7 @@ std::vector<Inventory::HostInfo> Inventory::load_cache_db()
                 BH_LOG(app::logger(), DNET_LOG_INFO, "Loaded DC '%s' for host '%s' (updated at %lu)",
                         info.dc, info.host, info.timestamp);
 
-                result.emplace_back(info);
+                result.emplace_back(std::move(info));
             } catch (const mongo::MsgAssertionException & e) {
                 BH_LOG(app::logger(), DNET_LOG_ERROR,
                         "Initializing HostInfo from BSON: msg assertion exception: '%s'", e.what());
