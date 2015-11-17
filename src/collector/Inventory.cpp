@@ -143,6 +143,20 @@ void Inventory::execute_save_update(void *arg)
         data->self.m_host_info[info.host] = info;
 }
 
+// Reload is asynchronously executed in update_queue every
+// infrastructure_dc_cache_update_period seconds. The following steps are
+// performed:
+// 1) Set of host-dc records is fetched from MongoDB with filter by timestamp:
+//    only records updated after a previous reload are queried.
+//    See load_cache_db().
+// 2) Entries are checked for expiration (see load_hosts()). Records updated
+//    more than infrastructure_dc_cache_valid_time seconds before are refreshed
+//    using fetch_from_cocaine().
+// 3) All refreshed records are saved into the database using cache_db_update().
+// 4) Since the steps above are performed in update_queue we cannot write to
+//    m_host_info. So we dispatch an asynchronous event to common_queue
+//    (execute_save_update).
+// 5) dispatch_next_reload() is called.
 void Inventory::execute_reload(void *arg)
 {
     // Executed in update queue.
@@ -192,6 +206,18 @@ void Inventory::stop()
     m_service.reset();
 }
 
+// To get DC by hostname involves the following steps:
+// 1) Pass on common_queue. In order to serialize access to m_host_info in this
+//    method itself we only call dispatch_sync_f with execute_get_dc_by_host.
+// 2) Do find() in m_host_info. If it succeeds, the work is done.
+// 3) If not, we synchronously (using cocaine future) fetch the information from
+//    the inventory worker in method fetch_from_cocaine().
+// 4) After step #3 the information is ready to be returned to user. However,
+//    we also need to create a database record. We use dispatch_async_f() to pass
+//    update event to update_queue. execute_get_dc_by_host() ends at this point,
+//    the information is returned to user.
+// 5) cache_db_update() is executed asynchronously in update_queue. It invokes
+//    DBClientReplicaSet::update().
 std::string Inventory::get_dc_by_host(const std::string & addr)
 {
     // We can access m_host_info only in common queue.
