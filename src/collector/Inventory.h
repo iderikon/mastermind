@@ -71,6 +71,7 @@ private:
     std::vector<HostInfo> load_hosts();
 
     // Functions below are executed in common queue.
+    // Structures *Data are declared here to be able to add member of type HostInfo.
     struct GetDcData;
     static void execute_get_dc_by_host(void *arg);
     static void execute_reload(void *arg);
