@@ -48,7 +48,8 @@ struct Config
         io_thread_num(3),
         nonblocking_io_thread_num(3),
         infrastructure_dc_cache_update_period(150),
-        infrastructure_dc_cache_valid_time(604800)
+        infrastructure_dc_cache_valid_time(604800),
+        inventory_worker_timeout(5)
     {
         metadata.options.connectTimeoutMS = 5000;
     }
@@ -67,6 +68,7 @@ struct Config
     uint64_t nonblocking_io_thread_num;
     uint64_t infrastructure_dc_cache_update_period;
     uint64_t infrastructure_dc_cache_valid_time;
+    uint64_t inventory_worker_timeout;
     std::string app_name;
     std::string cache_group_path_prefix;
     std::vector<NodeInfo> nodes;

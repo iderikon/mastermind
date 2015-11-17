@@ -50,7 +50,8 @@ enum ConfigKey
     ForbiddenDcSharingAmongGroups     = 0x1000000,
     AppName                           = 0x2000000,
     InfrastructureDcCacheUpdatePeriod = 0x4000000,
-    InfrastructureDcCacheValidTime    = 0x8000000
+    InfrastructureDcCacheValidTime    = 0x8000000,
+    InventoryWorkerTimeout            = 0x10000000
 };
 
 std::vector<Parser::FolderVector> config_folders = {
@@ -69,6 +70,7 @@ std::vector<Parser::FolderVector> config_folders = {
         { "nonblocking_io_thread_num",             0, NonblockingIoThreadNum            },
         { "infrastructure_dc_cache_update_period", 0, InfrastructureDcCacheUpdatePeriod },
         { "infrastructure_dc_cache_valid_time",    0, InfrastructureDcCacheValidTime    },
+        { "inventory_worker_timeout",              0, InventoryWorkerTimeout            },
         { "metadata",                              0, Metadata                          },
         { "cache",                                 0, Cache                             }
     },
@@ -106,7 +108,8 @@ Parser::UIntInfoVector config_uint_info = {
     { NonblockingIoThreadNum,            SET, offsetof(Config, nonblocking_io_thread_num)             },
     { Metadata|Options|ConnectTimeoutMS, SET, offsetof(Config, metadata.options.connectTimeoutMS)     },
     { InfrastructureDcCacheUpdatePeriod, SET, offsetof(Config, infrastructure_dc_cache_update_period) },
-    { InfrastructureDcCacheValidTime,    SET, offsetof(Config, infrastructure_dc_cache_valid_time)    }
+    { InfrastructureDcCacheValidTime,    SET, offsetof(Config, infrastructure_dc_cache_valid_time)    },
+    { InventoryWorkerTimeout,            SET, offsetof(Config, inventory_worker_timeout)              }
 };
 
 Parser::StringInfoVector config_string_info = {
